@@ -1,0 +1,11 @@
+development:
+  dialect: postgresql
+  datasource: root:root@tcp(127.0.0.1:33062)/rakugan?parseTime=true
+  dir: migrations
+  table: gorp_migrations
+
+test:
+  dialect: postgresql
+  datasource: root:root@tcp(127.0.0.1:33062)/rakugan_test?parseTime=true
+  dir: migrations
+  table: gorp_migrations

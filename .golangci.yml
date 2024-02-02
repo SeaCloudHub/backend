@@ -1,0 +1,46 @@
+linters:
+  disable-all: true
+  enable:
+    ## enabled by default
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - tagliatelle
+    - nestif
+    - gocyclo
+    - gocognit
+    - funlen
+
+linters-settings:
+  funlen:
+    lines: 150
+    statements: 70
+    ignore-comments: true
+  gocyclo:
+    min-complexity: 50
+  gocognit:
+    min-complexity: 50
+  nestif:
+    min-complexity: 50
+  tagliatelle:
+    case:
+      use-field-name: true
+      rules:
+        # any struct tag type can be used.
+        # support string case: `camel`, `pascal`, `kebab`, `snake`, `goCamel`, `goPascal`, `goKebab`, `goSnake`, `upper`, `lower`
+        json: snake
+
+run:
+  timeout: 3m
+  skip-dirs:
+    - build
+    - tmp
+    - scripts
+  tests: false
+
+issues:
+  exclude-use-default: true

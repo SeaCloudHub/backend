@@ -1,0 +1,21 @@
+version: "3"
+
+services:
+  db:
+    platform: linux/amd64
+    image: postgres:15-alpine3.18
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    networks:
+      - teqnet
+    volumes:
+      - teqgo-db:/var/lib/postgresql
+
+volumes:
+  teqgo-db:
+
+networks:
+  teqnet:
