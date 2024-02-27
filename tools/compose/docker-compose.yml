@@ -1,21 +1,61 @@
-version: "3"
+version: '3'
 
 services:
-  db:
-    platform: linux/amd64
-    image: postgres:15-alpine3.18
-    environment:
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
+  filerstore:
+    image: 'mongo:latest'
     ports:
-      - "${DB_PORT}:5432"
-    networks:
-      - teqnet
+      - '27017:27017'
     volumes:
-      - teqgo-db:/var/lib/postgresql
+      - 'filerstore:/data/db'
+
+  seaweedfs-master:
+    image: 'chrislusf/seaweedfs'
+    ports:
+      - 9333:9333
+      - 19333:19333
+    command: 'master -ip=seaweedfs-master -ip.bind=0.0.0.0'
+
+  seaweedfs-volume:
+    image: 'chrislusf/seaweedfs'
+    ports:
+      - 8080:8080
+      - 18080:18080
+    command: 'volume -mserver="seaweedfs-master:9333" -ip.bind=0.0.0.0 -port=8080'
+    volumes:
+      - seaweedfs:/data
+    depends_on:
+      - seaweedfs-master
+
+  seaweedfs-filer:
+    build: .
+    ports:
+      - 8888:8888
+      - 18888:18888
+    command: 'filer -master="seaweedfs-master:9333" -ip.bind=0.0.0.0'
+    tty: true
+    stdin_open: true
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+      - filerstore
+
+  appdb:
+    image: 'postgres:15-alpine3.18'
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    ports:
+      - ${DB_PORT}:5432
+    volumes:
+      - appdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'postgres']
+      interval: 5s
+      retries: 5
+    restart: always
 
 volumes:
-  teqgo-db:
-
-networks:
-  teqnet:
+  seaweedfs:
+  filerstore:
+  appdb:

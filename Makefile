@@ -7,9 +7,12 @@ test:
 	go clean -testcache
 	go test -cover ./...
 
-local-db:
+db:
 	docker-compose --env-file ./.env -f ./tools/compose/docker-compose.yml down
 	docker-compose --env-file ./.env -f ./tools/compose/docker-compose.yml up -d
+
+db-down:
+	docker-compose --env-file ./.env -f ./tools/compose/docker-compose.yml down
 
 lint:
 	@(hash golangci-lint 2>/dev/null || \
