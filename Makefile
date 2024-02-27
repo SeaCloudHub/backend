@@ -20,5 +20,5 @@ lint:
 		sh -s -- -b $(go env GOPATH)/bin v1.54.2)
 	@golangci-lint run
 
-db/migrate:
+migrate:
 	go run ./cmd/migrate
