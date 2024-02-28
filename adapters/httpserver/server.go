@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/SeaCloudHub/backend/domain/book"
+	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -23,6 +24,9 @@ type Server struct {
 
 	// storage adapters
 	BookStore book.Storage
+
+	// services
+	FileService file.Service
 }
 
 func New(options ...Options) (*Server, error) {
@@ -42,6 +46,7 @@ func New(options ...Options) (*Server, error) {
 
 	s.RegisterHealthCheck(s.router.Group(""))
 	s.RegisterBookRoutes(s.router.Group("/api/books"))
+	s.RegisterFileRoutes(s.router.Group("/api/files"))
 
 	return &s, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver"
 	"github.com/SeaCloudHub/backend/adapters/postgrestore"
+	"github.com/SeaCloudHub/backend/adapters/seaweedfs"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -51,6 +52,7 @@ func main() {
 	server.Logger = applog
 	server.Config = cfg
 	server.BookStore = postgrestore.NewBookStore(db)
+	server.FileService = seaweedfs.NewSeaweedService(cfg)
 	//server.BookStore = inmemstore.NewBookStore(db)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)

@@ -23,6 +23,10 @@ type Config struct {
 		Pass      string `envconfig:"DB_PASS"`
 		EnableSSL bool   `envconfig:"ENABLE_SSL"`
 	}
+
+	SeaweedFS struct {
+		FilerServer string `envconfig:"FILER_SERVER"`
+	}
 }
 
 func LoadConfig() (*Config, error) {
