@@ -3,24 +3,33 @@
 ## Development
 
 ### Init local environment
+
 1. Copy file `.env.example` and rename to `.env`
 
 2. Update env vars to fit your local
 
 3. Start local services
-    ```shell
-    make local-db
-    ```
 
-4. Run the server
-    ```shell
-    make run
-    ```
+   ```shell
+   make db
+   ```
 
-5. Unit test
-    ```shell
-    make test
-    ```
+4. Run the migration
+
+   ```shell
+    make migrate
+   ```
+
+5. Run the server
+
+   ```shell
+   make run
+   ```
+
+6. Unit test
+   ```shell
+   make test
+   ```
 
 ### Linting
 
