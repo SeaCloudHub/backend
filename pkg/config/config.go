@@ -27,6 +27,11 @@ type Config struct {
 	SeaweedFS struct {
 		FilerServer string `envconfig:"FILER_SERVER"`
 	}
+
+	Kratos struct {
+		AdminURL  string `envconfig:"KRATOS_ADMIN_URL"`
+		PublicURL string `envconfig:"KRATOS_PUBLIC_URL"`
+	}
 }
 
 func LoadConfig() (*Config, error) {

@@ -41,6 +41,41 @@ services:
       - seaweedfs-volume
       - filerstore
 
+  kratosdb:
+    image: postgres:15-alpine3.18
+    environment:
+      POSTGRES_DB: ${KRATOS_DB_NAME}
+      POSTGRES_USER: ${KRATOS_DB_USER}
+      POSTGRES_PASSWORD: ${KRATOS_DB_PASS}
+    ports:
+      - ${KRATOS_DB_PORT}:5432
+    volumes:
+      - kratosdb:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres]
+      interval: 5s
+      retries: 5
+    restart: always
+
+  kratos:
+    image: oryd/kratos:v1.1.0
+    environment:
+      - DSN=postgresql://root:123456@kratosdb:5432/kratos
+    entrypoint: [/bin/sh, -c]
+    command:
+      - |
+        kratos migrate -c /home/ory/kratos.yml sql -ey
+        kratos serve -c /home/ory/kratos.yml
+    ports:
+      - 4433:4433
+      - 4434:4434
+      - 4455:4455
+    volumes:
+      - ./kratos.yml:/home/ory/kratos.yml
+      - ./identity.schema.json:/home/ory/identity.schema.json
+    depends_on:
+      - kratosdb
+
   appdb:
     image: postgres:15-alpine3.18
     environment:
@@ -60,4 +95,5 @@ services:
 volumes:
   seaweedfs:
   filerstore:
+  kratosdb:
   appdb:

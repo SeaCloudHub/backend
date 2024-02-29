@@ -1,4 +1,4 @@
-package seaweedfs
+package services
 
 import (
 	"bytes"
@@ -9,20 +9,20 @@ import (
 	"github.com/SeaCloudHub/backend/pkg/config"
 )
 
-type SeaweedService struct {
+type FileService struct {
 	FilerServer string
 
 	client *http.Client
 }
 
-func NewSeaweedService(cfg *config.Config) *SeaweedService {
-	return &SeaweedService{
+func NewFileService(cfg *config.Config) *FileService {
+	return &FileService{
 		FilerServer: cfg.SeaweedFS.FilerServer,
 		client:      http.DefaultClient,
 	}
 }
 
-func (s *SeaweedService) GetFile(filename string) (io.ReadCloser, error) {
+func (s *FileService) GetFile(filename string) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", s.FilerServer+"/"+filename, nil)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (s *SeaweedService) GetFile(filename string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func (s *SeaweedService) UploadFile(file *multipart.FileHeader) error {
+func (s *FileService) UploadFile(file *multipart.FileHeader) error {
 	var (
 		buf = new(bytes.Buffer)
 		w   = multipart.NewWriter(buf)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/SeaCloudHub/backend/domain/book"
 	"github.com/SeaCloudHub/backend/domain/file"
+	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -26,7 +27,8 @@ type Server struct {
 	BookStore book.Storage
 
 	// services
-	FileService file.Service
+	FileService     file.Service
+	IdentityService identity.Service
 }
 
 func New(options ...Options) (*Server, error) {
@@ -44,9 +46,16 @@ func New(options ...Options) (*Server, error) {
 
 	s.RegisterGlobalMiddlewares()
 
+	authMiddleware := s.NewAuthentication("header:Authorization", "Bearer",
+		[]string{"/api/admin/login"},
+	).Middleware()
+
+	s.router.Use(authMiddleware)
+
 	s.RegisterHealthCheck(s.router.Group(""))
 	s.RegisterBookRoutes(s.router.Group("/api/books"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))
+	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 
 	return &s, nil
 }
@@ -89,6 +98,7 @@ func (s *Server) handleError(c echo.Context, err error, status int) error {
 
 	return c.JSON(status, map[string]string{
 		"message": http.StatusText(status),
+		"info":    err.Error(),
 	})
 }
 
