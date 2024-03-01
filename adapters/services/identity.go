@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/SeaCloudHub/backend/domain/identity"
 	"strings"
+
+	"github.com/SeaCloudHub/backend/domain/identity"
 
 	"github.com/SeaCloudHub/backend/pkg/config"
 	kratos "github.com/ory/kratos-client-go"
@@ -52,7 +53,7 @@ func (s *IdentityService) Login(ctx context.Context, email string, password stri
 			},
 		}).Execute()
 	if err != nil {
-		if _, ok := assetKratosError[kratos.LoginFlow](err); ok {
+		if _, loginFlow := assetKratosError[kratos.LoginFlow](err); loginFlow != nil {
 			return "", identity.ErrInvalidCredentials
 		}
 
@@ -65,7 +66,7 @@ func (s *IdentityService) Login(ctx context.Context, email string, password stri
 func (s *IdentityService) WhoAmI(ctx context.Context, token string) (*identity.Identity, error) {
 	session, _, err := s.publicClient.FrontendAPI.ToSession(ctx).XSessionToken(token).Execute()
 	if err != nil {
-		if _, ok := assetKratosError[kratos.ErrorGeneric](err); ok {
+		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
 			return nil, identity.ErrInvalidSession
 		}
 
@@ -77,16 +78,44 @@ func (s *IdentityService) WhoAmI(ctx context.Context, token string) (*identity.I
 	}, nil
 }
 
-func assetKratosError[T any](err error) (*kratos.GenericOpenAPIError, bool) {
+func (s *IdentityService) CreateIdentity(ctx context.Context, email string, password string) (*identity.Identity, error) {
+	id, _, err := s.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(
+		kratos.CreateIdentityBody{
+			Credentials: &kratos.IdentityWithCredentials{
+				Password: &kratos.IdentityWithCredentialsPassword{
+					Config: &kratos.IdentityWithCredentialsPasswordConfig{
+						Password: kratos.PtrString(password),
+					},
+				},
+			},
+			Traits: map[string]interface{}{
+				"email": email,
+			},
+		},
+	).Execute()
+	if err != nil {
+		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return nil, fmt.Errorf("error creating identity: %s", genericErr.Error.GetMessage())
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return &identity.Identity{
+		ID: id.Id,
+	}, nil
+}
+
+func assetKratosError[T any](err error) (*kratos.GenericOpenAPIError, *T) {
 	var kratosErr *kratos.GenericOpenAPIError
 
 	if errors.As(err, &kratosErr) {
-		if _, ok := kratosErr.Model().(T); ok {
-			return kratosErr, true
+		if t, ok := kratosErr.Model().(T); ok {
+			return kratosErr, &t
 		}
 
-		return kratosErr, false
+		return kratosErr, nil
 	}
 
-	return nil, false
+	return nil, nil
 }

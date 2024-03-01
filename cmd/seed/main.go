@@ -1,12 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
-	"net/http"
 
-	"github.com/SeaCloudHub/backend/adapters/httpserver"
-	"github.com/SeaCloudHub/backend/adapters/postgrestore"
 	"github.com/SeaCloudHub/backend/adapters/services"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
@@ -20,7 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("cannot load config: %v\n", err)
 	}
-	defer logger.Sync(applog)
+	// defer logger.Sync(applog)
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -37,26 +34,24 @@ func main() {
 	}
 	defer sentrygo.Flush(sentry.FlushTime)
 
-	db, err := postgrestore.NewConnection(postgrestore.ParseFromConfig(cfg))
+	identityService := services.NewIdentityService(cfg)
+	permissionService := services.NewPermissionService(cfg)
+
+	ctx := context.Background()
+	email := "admin@seacloudhub.com"
+	password := "admin"
+
+	// create admin user
+	identity, err := identityService.CreateIdentity(ctx, email, password)
 	if err != nil {
-		applog.Fatal(err)
+		applog.Fatalf("cannot create admin user: %v", err)
 	}
 
-	//db, err := inmemstore.NewConnection()
-
-	server, err := httpserver.New()
-	if err != nil {
-		applog.Fatal(err)
+	// create admin permission
+	if err := permissionService.CreateManager(ctx, identity.ID); err != nil {
+		applog.Fatalf("cannot create admin permission: %v", err)
 	}
 
-	server.Logger = applog
-	server.Config = cfg
-	server.BookStore = postgrestore.NewBookStore(db)
-	server.FileService = services.NewFileService(cfg)
-	server.IdentityService = services.NewIdentityService(cfg)
-	//server.BookStore = inmemstore.NewBookStore(db)
-
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	applog.Info("server started!")
-	applog.Fatal(http.ListenAndServe(addr, server))
+	applog.Info("admin user created successfully")
+	applog.Infof("email: %s - password: %s", email, password)
 }

@@ -22,3 +22,6 @@ lint:
 
 migrate:
 	go run ./cmd/migrate
+
+seed:
+	go run ./cmd/admininit/main.go

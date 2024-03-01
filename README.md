@@ -20,13 +20,19 @@
     make migrate
    ```
 
-5. Run the server
+5. Create admin account
+
+   ```shell
+   make seed
+   ```
+
+6. Run the server
 
    ```shell
    make run
    ```
 
-6. Unit test
+7. Unit test
    ```shell
    make test
    ```

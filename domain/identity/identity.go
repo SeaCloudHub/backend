@@ -13,6 +13,7 @@ var (
 type Service interface {
 	Login(ctx context.Context, email string, password string) (string, error)
 	WhoAmI(ctx context.Context, token string) (*Identity, error)
+	CreateIdentity(ctx context.Context, email string, password string) (*Identity, error)
 }
 
 type Identity struct {
