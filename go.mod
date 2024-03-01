@@ -9,6 +9,8 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/lib/pq v1.10.9
+	github.com/ory/keto-client-go v0.11.0-alpha.0
+	github.com/ory/kratos-client-go v1.1.0
 	github.com/rubenv/sql-migrate v1.5.2
 	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.26.0
@@ -23,9 +25,10 @@ require (
 	github.com/gosimple/slug v1.13.1 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/ory/kratos-client-go v1.1.0 // indirect
 	github.com/segmentio/go-camelcase v0.0.0-20160726192923-7085f1e3c734 // indirect
 	github.com/segmentio/go-snakecase v1.2.0 // indirect
+	golang.org/x/oauth2 v0.11.0 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
 )
 
 require (

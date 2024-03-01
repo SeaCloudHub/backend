@@ -32,6 +32,11 @@ type Config struct {
 		AdminURL  string `envconfig:"KRATOS_ADMIN_URL"`
 		PublicURL string `envconfig:"KRATOS_PUBLIC_URL"`
 	}
+
+	Keto struct {
+		ReadURL  string `envconfig:"KETO_READ_URL"`
+		WriteURL string `envconfig:"KETO_WRITE_URL"`
+	}
 }
 
 func LoadConfig() (*Config, error) {

@@ -54,7 +54,6 @@ func main() {
 	server.BookStore = postgrestore.NewBookStore(db)
 	server.FileService = services.NewFileService(cfg)
 	server.IdentityService = services.NewIdentityService(cfg)
-	server.PermissionService = services.NewPermissionService(cfg)
 	//server.BookStore = inmemstore.NewBookStore(db)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)

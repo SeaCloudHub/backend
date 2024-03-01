@@ -7,6 +7,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain/book"
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
+	"github.com/SeaCloudHub/backend/domain/permission"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -27,8 +28,9 @@ type Server struct {
 	BookStore book.Storage
 
 	// services
-	FileService     file.Service
-	IdentityService identity.Service
+	FileService       file.Service
+	IdentityService   identity.Service
+	PermissionService permission.Service
 }
 
 func New(options ...Options) (*Server, error) {
