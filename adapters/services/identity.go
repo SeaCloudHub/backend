@@ -11,6 +11,7 @@ import (
 
 	"github.com/SeaCloudHub/backend/pkg/config"
 	kratos "github.com/ory/kratos-client-go"
+	"github.com/ory/x/pagination/keysetpagination"
 )
 
 type IdentityService struct {
@@ -185,6 +186,37 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 	}
 
 	return mapIdentity(id)
+}
+
+func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.Identity, string, error) {
+	req := s.adminClient.IdentityAPI.ListIdentities(ctx).PageSize(pageSize)
+	if len(pageToken) > 0 {
+		req = req.PageToken(pageToken)
+	}
+
+	identities, resp, err := req.Execute()
+	if err != nil {
+		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return nil, "", fmt.Errorf("error listing identities: %s", genericErr.Error.GetMessage())
+		}
+
+		return nil, "", fmt.Errorf("unexpected error: %w", err)
+	}
+
+	var result []identity.Identity
+	for _, id := range identities {
+		i, err := mapIdentity(&id)
+		if err != nil {
+			return nil, "", err
+		}
+
+		result = append(result, *i)
+	}
+
+	pagination := keysetpagination.ParseHeader(resp)
+
+	return result, pagination.NextToken, nil
+
 }
 
 func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {
