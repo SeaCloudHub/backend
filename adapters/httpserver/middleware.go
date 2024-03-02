@@ -9,6 +9,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+const (
+	ContextKeyIdentity string = "identity"
+)
+
 type Authentication struct {
 	SkipperPath []string
 	KeyLookup   string
@@ -62,7 +66,7 @@ func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (boo
 		return false, err
 	}
 
-	c.Set("identity", identity)
+	c.Set(ContextKeyIdentity, identity)
 
 	return true, nil
 }

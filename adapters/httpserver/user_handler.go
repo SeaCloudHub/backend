@@ -34,13 +34,11 @@ func (s *Server) Login(c echo.Context) error {
 		return s.handleError(c, err, http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, model.LoginResponse{
-		SessionToken: *session.Token,
-	})
+	return s.success(c, model.LoginResponse{SessionToken: *session.Token})
 }
 
 func (s *Server) Me(c echo.Context) error {
-	return c.JSON(http.StatusOK, c.Get("identity"))
+	return c.JSON(http.StatusOK, c.Get(ContextKeyIdentity))
 }
 
 func (s *Server) ChangePassword(c echo.Context) error {
@@ -57,7 +55,7 @@ func (s *Server) ChangePassword(c echo.Context) error {
 		return s.handleError(c, err, http.StatusBadRequest)
 	}
 
-	id, ok := c.Get("identity").(*identity.Identity)
+	id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
 	if !ok {
 		return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
 	}
@@ -74,8 +72,7 @@ func (s *Server) ChangePassword(c echo.Context) error {
 		return s.handleError(c, err, http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, "password changed")
-
+	return s.success(c, "Password changed")
 }
 
 func (s *Server) RegisterUserRoutes(router *echo.Group) {

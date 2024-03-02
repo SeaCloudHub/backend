@@ -105,6 +105,13 @@ func (s *Server) handleError(c echo.Context, err error, status int) error {
 	})
 }
 
+func (s *Server) success(c echo.Context, data interface{}) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "success",
+		"data":    data,
+	})
+}
+
 func (s *Server) requestID(c echo.Context) string {
 	return c.Response().Header().Get(echo.HeaderXRequestID)
 }

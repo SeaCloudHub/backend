@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Server) AdminMe(c echo.Context) error {
-	return c.JSON(http.StatusOK, c.Get("identity"))
+	return s.success(c, c.Get(ContextKeyIdentity))
 }
 
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
@@ -25,7 +25,7 @@ func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			ctx = mycontext.NewEchoContextAdapter(c)
 		)
 
-		identity, ok := c.Get("identity").(*identity.Identity)
+		identity, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
 		if !ok {
 			return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
 		}
