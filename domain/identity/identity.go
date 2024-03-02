@@ -25,6 +25,7 @@ type Service interface {
 type Identity struct {
 	ID                string     `json:"id"`
 	Email             string     `json:"email"`
+	Password          string     `json:"password,omitempty"`
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 	Session           *Session   `json:"-"`
 }

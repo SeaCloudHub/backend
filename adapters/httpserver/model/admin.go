@@ -3,6 +3,7 @@ package model
 import (
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/validation"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 type ListIdentitiesRequest struct {
@@ -21,4 +22,17 @@ func (r *ListIdentitiesRequest) Validate() error {
 type ListIdentitiesResponse struct {
 	Identities []identity.Identity `json:"identities"`
 	NextToken  string              `json:"next_token"`
+}
+
+type CreateIdentityRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
+}
+
+func (r *CreateIdentityRequest) Validate() error {
+	if len(r.Password) == 0 {
+		r.Password = gonanoid.Must(11)
+	}
+
+	return validation.Validate().Struct(r)
 }

@@ -40,10 +40,35 @@ func (s *Server) ListIdentities(c echo.Context) error {
 	})
 }
 
+func (s *Server) CreateIdentity(c echo.Context) error {
+	var (
+		ctx = mycontext.NewEchoContextAdapter(c)
+		req model.CreateIdentityRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	id, err := s.IdentityService.CreateIdentity(ctx, req.Email, req.Password)
+	if err != nil {
+		return s.handleError(c, err, http.StatusInternalServerError)
+	}
+
+	id.Password = req.Password
+
+	return s.success(c, id)
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
 	router.GET("/identities", s.ListIdentities)
+	router.POST("/identities", s.CreateIdentity)
 }
 
 func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {

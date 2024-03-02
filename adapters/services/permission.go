@@ -44,7 +44,7 @@ func (s *PermissionService) IsManager(ctx context.Context, userID string) (bool,
 		Execute()
 	if err != nil {
 		if _, genericErr := assetKetoError[keto.ErrorGeneric](err); genericErr != nil {
-			return false, fmt.Errorf("unexpected error: %s", genericErr.Error.GetMessage())
+			return false, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
 		}
 
 		return false, fmt.Errorf("unexpected error: %w", err)
@@ -64,7 +64,7 @@ func (s *PermissionService) CreateManager(ctx context.Context, userID string) er
 	).Execute()
 	if err != nil {
 		if _, genericErr := assetKetoError[keto.ErrorGeneric](err); genericErr != nil {
-			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetMessage())
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
 		}
 
 		return fmt.Errorf("unexpected error: %w", err)

@@ -179,7 +179,7 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 	).Execute()
 	if err != nil {
 		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
-			return nil, fmt.Errorf("error creating identity: %s", genericErr.Error.GetMessage())
+			return nil, fmt.Errorf("error creating identity: %s", genericErr.Error.GetReason())
 		}
 
 		return nil, fmt.Errorf("unexpected error: %w", err)
@@ -197,7 +197,7 @@ func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, 
 	identities, resp, err := req.Execute()
 	if err != nil {
 		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
-			return nil, "", fmt.Errorf("error listing identities: %s", genericErr.Error.GetMessage())
+			return nil, "", fmt.Errorf("error listing identities: %s", genericErr.Error.GetReason())
 		}
 
 		return nil, "", fmt.Errorf("unexpected error: %w", err)
