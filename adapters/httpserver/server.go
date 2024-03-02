@@ -49,7 +49,7 @@ func New(options ...Options) (*Server, error) {
 	s.RegisterGlobalMiddlewares()
 
 	authMiddleware := s.NewAuthentication("header:Authorization", "Bearer",
-		[]string{"/api/admin/login"},
+		[]string{"/api/users/login"},
 	).Middleware()
 
 	s.router.Use(authMiddleware)
@@ -57,6 +57,7 @@ func New(options ...Options) (*Server, error) {
 	s.RegisterHealthCheck(s.router.Group(""))
 	s.RegisterBookRoutes(s.router.Group("/api/books"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))
+	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 
 	return &s, nil

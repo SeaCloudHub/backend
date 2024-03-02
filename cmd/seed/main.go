@@ -39,7 +39,7 @@ func main() {
 
 	ctx := context.Background()
 	email := "admin@seacloudhub.com"
-	password := "admin"
+	password := "plzdonthackme"
 
 	// create admin user
 	identity, err := identityService.CreateIdentity(ctx, email, password)

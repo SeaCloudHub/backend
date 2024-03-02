@@ -24,4 +24,4 @@ migrate:
 	go run ./cmd/migrate
 
 seed:
-	go run ./cmd/admininit/main.go
+	go run ./cmd/seed/main.go

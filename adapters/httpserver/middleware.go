@@ -1,11 +1,12 @@
 package httpserver
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"net/http"
-	"strings"
 )
 
 type Authentication struct {
@@ -58,7 +59,7 @@ func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (boo
 
 	identity, err := a.server.IdentityService.WhoAmI(ctx, token)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	c.Set("identity", identity)
