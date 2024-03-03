@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"errors"
+	"github.com/SeaCloudHub/backend/domain/identity"
 	"net/http"
 	"strings"
 
@@ -61,14 +63,53 @@ func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (boo
 		ctx = mycontext.NewEchoContextAdapter(c)
 	)
 
-	identity, err := a.server.IdentityService.WhoAmI(ctx, token)
+	id, err := a.server.IdentityService.WhoAmI(ctx, token)
 	if err != nil {
 		return false, err
 	}
 
-	c.Set(ContextKeyIdentity, identity)
+	c.Set(ContextKeyIdentity, id)
 
 	return true, nil
+}
+
+func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		var (
+			ctx = mycontext.NewEchoContextAdapter(c)
+		)
+
+		id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
+		if !ok {
+			return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
+		}
+
+		isAdmin, err := s.PermissionService.IsManager(ctx, id.ID)
+		if err != nil {
+			return s.handleError(c, err, http.StatusInternalServerError)
+		}
+
+		if !isAdmin {
+			return s.handleError(c, errors.New("permission denied"), http.StatusForbidden)
+		}
+
+		return next(c)
+	}
+}
+
+func (s *Server) passwordChangedAtMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
+		if !ok {
+			return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
+		}
+
+		if id.PasswordChangedAt == nil {
+			return s.handleError(c, errors.New("please change your default password"), http.StatusForbidden)
+		}
+
+		return next(c)
+	}
 }
 
 func containFirst(elems []string, v string) bool {
