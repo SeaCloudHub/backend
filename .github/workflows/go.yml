@@ -96,6 +96,7 @@ jobs:
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker pull ghcr.io/$repository_lowercase/seed-admin
             docker run -d --name seed-admin --env-file ~/.env ghcr.io/$repository_lowercase/seed-admin
+            rm ~/.env
 
   migrate:
     if: github.ref == 'refs/heads/migrate'
@@ -134,6 +135,7 @@ jobs:
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker pull ghcr.io/$repository_lowercase/migrate
             docker run -d --name migrate --env-file ~/.env ghcr.io/$repository_lowercase/migrate
+            rm ~/.env
 
   make_app:
     if: github.ref == 'refs/heads/github-workflow' || github.ref == 'refs/heads/main'
