@@ -8,7 +8,7 @@ on:
       - seed-admin
       - migrate
 
-environment:
+env:
   IMAGE_NAME: seacloudserver/app
 
 jobs:
