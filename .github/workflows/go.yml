@@ -90,6 +90,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
             echo "${{ secrets.ENV_FILE }}" >> .env
             scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
@@ -127,68 +128,71 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
             echo "${{ secrets.ENV_FILE }}" >> .env
             scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker pull ghcr.io/$repository_lowercase/migrate
             docker run -d --name migrate --env-file ~/.env ghcr.io/$repository_lowercase/migrate
 
-  # make_app:
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     packages: write
+  make_app:
+    if: github.ref == 'refs/heads/github-workflow' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v2
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
 
-  #     - name: Login to GitHub Container Registry
-  #       uses: docker/login-action@v2
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ github.actor }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - name: Docker build and push
-  #       run: |
-  #         repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-  #         docker build -t ghcr.io/$repository_lowercase -f cmd/httpserver/Dockerfile .
-  #         docker push ghcr.io/$repository_lowercase
+      - name: Docker build and push
+        run: |
+          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$repository_lowercase -f cmd/httpserver/Dockerfile .
+          docker push ghcr.io/$repository_lowercase
 
-  # deploy:
-  #   runs-on: ubuntu-latest
+  deploy:
+    if: github.ref == 'refs/heads/github-workflow' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
 
-  #   needs: [make_app]
+    needs: [make_app]
 
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v2
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
 
-  #     - name: Generate env file
-  #       run: echo "${{ secrets.ENV_FILE }}" >> .env
+      - name: Generate env file
+        run: echo "${{ secrets.ENV_FILE }}" >> .env
 
-  #     - name: SCP env file to VM
-  #       uses: appleboy/scp-action@v0.1.7
-  #       with:
-  #         host: ${{ secrets.VM_IP }}
-  #         username: ${{ secrets.VM_USER }}
-  #         key: ${{ secrets.SSH_KEY }}
-  #         source: '.env'
-  #         target: '~'
+      - name: SCP env file to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: '.env'
+          target: '~'
 
-  #     - name: SSH into VM
-  #       uses: appleboy/ssh-action@master
-  #       with:
-  #         host: ${{ secrets.VM_IP }}
-  #         username: ${{ secrets.VM_USER }}
-  #         key: ${{ secrets.SSH_KEY }}
-  #         script: |
-  #           docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-  #           repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-  #           docker pull ghcr.io/$repository_lowercase
-  #           docker tag ghcr.io/$repository_lowercase ${{ env.IMAGE_NAME }}
-  #           docker rmi ghcr.io/$repository_lowercase
-  #           cd ~/tools/compose
-  #           docker-compose --env-file ~/.env -f docker-compose.yml down
-  #           docker-compose --env-file ~/.env -f docker-compose.yml up -d
+      - name: SSH into VM
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            docker pull ghcr.io/$repository_lowercase
+            docker tag ghcr.io/$repository_lowercase ${{ env.IMAGE_NAME }}
+            docker rmi ghcr.io/$repository_lowercase
+            cd ~/tools/compose
+            docker-compose --env-file ~/.env -f docker-compose.yml down
+            docker-compose --env-file ~/.env -f docker-compose.yml up -d
