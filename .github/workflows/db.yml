@@ -19,18 +19,6 @@ jobs:
       - name: Generate env file
         run: echo "${{ secrets.ENV_FILE_DB }}" >> .env
 
-      - name: Copy Tools and env file to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_IP_DB }}
-          username: ${{ secrets.VM_USER_DB }}
-          key: ${{ secrets.SSH_KEY_DB }}
-          source: |
-            .env
-            tools/compose
-          target: '~'
-          recursive: true
-
       - name: SSH into VM
         uses: appleboy/ssh-action@master
         with:
@@ -38,6 +26,8 @@ jobs:
           username: ${{ secrets.VM_USER_DB }}
           key: ${{ secrets.SSH_KEY_DB }}
           script: |
+            scp .env ${{ secrets.VM_USER_DB }}@${{ secrets.VM_IP_DB }}:~/
+            scp -r tools/compose ${{ secrets.VM_USER_DB }}@${{ secrets.VM_IP_DB }}:~/
             cd ~/tools/compose
             docker-compose --env-file ~/.env -f docker-compose.yml down
             docker-compose --env-file ~/.env -f docker-compose.yml up -d
