@@ -8,18 +8,6 @@ on:
       - migrate
 
 jobs:
-  make_db:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: SCP Tools to EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "mkdir -p ~/compose"
-          scp -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} -r ./compose ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
-
   seed_admin:
     if: github.ref == 'refs/heads/seed-admin'
     runs-on: ubuntu-latest
@@ -81,31 +69,43 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Docker build
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GITHUB_USERNAME }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker build and push
         run: |
-          docker build -t docker.pkg.github.com/${{ github.repository }}/app -f cmd/httpserver/Dockerfile .
+          docker build -t ghcr.io/${{ github.repository }}/app -f cmd/app/Dockerfile .
+          docker push ghcr.io/${{ github.repository }}/app
 
-      - name: Login to GitHub Package Registry
-        run: echo "${{ secrets.CR_PAT }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+      - name: SCP Tools to VM
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: 'tools/compose'
+          target: '~'
+          recursive: true
 
-      - name: Docker push
-        run: docker push docker.pkg.github.com/${{ github.repository }}/app
+  # deploy:
+  #   runs-on: ubuntu-latest
 
-  deploy:
-    runs-on: ubuntu-latest
+  #   needs: [make_db, make_app]
 
-    needs: [make_db, make_app]
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v2
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Deploy
-        run: |
-          echo "${{ secrets.ENV_FILE }}" >> .env
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/"
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}"
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker pull docker.pkg.github.com/${{ github.repository }}/app && docker tag docker.pkg.github.com/${{ github.repository }}/app seacloudserver/app && docker rmi docker.pkg.github.com/${{ github.repository }}/app"
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd ~/compose && \
-                                docker-compose --env-file ~/.env -f docker-compose.yml down && \
-                                docker-compose --env-file ~/.env -f docker-compose.yml up -d"
+  #     - name: Deploy
+  #       run: |
+  #         echo "${{ secrets.ENV_FILE }}" >> .env
+  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/"
+  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}"
+  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker pull docker.pkg.github.com/${{ github.repository }}/app && docker tag docker.pkg.github.com/${{ github.repository }}/app seacloudserver/app && docker rmi docker.pkg.github.com/${{ github.repository }}/app"
+  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd ~/compose && \
+  #                               docker-compose --env-file ~/.env -f docker-compose.yml down && \
+  #                               docker-compose --env-file ~/.env -f docker-compose.yml up -d"
