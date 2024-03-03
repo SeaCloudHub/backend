@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"strings"
 
 	"github.com/linxGnu/goseaweedfs"
 	"github.com/seaweedfs/seaweedfs/weed/filer"
@@ -35,20 +37,35 @@ func NewFileService(cfg *config.Config) *FileService {
 	}
 }
 
-//
-//func (s *FileService) GetFile(filename string) (io.ReadCloser, error) {
-//	req, err := http.NewRequest("GET", "/"+filename, nil)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	resp, err := s.client.Do(req)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return resp.Body, nil
-//}
+func (s *FileService) GetFile(ctx context.Context, filePath string) (*file.Entry, error) {
+	query := url.Values{}
+	query.Set("metadata", "true")
+
+	header := map[string]string{
+		"Accept": "application/json",
+	}
+
+	fmt.Println(filePath)
+
+	data, code, err := s.filer.Get(filePath, query, header)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(code)
+
+	if code != http.StatusOK {
+		fmt.Println(strings.TrimSpace(string(data)))
+		return nil, errors.New("failed to get file")
+	}
+
+	var entry filer.Entry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, err
+	}
+
+	return mapToEntry(entry), nil
+}
 
 func (s *FileService) CreateFile(_ context.Context, content io.Reader, fullName string, fileSize int64) (int64, error) {
 	result, err := s.filer.Upload(content, fileSize, fullName, "", "")
@@ -129,17 +146,7 @@ type listDirectoryEntriesResponse struct {
 func (r *listDirectoryEntriesResponse) mapToEntries() []file.Entry {
 	var entries []file.Entry
 	for _, entry := range r.Entries {
-		entries = append(entries, file.Entry{
-			Name:      entry.FullPath.Name(),
-			FullPath:  string(entry.FullPath),
-			Size:      entry.FileSize,
-			Mode:      entry.Mode,
-			MimeType:  entry.Mime,
-			MD5:       entry.Md5,
-			IsDir:     entry.IsDirectory(),
-			CreatedAt: entry.Crtime,
-			UpdatedAt: entry.Mtime,
-		})
+		entries = append(entries, *mapToEntry(entry))
 	}
 
 	return entries
@@ -152,4 +159,24 @@ func (r *listDirectoryEntriesResponse) mapToCursor() string {
 	}
 
 	return cursor
+}
+
+func mapToEntry(entry filer.Entry) *file.Entry {
+	e := file.Entry{
+		Name:      entry.FullPath.Name(),
+		Size:      entry.FileSize,
+		Mode:      entry.Mode,
+		MimeType:  entry.Mime,
+		MD5:       entry.Md5,
+		IsDir:     entry.IsDirectory(),
+		CreatedAt: entry.Crtime,
+		UpdatedAt: entry.Mtime,
+	}
+
+	// remove the root path from the full path
+	entryPath := entry.FullPath.Split()
+	entryPath[0] = "/"
+	e.FullPath = filepath.ToSlash(filepath.Join(entryPath...))
+
+	return &e
 }

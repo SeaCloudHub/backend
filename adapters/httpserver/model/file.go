@@ -7,6 +7,14 @@ import (
 	"github.com/SeaCloudHub/backend/pkg/validation"
 )
 
+type GetFileRequest struct {
+	FilePath string `query:"file_path" validate:"required"`
+}
+
+func (r *GetFileRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
 type UploadFileResponse struct {
 	Name string `json:"name"`
 	Size int64  `json:"size"`

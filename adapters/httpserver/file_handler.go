@@ -13,17 +13,29 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-//
-//func (s *Server) GetFile(c echo.Context) error {
-//	filename := c.Param("filename")
-//	file, err := s.FileService.GetFile(filename)
-//	if err != nil {
-//		return s.handleError(c, err, http.StatusInternalServerError)
-//	}
-//	defer file.Close()
-//
-//	return c.Stream(http.StatusOK, "image/webp", file)
-//}
+func (s *Server) GetFile(c echo.Context) error {
+	var (
+		ctx = mycontext.NewEchoContextAdapter(c)
+		req model.GetFileRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
+
+	file, err := s.FileService.GetFile(ctx, filepath.Join(id.ID, req.FilePath))
+	if err != nil {
+		return s.handleError(c, err, http.StatusInternalServerError)
+	}
+
+	return s.success(c, file)
+}
 
 func (s *Server) UploadFiles(c echo.Context) error {
 	var ctx = mycontext.NewEchoContextAdapter(c)
@@ -104,5 +116,5 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.POST("", s.UploadFiles)
 	router.GET("", s.ListEntries)
-	//router.GET(":filename", s.GetFile)
+	router.GET("/metadata", s.GetFile)
 }
