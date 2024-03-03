@@ -7,6 +7,10 @@ on:
       - seed-admin
       - migrate
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: seacloudserver/app
+
 jobs:
   seed_admin:
     if: github.ref == 'refs/heads/seed-admin'
@@ -72,14 +76,14 @@ jobs:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker build and push
         run: |
-          docker build -t ghcr.io/${{ github.repository }}/app -f cmd/app/Dockerfile .
-          docker push ghcr.io/${{ github.repository }}/app
+          docker build -t ghcr.io/${{ env.IMAGE_NAME }} -f cmd/app/Dockerfile .
+          docker push ghcr.io/${{ env.IMAGE_NAME }}
 
       - name: SCP Tools to VM
         uses: appleboy/scp-action@v0.1.7
