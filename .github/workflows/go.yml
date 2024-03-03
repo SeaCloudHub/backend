@@ -13,8 +13,8 @@ env:
   IMAGE_NAME: seacloudserver/app
 
 jobs:
-  if: github.ref == 'refs/heads/database'
   make_db:
+    if: github.ref == 'refs/heads/database'
     runs-on: ubuntu-latest
     permissions:
       contents: read
