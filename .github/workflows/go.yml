@@ -7,10 +7,6 @@ on:
       - seed-admin
       - migrate
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: seacloudserver/app
-
 jobs:
   seed_admin:
     if: github.ref == 'refs/heads/seed-admin'
@@ -82,8 +78,9 @@ jobs:
 
       - name: Docker build and push
         run: |
-          docker build -t ${{ env.IMAGE_NAME }} -f cmd/httpserver/Dockerfile .
-          docker push ${{ env.IMAGE_NAME }}
+          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$repository_lowercase -f cmd/httpserver/Dockerfile .
+          docker push ghcr.io/$repository_lowercase
 
       - name: SCP Tools to VM
         uses: appleboy/scp-action@v0.1.7
