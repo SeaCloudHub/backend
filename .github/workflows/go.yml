@@ -8,6 +8,9 @@ on:
       - seed-admin
       - migrate
 
+environment:
+  IMAGE_NAME: seacloudserver/app
+
 jobs:
   seed_admin:
     if: github.ref == 'refs/heads/seed-admin'
@@ -105,31 +108,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Set up SSH key permissions
-        run: chmod 400 ${{ secrets.SSH_KEY }}
-
       - name: Generate env file
         run: echo "${{ secrets.ENV_FILE }}" >> .env
 
       - name: SCP env file to VM
-        run: scp -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: appleboy/scp-action@v0.1.7
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: '.env'
+          target: '~'
 
-      - name: Pull, tag and push app image
-        run: |
-          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker pull ghcr.io/$repository_lowercase
-          docker tag ghcr.io/$repository_lowercase seacloudserver/app
-          docker rmi ghcr.io/$repository_lowercase
-
-      - name: Deploy
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd ~tools/compose && \
-                                docker-compose --env-file ~/.env -f docker-compose.yml down && \
-                                docker-compose --env-file ~/.env -f docker-compose.yml up -d"
+      - name: SSH into VM
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            docker pull ghcr.io/$repository_lowercase
+            docker tag ghcr.io/$repository_lowercase ${{ env.IMAGE_NAME }}
+            docker rmi ghcr.io/$repository_lowercase
+            cd ~/tools/compose
+            docker-compose --env-file ~/.env -f docker-compose.yml down
+            docker-compose --env-file ~/.env -f docker-compose.yml up -d
