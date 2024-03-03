@@ -97,21 +97,40 @@ jobs:
           target: '~'
           recursive: true
 
-  # deploy:
-  #   runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-latest
 
-  #   needs: [make_db, make_app]
+    needs: [make_app]
 
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v2
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
 
-  #     - name: Deploy
-  #       run: |
-  #         echo "${{ secrets.ENV_FILE }}" >> .env
-  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/"
-  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}"
-  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker pull docker.pkg.github.com/${{ github.repository }}/app && docker tag docker.pkg.github.com/${{ github.repository }}/app seacloudserver/app && docker rmi docker.pkg.github.com/${{ github.repository }}/app"
-  #         ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd ~/compose && \
-  #                               docker-compose --env-file ~/.env -f docker-compose.yml down && \
-  #                               docker-compose --env-file ~/.env -f docker-compose.yml up -d"
+      - name: Set up SSH key permissions
+        run: chmod 400 $SSH_KEY
+
+      - name: Generate env file
+        run: echo "${{ secrets.ENV_FILE }}" >> .env
+
+      - name: SCP env file to VM
+        run: scp -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull, tag and push app image
+        run: |
+          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker pull ghcr.io/$repository_lowercase
+          docker tag ghcr.io/$repository_lowercase seacloudserver/app
+          docker rmi ghcr.io/$repository_lowercase
+
+      - name: Deploy
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd ~tools/compose && \
+                                docker-compose --env-file ~/.env -f docker-compose.yml down && \
+                                docker-compose --env-file ~/.env -f docker-compose.yml up -d"
