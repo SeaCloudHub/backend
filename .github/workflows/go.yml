@@ -11,6 +11,8 @@ on:
 
 env:
   IMAGE_NAME: seacloudserver/app
+  CONTAINER_NAME: server
+  PORT: 8088
 
 jobs:
   make_db:
@@ -195,6 +197,8 @@ jobs:
             docker pull ghcr.io/$repository_lowercase
             docker tag ghcr.io/$repository_lowercase ${{ env.IMAGE_NAME }}
             docker rmi ghcr.io/$repository_lowercase
-            cd ~/tools/compose
-            docker-compose --env-file ~/.env -f docker-compose.yml down
-            docker-compose --env-file ~/.env -f docker-compose.yml up -d
+            docker stop ${{ env.CONTAINER_NAME }}
+            docker rm ${{ env.CONTAINER_NAME }}
+            docker run -d --name ${{ env.CONTAINER_NAME }} --env-file ~/.env -p ${{ env.PORT }}:8088 ${{ env.IMAGE_NAME }}
+            docker image prune -f
+            rm ~/.env
