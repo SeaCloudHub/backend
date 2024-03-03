@@ -56,9 +56,9 @@ func New(options ...Options) (*Server, error) {
 
 	s.RegisterHealthCheck(s.router.Group(""))
 	s.RegisterBookRoutes(s.router.Group("/api/books"))
-	s.RegisterFileRoutes(s.router.Group("/api/files"))
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
+	s.RegisterFileRoutes(s.router.Group("/api/files"))
 
 	return &s, nil
 }

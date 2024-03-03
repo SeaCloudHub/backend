@@ -25,7 +25,8 @@ type Config struct {
 	}
 
 	SeaweedFS struct {
-		FilerServer string `envconfig:"FILER_SERVER"`
+		MasterServer string `envconfig:"MASTER_SERVER"`
+		FilerServer  string `envconfig:"FILER_SERVER"`
 	}
 
 	Kratos struct {
