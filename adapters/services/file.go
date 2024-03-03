@@ -50,13 +50,13 @@ func NewFileService(cfg *config.Config) *FileService {
 //	return resp.Body, nil
 //}
 
-func (s *FileService) CreateFile(_ context.Context, content io.Reader, fullName string, fileSize int64) (string, error) {
+func (s *FileService) CreateFile(_ context.Context, content io.Reader, fullName string, fileSize int64) (int64, error) {
 	result, err := s.filer.Upload(content, fileSize, fullName, "", "")
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
-	return result.FileID, nil
+	return result.Size, nil
 }
 
 func (s *FileService) ListEntries(_ context.Context, dirpath string, limit int, cursor string) ([]file.Entry, string, error) {

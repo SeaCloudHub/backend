@@ -7,6 +7,11 @@ import (
 	"github.com/SeaCloudHub/backend/pkg/validation"
 )
 
+type UploadFileResponse struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
 type ListEntriesRequest struct {
 	DirPath string `query:"dirpath" validate:"required,dirpath"`
 	Limit   int    `query:"limit" validate:"omitempty,min=1,max=100"`

@@ -43,6 +43,9 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		return s.handleError(c, err, http.StatusBadRequest)
 	}
 
+	var resp []model.UploadFileResponse
+
+	// TODO: add workerpool to handle multiple file uploads concurrently
 	files := form.File["files"]
 	for _, file := range files {
 		// open file
@@ -55,12 +58,18 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		fullName := filepath.Join(identity.ID, dirpath, file.Filename)
 
 		// save files
-		if _, err := s.FileService.CreateFile(ctx, src, fullName, file.Size); err != nil {
+		size, err := s.FileService.CreateFile(ctx, src, fullName, file.Size)
+		if err != nil {
 			return s.handleError(c, err, http.StatusInternalServerError)
 		}
+
+		resp = append(resp, model.UploadFileResponse{
+			Name: file.Filename,
+			Size: size,
+		})
 	}
 
-	return c.JSON(http.StatusOK, "files uploaded")
+	return s.success(c, resp)
 }
 
 func (s *Server) ListEntries(c echo.Context) error {

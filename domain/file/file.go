@@ -9,7 +9,7 @@ import (
 
 type Service interface {
 	//GetFile(filename string) (io.ReadCloser, error)
-	CreateFile(ctx context.Context, content io.Reader, fullName string, fileSize int64) (string, error)
+	CreateFile(ctx context.Context, content io.Reader, fullName string, fileSize int64) (int64, error)
 	ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]Entry, string, error)
 }
 
