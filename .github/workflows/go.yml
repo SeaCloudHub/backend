@@ -63,50 +63,50 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker run -d --name migrate --network seacloudserver --env-file ~/.env docker.pkg.github.com/${{ github.repository }}/migrate"
           ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker stop migrate || true && docker rm migrate || true && docker rmi docker.pkg.github.com/${{ github.repository }}/migrate || true && docker logout docker.pkg.github.com || true && rm ~/.env"
 
-  make_app:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+  # make_app:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v2
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Login to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker build and push
-        run: |
-          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker build -t ghcr.io/$repository_lowercase -f cmd/httpserver/Dockerfile .
-          docker push ghcr.io/$repository_lowercase
+  #     - name: Docker build and push
+  #       run: |
+  #         repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+  #         docker build -t ghcr.io/$repository_lowercase -f cmd/httpserver/Dockerfile .
+  #         docker push ghcr.io/$repository_lowercase
 
-      - name: SCP Tools to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: 'tools/compose'
-          target: '~'
-          recursive: true
+  #     - name: SCP Tools to VM
+  #       uses: appleboy/scp-action@v0.1.7
+  #       with:
+  #         host: ${{ secrets.VM_IP }}
+  #         username: ${{ secrets.VM_USER }}
+  #         key: ${{ secrets.SSH_KEY }}
+  #         source: 'tools/compose'
+  #         target: '~'
+  #         recursive: true
 
   deploy:
     runs-on: ubuntu-latest
 
-    needs: [make_app]
+    # needs: [make_app]
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
       - name: Set up SSH key permissions
-        run: chmod 400 $SSH_KEY
+        run: chmod 400 ${{ secrets.SSH_KEY }}
 
       - name: Generate env file
         run: echo "${{ secrets.ENV_FILE }}" >> .env
