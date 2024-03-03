@@ -11,7 +11,7 @@ COPY . .
 
 RUN go mod verify
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o seed ./cmd/migrate/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o migrate ./cmd/migrate/main.go
 
 FROM alpine:3.18
 
