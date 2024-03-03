@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
+	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
 	"github.com/SeaCloudHub/backend/pkg/validation"
@@ -29,12 +30,44 @@ func (s *Server) GetFile(c echo.Context) error {
 
 	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	file, err := s.FileService.GetFile(ctx, filepath.Join(id.ID, req.FilePath))
+	f, err := s.FileService.GetFile(ctx, filepath.Join(id.ID, req.FilePath))
 	if err != nil {
+		if errors.Is(err, file.ErrFileNotFound) {
+			return s.handleError(c, err, http.StatusNotFound)
+		}
+
 		return s.handleError(c, err, http.StatusInternalServerError)
 	}
 
-	return s.success(c, file)
+	return s.success(c, f)
+}
+
+func (s *Server) DownloadFile(c echo.Context) error {
+	var (
+		ctx = mycontext.NewEchoContextAdapter(c)
+		req model.DownloadFileRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
+
+	f, mime, err := s.FileService.DownloadFile(ctx, filepath.Join(id.ID, req.FilePath))
+	if err != nil {
+		if errors.Is(err, file.ErrFileNotFound) {
+			return s.handleError(c, err, http.StatusNotFound)
+		}
+
+		return s.handleError(c, err, http.StatusInternalServerError)
+	}
+
+	return c.Stream(http.StatusOK, mime, f)
 }
 
 func (s *Server) UploadFiles(c echo.Context) error {
@@ -117,4 +150,5 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.POST("", s.UploadFiles)
 	router.GET("", s.ListEntries)
 	router.GET("/metadata", s.GetFile)
+	router.GET("/download", s.DownloadFile)
 }

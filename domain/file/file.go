@@ -2,13 +2,19 @@ package file
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"time"
 )
 
+var (
+	ErrFileNotFound = errors.New("no such file or directory")
+)
+
 type Service interface {
 	GetFile(ctx context.Context, filePath string) (*Entry, error)
+	DownloadFile(ctx context.Context, filePath string) (io.Reader, string, error)
 	CreateFile(ctx context.Context, content io.Reader, fullName string, fileSize int64) (int64, error)
 	ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]Entry, string, error)
 }

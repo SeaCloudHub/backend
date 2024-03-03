@@ -8,10 +8,18 @@ import (
 )
 
 type GetFileRequest struct {
-	FilePath string `query:"file_path" validate:"required"`
+	FilePath string `query:"file_path" validate:"required,filepath"`
 }
 
 func (r *GetFileRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type DownloadFileRequest struct {
+	FilePath string `query:"file_path" validate:"required,filepath"`
+}
+
+func (r *DownloadFileRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 

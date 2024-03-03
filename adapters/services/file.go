@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"strings"
 
 	"github.com/linxGnu/goseaweedfs"
 	"github.com/seaweedfs/seaweedfs/weed/filer"
@@ -45,17 +45,16 @@ func (s *FileService) GetFile(ctx context.Context, filePath string) (*file.Entry
 		"Accept": "application/json",
 	}
 
-	fmt.Println(filePath)
-
 	data, code, err := s.filer.Get(filePath, query, header)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println(code)
+	if code == http.StatusNotFound {
+		return nil, file.ErrFileNotFound
+	}
 
 	if code != http.StatusOK {
-		fmt.Println(strings.TrimSpace(string(data)))
 		return nil, errors.New("failed to get file")
 	}
 
@@ -65,6 +64,28 @@ func (s *FileService) GetFile(ctx context.Context, filePath string) (*file.Entry
 	}
 
 	return mapToEntry(entry), nil
+}
+
+func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.Reader, string, error) {
+	entry, err := s.GetFile(ctx, filePath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if entry.IsDir {
+		return nil, "", errors.New("cannot download a directory")
+	}
+
+	var buf bytes.Buffer
+
+	if err := s.filer.Download(filePath, nil, func(reader io.Reader) error {
+		_, err := io.Copy(&buf, reader)
+		return err
+	}); err != nil {
+		return nil, "", err
+	}
+
+	return &buf, entry.MimeType, nil
 }
 
 func (s *FileService) CreateFile(_ context.Context, content io.Reader, fullName string, fileSize int64) (int64, error) {
