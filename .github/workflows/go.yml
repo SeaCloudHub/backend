@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - github-workflow
+      - database
       - seed-admin
       - migrate
 
@@ -12,36 +13,95 @@ env:
   IMAGE_NAME: seacloudserver/app
 
 jobs:
-  seed_admin:
-    if: github.ref == 'refs/heads/seed-admin'
+  if: github.ref == 'refs/heads/database'
+  make_db:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Docker build
+      - name: Generate env file
+        run: echo "${{ secrets.ENV_FILE_DB }}" >> .env
+
+      - name: SCP env file to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_IP_DB }}
+          username: ${{ secrets.VM_USER_DB }}
+          key: ${{ secrets.SSH_KEY_DB }}
+          source: '.env'
+          target: '~'
+
+      - name: SCP Tools to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_IP_DB }}
+          username: ${{ secrets.VM_USER_DB }}
+          key: ${{ secrets.SSH_KEY_DB }}
+          source: 'tools/compose'
+          target: '~'
+          recursive: true
+
+      - name: SSH into VM
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_IP_DB }}
+          username: ${{ secrets.VM_USER_DB }}
+          key: ${{ secrets.SSH_KEY_DB }}
+          script: |
+            cd ~/tools/compose
+            docker-compose --env-file ~/.env -f docker-compose.yml down
+            docker-compose --env-file ~/.env -f docker-compose.yml up -d
+            rm ~/.env
+            rm -rf ~/tools
+
+  seed_admin:
+    if: github.ref == 'refs/heads/seed-admin'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker build and push
         run: |
-          docker build -t docker.pkg.github.com/${{ github.repository }}/seed-admin -f cmd/seed-admin/Dockerfile .
-
-      - name: Login to GitHub Package Registry
-        run: echo "${{ secrets.CR_PAT }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
-
-      - name: Docker push
-        run: docker push docker.pkg.github.com/${{ github.repository }}/seed-admin
+          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$repository_lowercase/seed-admin -f cmd/seed-admin/Dockerfile .
+          docker push ghcr.io/$repository_lowercase/seed-admin
 
       - name: Seed Admin Deployment
-        run: |
-          echo "${{ secrets.ENV_FILE }}" >> .env
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/"
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}"
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker pull docker.pkg.github.com/${{ github.repository }}/seed-admin"
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker run - d --name seed-admin --network seacloudserver --env-file ~/.env docker.pkg.github.com/${{ github.repository }}/seed-admin"
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker stop seed-admin || true && docker rm seed-admin || true && docker rmi docker.pkg.github.com/${{ github.repository }}/seed-admin || true && docker logout docker.pkg.github.com || true"
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "${{ secrets.ENV_FILE }}" >> .env
+            scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker pull ghcr.io/$repository_lowercase/seed-admin
+            docker run -d --name seed-admin --env-file ~/.env ghcr.io/$repository_lowercase/seed-admin
 
   migrate:
     if: github.ref == 'refs/heads/migrate'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout Repository
@@ -62,83 +122,73 @@ jobs:
 
       - name: Migrate Deployment
         uses: appleboy/ssh-action@master
-          with:
-            host: ${{ secrets.VM_IP }}
-            username: ${{ secrets.VM_USER }}
-            key: ${{ secrets.SSH_KEY }}
-            script: |
-              echo "${{ secrets.ENV_FILE }}" >> .env
-              scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
-              docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-              docker pull ghcr.io/$repository_lowercase/migrate
-              docker run -d --name migrate --network seacloudserver --env-file ~/.env ghcr.io/$repository_lowercase/migrate
-              docker stop 
-  make_app:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker build and push
-        run: |
-          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker build -t ghcr.io/$repository_lowercase -f cmd/httpserver/Dockerfile .
-          docker push ghcr.io/$repository_lowercase
-
-      - name: SCP Tools to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: 'tools/compose'
-          target: '~'
-          recursive: true
-
-  deploy:
-    runs-on: ubuntu-latest
-
-    needs: [make_app]
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Generate env file
-        run: echo "${{ secrets.ENV_FILE }}" >> .env
-
-      - name: SCP env file to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: '.env'
-          target: '~'
-
-      - name: SSH into VM
-        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            echo "${{ secrets.ENV_FILE }}" >> .env
+            scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-            repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-            docker pull ghcr.io/$repository_lowercase
-            docker tag ghcr.io/$repository_lowercase ${{ env.IMAGE_NAME }}
-            docker rmi ghcr.io/$repository_lowercase
-            cd ~/tools/compose
-            docker-compose --env-file ~/.env -f docker-compose.yml down
-            docker-compose --env-file ~/.env -f docker-compose.yml up -d
+            docker pull ghcr.io/$repository_lowercase/migrate
+            docker run -d --name migrate --env-file ~/.env ghcr.io/$repository_lowercase/migrate
+
+  # make_app:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
+
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v2
+
+  #     - name: Login to GitHub Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+
+  #     - name: Docker build and push
+  #       run: |
+  #         repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+  #         docker build -t ghcr.io/$repository_lowercase -f cmd/httpserver/Dockerfile .
+  #         docker push ghcr.io/$repository_lowercase
+
+  # deploy:
+  #   runs-on: ubuntu-latest
+
+  #   needs: [make_app]
+
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v2
+
+  #     - name: Generate env file
+  #       run: echo "${{ secrets.ENV_FILE }}" >> .env
+
+  #     - name: SCP env file to VM
+  #       uses: appleboy/scp-action@v0.1.7
+  #       with:
+  #         host: ${{ secrets.VM_IP }}
+  #         username: ${{ secrets.VM_USER }}
+  #         key: ${{ secrets.SSH_KEY }}
+  #         source: '.env'
+  #         target: '~'
+
+  #     - name: SSH into VM
+  #       uses: appleboy/ssh-action@master
+  #       with:
+  #         host: ${{ secrets.VM_IP }}
+  #         username: ${{ secrets.VM_USER }}
+  #         key: ${{ secrets.SSH_KEY }}
+  #         script: |
+  #           docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+  #           repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+  #           docker pull ghcr.io/$repository_lowercase
+  #           docker tag ghcr.io/$repository_lowercase ${{ env.IMAGE_NAME }}
+  #           docker rmi ghcr.io/$repository_lowercase
+  #           cd ~/tools/compose
+  #           docker-compose --env-file ~/.env -f docker-compose.yml down
+  #           docker-compose --env-file ~/.env -f docker-compose.yml up -d

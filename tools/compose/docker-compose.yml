@@ -125,6 +125,24 @@ services:
     networks:
       - seacloudserver
 
+  appdb:
+    image: postgres:15-alpine3.18
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    ports:
+      - ${DB_PORT}:5432
+    volumes:
+      - appdb:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres]
+      interval: 5s
+      retries: 5
+    restart: always
+    networks:
+      - seacloudserver
+
 volumes:
   seaweedfs:
   filerstore:
