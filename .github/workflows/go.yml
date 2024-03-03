@@ -82,7 +82,7 @@ jobs:
           docker push ghcr.io/${{ github.repository }}/app
 
       - name: SCP Tools to VM
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
