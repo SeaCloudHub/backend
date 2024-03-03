@@ -80,7 +80,7 @@ jobs:
       - name: Docker build and push
         run: |
           repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker build -t ghcr.io/$repository_lowercase/seed-admin -f cmd/seed-admin/Dockerfile .
+          docker build -t ghcr.io/$repository_lowercase/seed-admin -f cmd/seed/Dockerfile .
           docker push ghcr.io/$repository_lowercase/seed-admin
 
       - name: Seed Admin Deployment
