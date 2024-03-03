@@ -22,18 +22,18 @@ jobs:
       - name: SCP env file to VM
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.VM_IP_DB }}
+          username: ${{ secrets.VM_USER_DB }}
+          key: ${{ secrets.SSH_KEY_DB }}
           source: '.env'
           target: '~'
 
       - name: SCP Tools to VM
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.VM_IP_DB }}
+          username: ${{ secrets.VM_USER_DB }}
+          key: ${{ secrets.SSH_KEY_DB }}
           source: 'tools/compose'
           target: '~'
           recursive: true
