@@ -1,0 +1,110 @@
+name: Golang App Deployment
+
+on:
+  push:
+    branches:
+      - main
+      - seed-admin
+      - migrate
+
+jobs:
+  make_db:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: SCP Tools to EC2
+        run: |
+          scp -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} -r ./tools/compose @VM_USER@VM_IP:~/compose
+
+  seed_admin:
+    if: github.ref == 'refs/heads/seed-admin'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Docker build
+        run: |
+          docker build -t docker.pkg.github.com/${{ github.repository }}/seed-admin -f cmd/seed-admin/Dockerfile .
+
+      - name: Login to GitHub Package Registry
+        run: echo "${{ secrets.CR_PAT }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+
+      - name: Docker push
+        run: docker push docker.pkg.github.com/${{ github.repository }}/seed-admin
+
+      - name: Seed Admin Deployment
+        run: |
+          echo "${{ secrets.ENV_FILE }}" >> .env
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker pull docker.pkg.github.com/${{ github.repository }}/seed-admin"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker run - d --name seed-admin --network seacloudserver --env-file ~/.env docker.pkg.github.com/${{ github.repository }}/seed-admin"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker stop seed-admin || true && docker rm seed-admin || true && docker rmi docker.pkg.github.com/${{ github.repository }}/seed-admin || true && docker logout docker.pkg.github.com || true"
+
+  migrate:
+    if: github.ref == 'refs/heads/migrate'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Docker build
+        run: |
+          docker build -t docker.pkg.github.com/${{ github.repository }}/migrate -f cmd/migrate/Dockerfile .
+
+      - name: Login to GitHub Package Registry
+        run: echo "${{ secrets.CR_PAT }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+
+      - name: Docker push
+        run: docker push docker.pkg.github.com/${{ github.repository }}/migrate
+
+      - name: Migrate Deployment
+        run: |
+          echo "${{ secrets.ENV_FILE }}" >> .env
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker pull docker.pkg.github.com/${{ github.repository }}/migrate"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker run -d --name migrate --network seacloudserver --env-file ~/.env docker.pkg.github.com/${{ github.repository }}/migrate"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker stop migrate || true && docker rm migrate || true && docker rmi docker.pkg.github.com/${{ github.repository }}/migrate || true && docker logout docker.pkg.github.com || true && rm ~/.env"
+
+  make_app:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Docker build
+        run: |
+          docker build -t docker.pkg.github.com/${{ github.repository }}/app -f cmd/httpserver/Dockerfile .
+
+      - name: Login to GitHub Package Registry
+        run: echo "${{ secrets.CR_PAT }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+
+      - name: Docker push
+        run: docker push docker.pkg.github.com/${{ github.repository }}/app
+
+  deploy:
+    runs-on: ubuntu-latest
+
+    needs: [make_db, make_app]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Deploy
+        run: |
+          echo "${{ secrets.ENV_FILE }}" >> .env
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker login docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.CR_PAT }}"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "docker pull docker.pkg.github.com/${{ github.repository }}/app && docker tag docker.pkg.github.com/${{ github.repository }}/app seacloudserver/app && docker rmi docker.pkg.github.com/${{ github.repository }}/app"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "cd ~/compose && \
+                                docker-compose --env-file ~/.env -f docker-compose.yml down && \
+                                docker-compose --env-file ~/.env -f docker-compose.yml up -d"
