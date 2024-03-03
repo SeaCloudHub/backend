@@ -17,7 +17,8 @@ jobs:
 
       - name: SCP Tools to EC2
         run: |
-          scp -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} -r ./tools/compose @VM_USER@VM_IP:~/compose
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} "mkdir -p ~/compose"
+          scp -o StrictHostKeyChecking=no -i ${{ secrets.SSH_KEY }} -r ./compose ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
 
   seed_admin:
     if: github.ref == 'refs/heads/seed-admin'
