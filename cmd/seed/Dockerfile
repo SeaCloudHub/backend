@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine3.18 as builder
+FROM golang:1.22-alpine3.18 as builder
 
 RUN apk update && apk add --no-cache git make ca-certificates tzdata openssh
 WORKDIR /build
@@ -7,11 +7,11 @@ COPY go.mod go.sum ./
 
 RUN go mod download
 
-COPY ../httpserver .
+COPY . .
 
 RUN go mod verify
 
-RUN go build -ldflags "-s -w" -o seed ./cmd/seed/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o seed ./cmd/seed/main.go
 
 FROM alpine:3.18
 

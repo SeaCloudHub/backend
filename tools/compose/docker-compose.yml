@@ -143,6 +143,19 @@ services:
     networks:
       - seacloudserver
 
+  app:
+    image: seacloudserver/app
+    ports:
+      - 8088:8088
+    environment:
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_PORT=${DB_PORT}
+      - DB_HOST=appdb
+    networks:
+      - seacloudserver
+
 volumes:
   seaweedfs:
   filerstore:
