@@ -9,7 +9,9 @@ import (
 
 	"github.com/SeaCloudHub/backend/domain/identity"
 
+	"github.com/SeaCloudHub/backend/pkg/common"
 	"github.com/SeaCloudHub/backend/pkg/config"
+	client "github.com/ory/kratos-client-go"
 	kratos "github.com/ory/kratos-client-go"
 	"github.com/ory/x/pagination/keysetpagination"
 )
@@ -186,6 +188,25 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 	}
 
 	return mapIdentity(id)
+}
+
+func (s *IdentityService) ChangeState(ctx context.Context, id string, state common.State) (*identity.Identity, error) {
+	req := s.adminClient.IdentityAPI.PatchIdentity(ctx, id).JsonPatch([]client.JsonPatch{{Op: "replace", Path: "/state", Value: state}})
+	identity, _, err := req.Execute()
+	if err != nil {
+		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return nil, fmt.Errorf("error change status identities: %s", genericErr.Error.GetReason())
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	idRes, err := mapIdentity(identity)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error when mapping identity: %w", err)
+	}
+
+	return idRes, nil
 }
 
 func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.Identity, string, error) {
