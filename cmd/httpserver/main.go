@@ -42,20 +42,15 @@ func main() {
 		applog.Fatal(err)
 	}
 
-	//db, err := inmemstore.NewConnection()
-
-	server, err := httpserver.New()
+	server, err := httpserver.New(cfg, applog)
 	if err != nil {
 		applog.Fatal(err)
 	}
 
-	server.Logger = applog
-	server.Config = cfg
 	server.BookStore = postgrestore.NewBookStore(db)
 	server.FileService = services.NewFileService(cfg)
 	server.IdentityService = services.NewIdentityService(cfg)
 	server.PermissionService = services.NewPermissionService(cfg)
-	//server.BookStore = inmemstore.NewBookStore(db)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	applog.Info("server started!")

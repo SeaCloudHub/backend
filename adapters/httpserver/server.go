@@ -9,7 +9,6 @@ import (
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
 	"github.com/SeaCloudHub/backend/pkg/config"
-	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
 	sentryecho "github.com/getsentry/sentry-go/echo"
 	"github.com/labstack/echo/v4"
@@ -33,11 +32,11 @@ type Server struct {
 	PermissionService permission.Service
 }
 
-func New(options ...Options) (*Server, error) {
+func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Server, error) {
 	s := Server{
 		router: echo.New(),
-		Config: config.Empty,
-		Logger: logger.NOOPLogger,
+		Config: cfg,
+		Logger: logger,
 	}
 
 	for _, fn := range options {
@@ -47,14 +46,16 @@ func New(options ...Options) (*Server, error) {
 	}
 
 	s.RegisterGlobalMiddlewares()
+	s.RegisterHealthCheck(s.router.Group(""))
 
 	authMiddleware := s.NewAuthentication("header:Authorization", "Bearer",
-		[]string{"/api/users/login"},
+		[]string{
+			"/healthz",
+			"/api/users/login"},
 	).Middleware()
 
 	s.router.Use(authMiddleware)
 
-	s.RegisterHealthCheck(s.router.Group(""))
 	s.RegisterBookRoutes(s.router.Group("/api/books"))
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
