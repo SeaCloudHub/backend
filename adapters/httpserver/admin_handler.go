@@ -42,7 +42,7 @@ func (s *Server) ListIdentities(c echo.Context) error {
 func (s *Server) setStatusUserCommon(c echo.Context, state common.State) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
-		req model.ActivateAndDeactiveStateUserRequest
+		req model.ChangeStateRequest
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -58,7 +58,7 @@ func (s *Server) setStatusUserCommon(c echo.Context, state common.State) error {
 		return s.handleError(c, err, http.StatusInternalServerError)
 	}
 
-	return s.success(c, model.ActivateAndDeactiveStateUserResponse{
+	return s.success(c, model.ChangeStateResponse{
 		Identitiy: *identitity,
 	})
 

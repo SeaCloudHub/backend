@@ -39,15 +39,15 @@ func (r *CreateIdentityRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
 
-type ActivateAndDeactiveStateUserRequest struct {
+type ChangeStateRequest struct {
 	Id string `json:"id" validate:"required"`
 }
 
-type ActivateAndDeactiveStateUserResponse struct {
+type ChangeStateResponse struct {
 	Identitiy identity.Identity `json:"identity"`
 }
 
-func (r *ActivateAndDeactiveStateUserRequest) Validate() error {
+func (r *ChangeStateRequest) Validate() error {
 	if r.Id == "" {
 		return errors.New("id cannot be empty")
 	}
