@@ -8,6 +8,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
+	"github.com/SeaCloudHub/backend/internal"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
 	sentryecho "github.com/getsentry/sentry-go/echo"
@@ -22,6 +23,10 @@ type Server struct {
 	router *echo.Echo
 	Config *config.Config
 	Logger *zap.SugaredLogger
+
+	// internal services
+	MapperService internal.Mapper
+	CSVService    internal.CSVService
 
 	// storage adapters
 	BookStore book.Storage

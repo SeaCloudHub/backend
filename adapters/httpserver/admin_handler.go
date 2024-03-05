@@ -1,7 +1,9 @@
 package httpserver
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
@@ -62,6 +64,51 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 	return s.success(c, id)
 }
 
+func (s *Server) CreateMultipleIdentities(c echo.Context) error {
+	file, _, err := c.Request().FormFile("file")
+	if err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+	defer file.Close()
+
+	entityMapper := func(record []string) interface{} {
+		return model.CreateIdentityRequest{
+			Email:    strings.TrimSpace(record[0]),
+			Password: strings.TrimSpace(record[1]),
+		}
+	}
+
+	records, err := s.CSVService.CsvToEntities(file, entityMapper)
+	if err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	var identities []model.CreateIdentityRequest
+	for _, record := range records {
+		identity, ok := record.(model.CreateIdentityRequest)
+		if !ok {
+			return s.handleError(c, fmt.Errorf("record is not of type *model.CreateIdentityRequest"), http.StatusBadRequest)
+		}
+
+		if err := identity.Validate(); err != nil {
+			return s.handleError(c, err, http.StatusBadRequest)
+		}
+
+		identities = append(identities, identity)
+	}
+
+	ids, err := s.IdentityService.CreateMultipleIdentities(mycontext.NewEchoContextAdapter(c), s.MapperService.ToIdentities(identities))
+	if err != nil {
+		return s.handleError(c, err, http.StatusInternalServerError)
+	}
+
+	for i := range ids {
+		ids[i].Password = identities[i].Password
+	}
+
+	return s.success(c, ids)
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
@@ -69,4 +116,5 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)
 	router.POST("/identities", s.CreateIdentity)
+	router.POST("/identities/bulk", s.CreateMultipleIdentities)
 }
