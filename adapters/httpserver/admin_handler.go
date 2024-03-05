@@ -39,7 +39,7 @@ func (s *Server) ListIdentities(c echo.Context) error {
 	})
 }
 
-func (s *Server) setStatusUserCommon(c echo.Context, state common.State) error {
+func (s *Server) ChangeStateUser(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
 		req model.ChangeStateRequest
@@ -49,11 +49,7 @@ func (s *Server) setStatusUserCommon(c echo.Context, state common.State) error {
 		return s.handleError(c, err, http.StatusBadRequest)
 	}
 
-	if err := req.Validate(); err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
-	}
-
-	identitity, err := s.IdentityService.ChangeState(ctx, req.Id, state)
+	identitity, err := s.IdentityService.ChangeState(ctx, req.Id, common.State(req.State))
 	if err != nil {
 		return s.handleError(c, err, http.StatusInternalServerError)
 	}
@@ -62,15 +58,6 @@ func (s *Server) setStatusUserCommon(c echo.Context, state common.State) error {
 		Identitiy: *identitity,
 	})
 
-}
-
-func (s *Server) ActivateStateUser(c echo.Context) error {
-	return s.setStatusUserCommon(c, common.ActiveState)
-
-}
-
-func (s *Server) DeActivateStateUser(c echo.Context) error {
-	return s.setStatusUserCommon(c, common.DeActiveState)
 }
 
 func (s *Server) CreateIdentity(c echo.Context) error {
@@ -104,6 +91,5 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)
 	router.POST("/identities", s.CreateIdentity)
-	router.PATCH("/identities/:id/activate", s.ActivateStateUser)
-	router.PATCH("/identities/:id/deactivate", s.DeActivateStateUser)
+	router.PATCH("/identities/:id/state", s.ChangeStateUser)
 }

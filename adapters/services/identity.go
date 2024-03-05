@@ -191,7 +191,22 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 }
 
 func (s *IdentityService) ChangeState(ctx context.Context, id string, state common.State) (*identity.Identity, error) {
-	req := s.adminClient.IdentityAPI.PatchIdentity(ctx, id).JsonPatch([]client.JsonPatch{{Op: "replace", Path: "/state", Value: state}})
+	var isValidState bool
+	for _, s := range common.AvailableState {
+		if s == state {
+			isValidState = true
+			break
+		}
+	}
+
+	var req kratos.IdentityAPIPatchIdentityRequest
+
+	if isValidState {
+		req = s.adminClient.IdentityAPI.PatchIdentity(ctx, id).JsonPatch([]client.JsonPatch{{Op: "replace", Path: "/state", Value: state}})
+	} else {
+		return nil, fmt.Errorf("status is not supported")
+	}
+
 	identity, _, err := req.Execute()
 	if err != nil {
 		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {

@@ -1,8 +1,6 @@
 package model
 
 import (
-	"errors"
-
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/validation"
 	gonanoid "github.com/matoous/go-nanoid/v2"
@@ -40,17 +38,10 @@ func (r *CreateIdentityRequest) Validate() error {
 }
 
 type ChangeStateRequest struct {
-	Id string `json:"id" validate:"required"`
+	Id    string `json:"id" validate:"required"`
+	State string `json:"state" validate:"required"`
 }
 
 type ChangeStateResponse struct {
 	Identitiy identity.Identity `json:"identity"`
-}
-
-func (r *ChangeStateRequest) Validate() error {
-	if r.Id == "" {
-		return errors.New("id cannot be empty")
-	}
-	return validation.Validate().Struct(r)
-
 }
