@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
+	"github.com/SeaCloudHub/backend/pkg/common"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
 
 	"github.com/labstack/echo/v4"
@@ -38,6 +39,27 @@ func (s *Server) ListIdentities(c echo.Context) error {
 	})
 }
 
+func (s *Server) ChangeStateUser(c echo.Context) error {
+	var (
+		ctx = mycontext.NewEchoContextAdapter(c)
+		req model.ChangeStateRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.handleError(c, err, http.StatusBadRequest)
+	}
+
+	identitity, err := s.IdentityService.ChangeState(ctx, req.Id, common.State(req.State))
+	if err != nil {
+		return s.handleError(c, err, http.StatusInternalServerError)
+	}
+
+	return s.success(c, model.ChangeStateResponse{
+		Identitiy: *identitity,
+	})
+
+}
+
 func (s *Server) CreateIdentity(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
@@ -69,4 +91,5 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)
 	router.POST("/identities", s.CreateIdentity)
+	router.PATCH("/identities/:id/state", s.ChangeStateUser)
 }

@@ -36,3 +36,12 @@ func (r *CreateIdentityRequest) Validate() error {
 
 	return validation.Validate().Struct(r)
 }
+
+type ChangeStateRequest struct {
+	Id    string `json:"id" validate:"required"`
+	State string `json:"state" validate:"required"`
+}
+
+type ChangeStateResponse struct {
+	Identitiy identity.Identity `json:"identity"`
+}

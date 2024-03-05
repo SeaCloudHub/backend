@@ -1,6 +1,7 @@
 package postgrestore_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SeaCloudHub/backend/adapters/postgrestore"
@@ -11,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var ctx context.Context
+
 func TestBookStore(t *testing.T) {
 	dbName, dbUser, dbPass := "test2", "test2", "123456"
 	db := testutil.CreateConnection(t, dbName, dbUser, dbPass)
@@ -20,7 +23,7 @@ func TestBookStore(t *testing.T) {
 
 	t.Run("Save a book", func(t *testing.T) {
 		want := book.NewBook("9781680500745", "Clojure Applied")
-		err := store.Save(&want)
+		err := store.Save(ctx, &want)
 
 		assert.NoError(t, err)
 		verifyInsertedBook(t, db, want.ISBN)
@@ -28,10 +31,10 @@ func TestBookStore(t *testing.T) {
 
 	t.Run("Read existed book", func(t *testing.T) {
 		want := book.NewBook("9781680507607", "Distributed Services with Go")
-		err := store.Save(&want)
+		err := store.Save(ctx, &want)
 		assert.NoError(t, err)
 
-		got, err := store.FindByISBN(want.ISBN)
+		got, err := store.FindByISBN(ctx, want.ISBN)
 
 		assert.NoError(t, err)
 		assertFoundBook(t, got, want)
