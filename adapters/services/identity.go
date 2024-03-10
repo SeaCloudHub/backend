@@ -189,11 +189,10 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 }
 
 func (s *IdentityService) CreateMultipleIdentities(ctx context.Context, simpleIdentities []identity.SimpleIdentity) ([]*identity.Identity, error) {
-	var identities []*identity.Identity
-
+	var identitiesPatch []kratos.IdentityPatch
 	for _, simpleIdentity := range simpleIdentities {
-		id, _, err := s.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(
-			kratos.CreateIdentityBody{
+		identitiesPatch = append(identitiesPatch, kratos.IdentityPatch{
+			Create: &kratos.CreateIdentityBody{
 				Credentials: &kratos.IdentityWithCredentials{
 					Password: &kratos.IdentityWithCredentialsPassword{
 						Config: &kratos.IdentityWithCredentialsPasswordConfig{
@@ -206,28 +205,21 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context, simpleId
 					"password_changed_at": nil,
 				},
 			},
-		).Execute()
-		if err != nil {
-			// Rollback already created identities
-			for _, createdID := range identities {
-				// Delete the identities that were created before the error occurred
-				_, _ = s.adminClient.IdentityAPI.DeleteIdentity(ctx, createdID.ID).Execute()
-			}
-			return nil, fmt.Errorf("error creating newIdentity for email %s: %w", simpleIdentity.Email, err)
-		}
-
-		newIdentity, err := mapIdentity(id)
-		if err != nil {
-			for _, createdID := range identities {
-				_, _ = s.adminClient.IdentityAPI.DeleteIdentity(ctx, createdID.ID).Execute()
-			}
-			return nil, fmt.Errorf("error mapping newIdentity for email %s: %w", simpleIdentity.Email, err)
-		}
-
-		identities = append(identities, newIdentity)
+		})
 	}
 
-	return identities, nil
+	res, _, err := s.adminClient.IdentityAPI.BatchPatchIdentities(ctx).PatchIdentitiesBody(
+		kratos.PatchIdentitiesBody{
+			Identities: identitiesPatch}).Execute()
+	if err != nil {
+		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return nil, fmt.Errorf("error creating identities: %s", genericErr.Error.Message)
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return mapIdentityFromPatchRes(res)
 }
 
 func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.Identity, string, error) {
@@ -287,6 +279,19 @@ func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {
 		Email:             email,
 		PasswordChangedAt: passwordChangedAt,
 	}, nil
+}
+
+func mapIdentityFromPatchRes(res *kratos.BatchPatchIdentitiesResponse) ([]*identity.Identity, error) {
+	var identities []*identity.Identity
+	for _, id := range res.Identities {
+		i := &identity.Identity{
+			ID: *id.Identity,
+		}
+
+		identities = append(identities, i)
+	}
+
+	return identities, nil
 }
 
 func assetKratosError[T any](err error) (*kratos.GenericOpenAPIError, *T) {

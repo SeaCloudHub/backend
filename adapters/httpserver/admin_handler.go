@@ -86,6 +86,7 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 	}
 
 	for i := range ids {
+		ids[i].Email = identities[i].Email
 		ids[i].Password = identities[i].Password
 	}
 
