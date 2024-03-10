@@ -1,10 +1,7 @@
 package internal
 
-import (
-	"mime/multipart"
-)
+import "mime/multipart"
 
 type CSVService interface {
-	CsvToEntities(file multipart.File,
-		entityMapper func(record []string) interface{}) ([]interface{}, error)
+	CsvToEntities(file *multipart.File, entity interface{}) error
 }

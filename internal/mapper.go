@@ -6,7 +6,8 @@ import (
 )
 
 type Mapper interface {
-	ToIdentity(request model.CreateIdentityRequest) identity.SimpleIdentity
+	ToIdentity(request *model.CreateIdentityRequest) identity.SimpleIdentity
 
-	ToIdentities(request []model.CreateIdentityRequest) []identity.SimpleIdentity
+	ToIdentities(request []*model.CreateIdentityRequest) ([]identity.
+		SimpleIdentity, error)
 }

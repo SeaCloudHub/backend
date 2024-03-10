@@ -25,8 +25,8 @@ type ListIdentitiesResponse struct {
 }
 
 type CreateIdentityRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
+	Email    string `json:"email" validate:"required,email" csv:"email"`
+	Password string `json:"password" validate:"required,min=6" csv:"password"`
 }
 
 func (r *CreateIdentityRequest) Validate() error {
