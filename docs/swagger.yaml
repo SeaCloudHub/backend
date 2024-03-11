@@ -414,7 +414,7 @@ paths:
         type: string
       - description: File path
         in: query
-        name: filepath
+        name: file_path
         required: true
         type: string
       responses:
@@ -453,7 +453,7 @@ paths:
         type: string
       - description: File path
         in: query
-        name: filepath
+        name: file_path
         required: true
         type: string
       produces:

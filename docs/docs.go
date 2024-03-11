@@ -378,7 +378,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "File path",
-                        "name": "filepath",
+                        "name": "file_path",
                         "in": "query",
                         "required": true
                     }
@@ -439,7 +439,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "File path",
-                        "name": "filepath",
+                        "name": "file_path",
                         "in": "query",
                         "required": true
                     }
