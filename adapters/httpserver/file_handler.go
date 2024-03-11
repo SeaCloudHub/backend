@@ -2,9 +2,10 @@ package httpserver
 
 import (
 	"errors"
-	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"net/http"
 	"path/filepath"
+
+	"github.com/SeaCloudHub/backend/pkg/apperror"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -21,7 +22,7 @@ import (
 // @Tags file
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param filepath query string true "File path"
+// @Param file_path query string true "File path"
 // @Success 200 {object} model.SuccessResponse{data=file.Entry}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -61,7 +62,7 @@ func (s *Server) GetFile(c echo.Context) error {
 // @Description DownloadFile
 // @Tags file
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param filepath query string true "File path"
+// @Param file_path query string true "File path"
 // @Success 200 {file} file
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse

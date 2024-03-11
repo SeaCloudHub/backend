@@ -375,7 +375,7 @@
                     {
                         "type": "string",
                         "description": "File path",
-                        "name": "filepath",
+                        "name": "file_path",
                         "in": "query",
                         "required": true
                     }
@@ -436,7 +436,7 @@
                     {
                         "type": "string",
                         "description": "File path",
-                        "name": "filepath",
+                        "name": "file_path",
                         "in": "query",
                         "required": true
                     }
