@@ -10,6 +10,16 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// Login godoc
+// @Summary Login
+// @Description Login
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param payload body model.LoginRequest true "Login request"
+// @Success 200 {object} model.SuccessResponse{data=model.LoginResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Router /users/login [post]
 func (s *Server) Login(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
@@ -36,10 +46,33 @@ func (s *Server) Login(c echo.Context) error {
 	return s.success(c, model.LoginResponse{SessionToken: *session.Token})
 }
 
+// Me godoc
+// @Summary Me
+// @Description Me
+// @Tags user
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=identity.Identity}
+// @Failure 401 {object} model.ErrorResponse
+// @Router /users/me [get]
 func (s *Server) Me(c echo.Context) error {
 	return s.success(c, c.Get(ContextKeyIdentity))
 }
 
+// ChangePassword godoc
+// @Summary Change password
+// @Description Change password
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.ChangePasswordRequest true "Change password request"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /users/change-password [post]
 func (s *Server) ChangePassword(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)

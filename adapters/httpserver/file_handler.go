@@ -15,6 +15,19 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// GetFile godoc
+// @Summary GetFile
+// @Description GetFile
+// @Tags file
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param filepath query string true "File path"
+// @Success 200 {object} model.SuccessResponse{data=file.Entry}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/metadata [get]
 func (s *Server) GetFile(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
@@ -43,6 +56,18 @@ func (s *Server) GetFile(c echo.Context) error {
 	return s.success(c, f)
 }
 
+// DownloadFile godoc
+// @Summary DownloadFile
+// @Description DownloadFile
+// @Tags file
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param filepath query string true "File path"
+// @Success 200 {file} file
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/download [get]
 func (s *Server) DownloadFile(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
@@ -71,6 +96,19 @@ func (s *Server) DownloadFile(c echo.Context) error {
 	return c.Stream(http.StatusOK, mime, f)
 }
 
+// UploadFiles godoc
+// @Summary UploadFiles
+// @Description UploadFiles
+// @Tags file
+// @Accept multipart/form-data
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param dirpath formData string true "Directory path"
+// @Param files formData file true "Files"
+// @Success 200 {object} model.SuccessResponse{data=[]model.UploadFileResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files [post]
 func (s *Server) UploadFiles(c echo.Context) error {
 	var ctx = mycontext.NewEchoContextAdapter(c)
 
@@ -118,6 +156,20 @@ func (s *Server) UploadFiles(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// ListEntries godoc
+// @Summary ListEntries
+// @Description ListEntries
+// @Tags file
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param dirpath query string true "Directory path"
+// @Param limit query int false "Limit"
+// @Param cursor query string false "Cursor"
+// @Success 200 {object} model.SuccessResponse{data=model.ListEntriesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files [get]
 func (s *Server) ListEntries(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)

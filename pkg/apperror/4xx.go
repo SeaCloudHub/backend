@@ -7,7 +7,7 @@ import (
 const (
 	BindingCode            = "400001"
 	ValidationCode         = "400002"
-	InvalidCredentialsCode = "401003"
+	InvalidCredentialsCode = "400003"
 	UnauthorizedCode       = "401004"
 	ForbiddenCode          = "403005"
 	EntityNotFoundCode     = "404006"
