@@ -26,7 +26,7 @@ func (r *DownloadFileRequest) Validate(ctx context.Context) error {
 type UploadFileResponse struct {
 	Name string `json:"name"`
 	Size int64  `json:"size"`
-}
+} // @name model.UploadFileResponse
 
 type ListEntriesRequest struct {
 	DirPath string `query:"dirpath" validate:"required,dirpath"`
@@ -45,4 +45,4 @@ func (r *ListEntriesRequest) Validate(ctx context.Context) error {
 type ListEntriesResponse struct {
 	Entries []file.Entry `json:"entries"`
 	Cursor  string       `json:"cursor"`
-}
+} // @name model.ListEntriesResponse

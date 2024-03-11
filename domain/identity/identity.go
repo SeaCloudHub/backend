@@ -28,7 +28,7 @@ type Identity struct {
 	Password          string     `json:"password,omitempty"`
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 	Session           *Session   `json:"-"`
-}
+} // @name identity.Identity
 
 type Session struct {
 	ID        string     `json:"id"`
