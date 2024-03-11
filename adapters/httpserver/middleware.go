@@ -3,7 +3,7 @@ package httpserver
 import (
 	"errors"
 	"github.com/SeaCloudHub/backend/domain/identity"
-	"net/http"
+	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"strings"
 
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
@@ -42,9 +42,7 @@ func (a *Authentication) Middleware() echo.MiddlewareFunc {
 			return nil
 		}
 
-		//logger.EchoContext(c).Error(err)
-
-		_ = a.server.handleError(c, err, http.StatusUnauthorized)
+		_ = a.server.error(c, apperror.ErrUnauthorized(err))
 
 		return err
 	}
@@ -81,16 +79,16 @@ func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 		id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
 		if !ok {
-			return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
+			return s.error(c, apperror.ErrInternalServer(errors.New("identity not found")))
 		}
 
 		isAdmin, err := s.PermissionService.IsManager(ctx, id.ID)
 		if err != nil {
-			return s.handleError(c, err, http.StatusInternalServerError)
+			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
 		if !isAdmin {
-			return s.handleError(c, errors.New("permission denied"), http.StatusForbidden)
+			return s.error(c, apperror.ErrForbidden(errors.New("not an admin")))
 		}
 
 		return next(c)
@@ -101,11 +99,11 @@ func (s *Server) passwordChangedAtMiddleware(next echo.HandlerFunc) echo.Handler
 	return func(c echo.Context) error {
 		id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
 		if !ok {
-			return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
+			return s.error(c, apperror.ErrInternalServer(errors.New("identity not found")))
 		}
 
 		if id.PasswordChangedAt == nil {
-			return s.handleError(c, errors.New("please change your default password"), http.StatusForbidden)
+			return s.error(c, apperror.ErrForbidden(errors.New("password not changed")))
 		}
 
 		return next(c)

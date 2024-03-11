@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"github.com/SeaCloudHub/backend/pkg/apperror"
+	"github.com/pkg/errors"
 	"net/http"
 	"strings"
 
@@ -106,9 +108,42 @@ func (s *Server) handleError(c echo.Context, err error, status int) error {
 	})
 }
 
+func (s *Server) error(c echo.Context, err error) error {
+	s.Logger.Errorw(
+		err.Error(),
+		zap.String("request_id", s.requestID(c)),
+	)
+
+	var appErr apperror.Error
+	if !errors.As(err, &appErr) {
+		sentry.WithContext(c).Error(err)
+
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"code":    "000000",
+			"message": "Internal Server Error",
+			"info":    err.Error(),
+		})
+	}
+
+	if appErr.HTTPCode >= http.StatusInternalServerError {
+		sentry.WithContext(c).Error(err)
+	}
+
+	var errMessage string
+	if appErr.Raw != nil {
+		errMessage = appErr.Raw.Error()
+	}
+
+	return c.JSON(appErr.HTTPCode, map[string]interface{}{
+		"code":    appErr.ErrorCode,
+		"message": appErr.Message,
+		"info":    errMessage,
+	})
+}
+
 func (s *Server) success(c echo.Context, data interface{}) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message": "success",
+		"message": "Success",
 		"data":    data,
 	})
 }
