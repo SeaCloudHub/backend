@@ -98,6 +98,19 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 	return s.success(c, id)
 }
 
+// CreateMultipleIdentities godoc
+// @Summary CreateMultipleIdentities
+// @Description CreateMultipleIdentities
+// @Tags admin
+// @Accept multipart/form-data
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param file formData file true "CSV file"
+// @Success 200 {object} model.SuccessResponse{data=[]identity.Identity}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/bulk [post]
 func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 	file, _, err := c.Request().FormFile("file")
 	if err != nil {
