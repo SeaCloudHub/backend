@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/SeaCloudHub/backend/pkg/apperror"
+
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
@@ -14,6 +16,19 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// GetFile godoc
+// @Summary GetFile
+// @Description GetFile
+// @Tags file
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param file_path query string true "File path"
+// @Success 200 {object} model.SuccessResponse{data=file.Entry}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/metadata [get]
 func (s *Server) GetFile(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
@@ -21,11 +36,11 @@ func (s *Server) GetFile(c echo.Context) error {
 	)
 
 	if err := c.Bind(&req); err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 
 	if err := req.Validate(ctx); err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
 	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
@@ -33,15 +48,27 @@ func (s *Server) GetFile(c echo.Context) error {
 	f, err := s.FileService.GetFile(ctx, filepath.Join(id.ID, req.FilePath))
 	if err != nil {
 		if errors.Is(err, file.ErrFileNotFound) {
-			return s.handleError(c, err, http.StatusNotFound)
+			return s.error(c, apperror.ErrEntityNotFound(err))
 		}
 
-		return s.handleError(c, err, http.StatusInternalServerError)
+		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	return s.success(c, f)
 }
 
+// DownloadFile godoc
+// @Summary DownloadFile
+// @Description DownloadFile
+// @Tags file
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param file_path query string true "File path"
+// @Success 200 {file} file
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/download [get]
 func (s *Server) DownloadFile(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
@@ -49,11 +76,11 @@ func (s *Server) DownloadFile(c echo.Context) error {
 	)
 
 	if err := c.Bind(&req); err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 
 	if err := req.Validate(ctx); err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
 	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
@@ -61,15 +88,28 @@ func (s *Server) DownloadFile(c echo.Context) error {
 	f, mime, err := s.FileService.DownloadFile(ctx, filepath.Join(id.ID, req.FilePath))
 	if err != nil {
 		if errors.Is(err, file.ErrFileNotFound) {
-			return s.handleError(c, err, http.StatusNotFound)
+			return s.error(c, apperror.ErrEntityNotFound(err))
 		}
 
-		return s.handleError(c, err, http.StatusInternalServerError)
+		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	return c.Stream(http.StatusOK, mime, f)
 }
 
+// UploadFiles godoc
+// @Summary UploadFiles
+// @Description UploadFiles
+// @Tags file
+// @Accept multipart/form-data
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param dirpath formData string true "Directory path"
+// @Param files formData file true "Files"
+// @Success 200 {object} model.SuccessResponse{data=[]model.UploadFileResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files [post]
 func (s *Server) UploadFiles(c echo.Context) error {
 	var ctx = mycontext.NewEchoContextAdapter(c)
 
@@ -79,13 +119,13 @@ func (s *Server) UploadFiles(c echo.Context) error {
 	// Directory
 	dirpath := c.FormValue("dirpath")
 	if err := validation.Validate().VarCtx(ctx, dirpath, "required,dirpath"); err != nil {
-		return s.handleError(c, errors.New("invalid dirpath"), http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
 	// Files
 	form, err := c.MultipartForm()
 	if err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 
 	var resp []model.UploadFileResponse
@@ -96,7 +136,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		// open file
 		src, err := file.Open()
 		if err != nil {
-			return s.handleError(c, err, http.StatusInternalServerError)
+			return s.error(c, apperror.ErrInternalServer(err))
 		}
 		defer src.Close()
 
@@ -105,7 +145,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		// save files
 		size, err := s.FileService.CreateFile(ctx, src, fullName, file.Size)
 		if err != nil {
-			return s.handleError(c, err, http.StatusInternalServerError)
+			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
 		resp = append(resp, model.UploadFileResponse{
@@ -117,6 +157,20 @@ func (s *Server) UploadFiles(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// ListEntries godoc
+// @Summary ListEntries
+// @Description ListEntries
+// @Tags file
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param dirpath query string true "Directory path"
+// @Param limit query int false "Limit"
+// @Param cursor query string false "Cursor"
+// @Success 200 {object} model.SuccessResponse{data=model.ListEntriesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files [get]
 func (s *Server) ListEntries(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
@@ -124,11 +178,11 @@ func (s *Server) ListEntries(c echo.Context) error {
 	)
 
 	if err := c.Bind(&req); err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 
 	if err := req.Validate(ctx); err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
 	// Identity ID will be used as root directory
@@ -136,7 +190,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 
 	files, next, err := s.FileService.ListEntries(ctx, filepath.Join(identity.ID, req.DirPath), req.Limit, req.Cursor)
 	if err != nil {
-		return s.handleError(c, err, http.StatusInternalServerError)
+		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	return s.success(c, model.ListEntriesResponse{

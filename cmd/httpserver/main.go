@@ -15,6 +15,13 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// @title SeaCloud APIs
+// @version 1.0
+
+// @BasePath /api
+// @schemes http https
+
+// @description Transaction API.
 func main() {
 	applog, err := logger.NewAppLogger()
 	if err != nil {

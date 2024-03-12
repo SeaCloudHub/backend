@@ -29,4 +29,4 @@ type Entry struct {
 	IsDir     bool        `json:"is_dir"`
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
-}
+} // @name file.Entry

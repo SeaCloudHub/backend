@@ -22,12 +22,12 @@ func (r *ListIdentitiesRequest) Validate() error {
 type ListIdentitiesResponse struct {
 	Identities []identity.Identity `json:"identities"`
 	NextToken  string              `json:"next_token"`
-}
+} // @name model.ListIdentitiesResponse
 
 type CreateIdentityRequest struct {
 	Email    string `json:"email" validate:"required,email" csv:"email"`
 	Password string `json:"password" validate:"required,min=6" csv:"password"`
-}
+} // @name model.CreateIdentityRequest
 
 func (r *CreateIdentityRequest) Validate() error {
 	if len(r.Password) == 0 {
