@@ -54,6 +54,10 @@ func main() {
 		applog.Fatal(err)
 	}
 
+	// internal services
+	server.CSVService = services.NewCSVService()
+	server.MapperService = services.NewMapperService()
+
 	server.BookStore = postgrestore.NewBookStore(db)
 	server.FileService = services.NewFileService(cfg)
 	server.IdentityService = services.NewIdentityService(cfg)

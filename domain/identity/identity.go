@@ -20,6 +20,12 @@ type Service interface {
 	// Admin APIs
 	CreateIdentity(ctx context.Context, email string, password string) (*Identity, error)
 	ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]Identity, string, error)
+	CreateMultipleIdentities(ctx context.Context, simpleIdentities []SimpleIdentity) ([]*Identity, error)
+}
+
+type SimpleIdentity struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type Identity struct {

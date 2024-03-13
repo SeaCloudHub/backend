@@ -188,6 +188,40 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 	return mapIdentity(id)
 }
 
+func (s *IdentityService) CreateMultipleIdentities(ctx context.Context, simpleIdentities []identity.SimpleIdentity) ([]*identity.Identity, error) {
+	var identitiesPatch []kratos.IdentityPatch
+	for _, simpleIdentity := range simpleIdentities {
+		identitiesPatch = append(identitiesPatch, kratos.IdentityPatch{
+			Create: &kratos.CreateIdentityBody{
+				Credentials: &kratos.IdentityWithCredentials{
+					Password: &kratos.IdentityWithCredentialsPassword{
+						Config: &kratos.IdentityWithCredentialsPasswordConfig{
+							Password: kratos.PtrString(simpleIdentity.Password),
+						},
+					},
+				},
+				Traits: map[string]interface{}{
+					"email":               simpleIdentity.Email,
+					"password_changed_at": nil,
+				},
+			},
+		})
+	}
+
+	res, _, err := s.adminClient.IdentityAPI.BatchPatchIdentities(ctx).PatchIdentitiesBody(
+		kratos.PatchIdentitiesBody{
+			Identities: identitiesPatch}).Execute()
+	if err != nil {
+		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return nil, fmt.Errorf("error creating identities: %s", genericErr.Error.Message)
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return mapIdentityFromPatchRes(res)
+}
+
 func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.Identity, string, error) {
 	req := s.adminClient.IdentityAPI.ListIdentities(ctx).PageSize(pageSize)
 	if len(pageToken) > 0 {
@@ -245,6 +279,19 @@ func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {
 		Email:             email,
 		PasswordChangedAt: passwordChangedAt,
 	}, nil
+}
+
+func mapIdentityFromPatchRes(res *kratos.BatchPatchIdentitiesResponse) ([]*identity.Identity, error) {
+	var identities []*identity.Identity
+	for _, id := range res.Identities {
+		i := &identity.Identity{
+			ID: *id.Identity,
+		}
+
+		identities = append(identities, i)
+	}
+
+	return identities, nil
 }
 
 func assetKratosError[T any](err error) (*kratos.GenericOpenAPIError, *T) {
