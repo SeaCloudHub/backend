@@ -5,8 +5,6 @@ import (
 	_ "github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
-	"net/http"
-
 	"github.com/labstack/echo/v4"
 )
 
@@ -114,7 +112,7 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 	file, _, err := c.Request().FormFile("file")
 	if err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 	defer file.Close()
 
@@ -122,17 +120,17 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 
 	err = s.CSVService.CsvToEntities(&file, &identities)
 	if err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 
 	simpleIdentities, err := s.MapperService.ToIdentities(identities)
 	if err != nil {
-		return s.handleError(c, err, http.StatusBadRequest)
+		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
 	ids, err := s.IdentityService.CreateMultipleIdentities(mycontext.NewEchoContextAdapter(c), simpleIdentities)
 	if err != nil {
-		return s.handleError(c, err, http.StatusInternalServerError)
+		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	for i := range ids {
