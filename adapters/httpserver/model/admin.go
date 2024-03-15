@@ -39,7 +39,7 @@ func (r *CreateIdentityRequest) Validate() error {
 
 type ChangeStateRequest struct {
 	Id    string `json:"id" validate:"required"`
-	State string `json:"state" validate:"required"`
+	State string `json:"state" validate:"required,oneof=active inactive"`
 }
 
 type ChangeStateResponse struct {

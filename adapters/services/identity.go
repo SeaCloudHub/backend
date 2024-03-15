@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
-
-	"github.com/SeaCloudHub/backend/pkg/common"
 	"github.com/SeaCloudHub/backend/pkg/config"
-	client "github.com/ory/kratos-client-go"
+
 	kratos "github.com/ory/kratos-client-go"
 	"github.com/ory/x/pagination/keysetpagination"
 )
@@ -190,35 +188,23 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 	return mapIdentity(id)
 }
 
-func (s *IdentityService) ChangeState(ctx context.Context, id string, state common.State) (*identity.Identity, error) {
-	var isValidState bool
-	for _, s := range common.AvailableState {
-		if s == state {
-			isValidState = true
-			break
-		}
-	}
+func (s *IdentityService) ChangeIdentityState(ctx context.Context, id string, state string) (*identity.Identity, error) {
 
-	var req kratos.IdentityAPIPatchIdentityRequest
+	req := s.adminClient.IdentityAPI.PatchIdentity(ctx, id).JsonPatch([]kratos.JsonPatch{})
 
-	if isValidState {
-		req = s.adminClient.IdentityAPI.PatchIdentity(ctx, id).JsonPatch([]client.JsonPatch{{Op: "replace", Path: "/state", Value: state}})
-	} else {
-		return nil, fmt.Errorf("status is not supported")
-	}
-
-	identity, _, err := req.Execute()
+	identity, response, err := req.Execute()
 	if err != nil {
+		fmt.Println("Error executing request:", err)
+		fmt.Println("Response:", response)
 		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
-			return nil, fmt.Errorf("error change status identities: %s", genericErr.Error.GetReason())
+			return nil, fmt.Errorf("error changing status of identities: %s", genericErr.Error.GetReason())
 		}
-
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
 	idRes, err := mapIdentity(identity)
 	if err != nil {
-		return nil, fmt.Errorf("unexpected error when mapping identity: %w", err)
+		return nil, fmt.Errorf("error mapping identity: %w", err)
 	}
 
 	return idRes, nil

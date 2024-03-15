@@ -1,8 +1,10 @@
 package book
 
+import "context"
+
 type Storage interface {
-	Save(book *Book) error
-	FindByISBN(isbn string) (*Book, error)
+	Save(ctx context.Context, book *Book) error
+	FindByISBN(ctx context.Context, isbn string) (*Book, error)
 }
 
 type Book struct {

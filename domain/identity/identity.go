@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"time"
-
-	"github.com/SeaCloudHub/backend/pkg/common"
 )
 
 var (
@@ -22,7 +20,7 @@ type Service interface {
 	// Admin APIs
 	CreateIdentity(ctx context.Context, email string, password string) (*Identity, error)
 	ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]Identity, string, error)
-	ChangeState(ctx context.Context, id string, state common.State) (*Identity, error)
+	ChangeIdentityState(ctx context.Context, id string, state string) (*Identity, error)
 }
 
 type Identity struct {

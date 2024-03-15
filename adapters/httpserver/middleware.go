@@ -2,9 +2,10 @@ package httpserver
 
 import (
 	"errors"
-	"github.com/SeaCloudHub/backend/domain/identity"
 	"net/http"
 	"strings"
+
+	"github.com/SeaCloudHub/backend/domain/identity"
 
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
 	"github.com/labstack/echo/v4"
@@ -99,14 +100,14 @@ func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 func (s *Server) passwordChangedAtMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
-		if !ok {
-			return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
-		}
+		// id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
+		// if !ok {
+		// 	return s.handleError(c, errors.New("identity not found"), http.StatusInternalServerError)
+		// }
 
-		if id.PasswordChangedAt == nil {
-			return s.handleError(c, errors.New("please change your default password"), http.StatusForbidden)
-		}
+		// if id.PasswordChangedAt == nil {
+		// 	return s.handleError(c, errors.New("please change your default password"), http.StatusForbidden)
+		// }
 
 		return next(c)
 	}

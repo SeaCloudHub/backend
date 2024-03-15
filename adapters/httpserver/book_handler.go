@@ -20,7 +20,7 @@ func (s *Server) CreateBook(c echo.Context) error {
 	}
 
 	b := book.NewBook(req.ISBN, req.Name)
-	if err := s.BookStore.Save(&b); err != nil {
+	if err := s.BookStore.Save(c.Request().Context(), &b); err != nil {
 		return s.handleError(c, err, http.StatusInternalServerError)
 	}
 
@@ -29,7 +29,7 @@ func (s *Server) CreateBook(c echo.Context) error {
 
 func (s *Server) GetBook(c echo.Context) error {
 	id := c.Param("id")
-	result, err := s.BookStore.FindByISBN(id)
+	result, err := s.BookStore.FindByISBN(c.Request().Context(), id)
 	if err != nil {
 		return s.handleError(c, err, http.StatusInternalServerError)
 	}
