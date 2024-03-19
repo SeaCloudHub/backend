@@ -43,7 +43,7 @@ func (s *PermissionService) IsManager(ctx context.Context, userID string) (bool,
 		Relation("manager").
 		Execute()
 	if err != nil {
-		if _, genericErr := assetKetoError[keto.ErrorGeneric](err); genericErr != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
 			return false, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
 		}
 
@@ -63,7 +63,7 @@ func (s *PermissionService) CreateManager(ctx context.Context, userID string) er
 		},
 	).Execute()
 	if err != nil {
-		if _, genericErr := assetKetoError[keto.ErrorGeneric](err); genericErr != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
 			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
 		}
 
@@ -73,7 +73,7 @@ func (s *PermissionService) CreateManager(ctx context.Context, userID string) er
 	return nil
 }
 
-func assetKetoError[T any](err error) (*keto.GenericOpenAPIError, *T) {
+func assertKetoError[T any](err error) (*keto.GenericOpenAPIError, *T) {
 	var ketoErr *keto.GenericOpenAPIError
 
 	if errors.As(err, &ketoErr) {

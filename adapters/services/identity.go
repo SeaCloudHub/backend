@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/SeaCloudHub/backend/pkg/config"
 	kratos "github.com/ory/kratos-client-go"
@@ -55,7 +56,7 @@ func (s *IdentityService) Login(ctx context.Context, email string, password stri
 			},
 		}).Execute()
 	if err != nil {
-		if _, loginFlow := assetKratosError[kratos.LoginFlow](err); loginFlow != nil {
+		if _, loginFlow := assertKratosError[kratos.LoginFlow](err); loginFlow != nil {
 			return nil, identity.ErrInvalidCredentials
 		}
 
@@ -72,7 +73,7 @@ func (s *IdentityService) Login(ctx context.Context, email string, password stri
 func (s *IdentityService) WhoAmI(ctx context.Context, token string) (*identity.Identity, error) {
 	session, _, err := s.publicClient.FrontendAPI.ToSession(ctx).XSessionToken(token).Execute()
 	if err != nil {
-		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
 			return nil, identity.ErrInvalidSession
 		}
 
@@ -94,16 +95,19 @@ func (s *IdentityService) WhoAmI(ctx context.Context, token string) (*identity.I
 }
 
 func (s *IdentityService) ChangePassword(ctx context.Context, id *identity.Identity, oldPassword string, newPassword string) error {
-	// Login to check if the old password is correct
-	session, err := s.Login(ctx, id.Email, oldPassword)
+	// Get current identity
+	iden, _, err := s.adminClient.IdentityAPI.GetIdentity(ctx, id.ID).IncludeCredential([]string{"password"}).Execute()
 	if err != nil {
-		return err
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("error getting identity: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
 	}
 
-	// Remove the session that was created by the login
-	if _, err := s.publicClient.FrontendAPI.DisableMySession(ctx, session.ID).
-		XSessionToken(*id.Session.Token).Execute(); err != nil {
-		return fmt.Errorf("unexpected error: %w", err)
+	// Check if the old password is correct
+	if bcrypt.CompareHashAndPassword([]byte((*iden.Credentials)["password"].Config["hashed_password"].(string)), []byte(oldPassword)) != nil {
+		return identity.ErrIncorrectPassword
 	}
 
 	// Change the password
@@ -123,8 +127,13 @@ func (s *IdentityService) ChangePassword(ctx context.Context, id *identity.Ident
 		},
 	).Execute()
 	if err != nil {
-		if _, settingsFlow := assetKratosError[kratos.SettingsFlow](err); settingsFlow != nil {
-			return identity.ErrInvalidCredentials
+		if _, settingsFlow := assertKratosError[kratos.SettingsFlow](err); settingsFlow != nil {
+			return identity.ErrInvalidPassword
+		}
+
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil &&
+			genericErr.Error.GetId() == "session_refresh_required" {
+			return identity.ErrSessionTooOld
 		}
 
 		return fmt.Errorf("unexpected error: %w", err)
@@ -133,7 +142,7 @@ func (s *IdentityService) ChangePassword(ctx context.Context, id *identity.Ident
 	return nil
 }
 
-func (s *IdentityService) SyncPasswordChangedAt(ctx context.Context, id *identity.Identity) error {
+func (s *IdentityService) SetPasswordChangedAt(ctx context.Context, id *identity.Identity) error {
 	// Change the profile to update the password_changed_at
 	flow, _, err := s.publicClient.FrontendAPI.CreateNativeSettingsFlow(ctx).
 		XSessionToken(*id.Session.Token).Execute()
@@ -178,7 +187,7 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, email string, pass
 		},
 	).Execute()
 	if err != nil {
-		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
 			return nil, fmt.Errorf("error creating identity: %s", genericErr.Error.GetReason())
 		}
 
@@ -212,7 +221,7 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context, simpleId
 		kratos.PatchIdentitiesBody{
 			Identities: identitiesPatch}).Execute()
 	if err != nil {
-		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
 			return nil, fmt.Errorf("error creating identities: %s", genericErr.Error.Message)
 		}
 
@@ -230,7 +239,7 @@ func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, 
 
 	identities, resp, err := req.Execute()
 	if err != nil {
-		if _, genericErr := assetKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
 			return nil, "", fmt.Errorf("error listing identities: %s", genericErr.Error.GetReason())
 		}
 
@@ -294,7 +303,7 @@ func mapIdentityFromPatchRes(res *kratos.BatchPatchIdentitiesResponse) ([]*ident
 	return identities, nil
 }
 
-func assetKratosError[T any](err error) (*kratos.GenericOpenAPIError, *T) {
+func assertKratosError[T any](err error) (*kratos.GenericOpenAPIError, *T) {
 	var kratosErr *kratos.GenericOpenAPIError
 
 	if errors.As(err, &kratosErr) {
