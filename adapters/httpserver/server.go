@@ -1,15 +1,15 @@
 package httpserver
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	_ "github.com/SeaCloudHub/backend/docs"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/pkg/errors"
 	echoSwagger "github.com/swaggo/echo-swagger"
-	"net/http"
-	"strings"
 
-	"github.com/SeaCloudHub/backend/domain/book"
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
@@ -34,7 +34,6 @@ type Server struct {
 	CSVService    internal.CSVService
 
 	// storage adapters
-	BookStore book.Storage
 
 	// services
 	FileService       file.Service
@@ -68,7 +67,6 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 
 	s.router.Use(authMiddleware)
 
-	s.RegisterBookRoutes(s.router.Group("/api/books"))
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))

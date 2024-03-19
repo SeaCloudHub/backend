@@ -49,6 +49,8 @@ func main() {
 		applog.Fatal(err)
 	}
 
+	_ = db
+
 	server, err := httpserver.New(cfg, applog)
 	if err != nil {
 		applog.Fatal(err)
@@ -58,7 +60,6 @@ func main() {
 	server.CSVService = services.NewCSVService()
 	server.MapperService = services.NewMapperService()
 
-	server.BookStore = postgrestore.NewBookStore(db)
 	server.FileService = services.NewFileService(cfg)
 	server.IdentityService = services.NewIdentityService(cfg)
 	server.PermissionService = services.NewPermissionService(cfg)
