@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"errors"
+
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
@@ -93,14 +94,22 @@ func (s *Server) ChangePassword(c echo.Context) error {
 	}
 
 	if err := s.IdentityService.ChangePassword(ctx, id, req.OldPassword, req.NewPassword); err != nil {
-		if errors.Is(err, identity.ErrInvalidCredentials) {
-			return s.error(c, apperror.ErrInvalidCredentials(err))
+		if errors.Is(err, identity.ErrIncorrectPassword) {
+			return s.error(c, apperror.ErrIncorrectPassword(err))
+		}
+
+		if errors.Is(err, identity.ErrInvalidPassword) {
+			return s.error(c, apperror.ErrInvalidPassword(err))
+		}
+
+		if errors.Is(err, identity.ErrSessionTooOld) {
+			return s.error(c, apperror.ErrSessionRefreshRequired(err))
 		}
 
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	if err := s.IdentityService.SyncPasswordChangedAt(ctx, id); err != nil {
+	if err := s.IdentityService.SetPasswordChangedAt(ctx, id); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 

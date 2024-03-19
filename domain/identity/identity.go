@@ -8,14 +8,17 @@ import (
 
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrIncorrectPassword  = errors.New("incorrect password")
+	ErrInvalidPassword    = errors.New("invalid password")
 	ErrInvalidSession     = errors.New("invalid session")
+	ErrSessionTooOld      = errors.New("session too old")
 )
 
 type Service interface {
 	Login(ctx context.Context, email string, password string) (*Session, error)
 	WhoAmI(ctx context.Context, token string) (*Identity, error)
 	ChangePassword(ctx context.Context, id *Identity, oldPassword string, newPassword string) error
-	SyncPasswordChangedAt(ctx context.Context, id *Identity) error
+	SetPasswordChangedAt(ctx context.Context, id *Identity) error
 
 	// Admin APIs
 	CreateIdentity(ctx context.Context, email string, password string) (*Identity, error)
