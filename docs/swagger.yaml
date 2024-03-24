@@ -29,6 +29,8 @@ definitions:
         type: string
       id:
         type: string
+      is_admin:
+        type: boolean
       password:
         type: string
       password_changed_at:
@@ -68,6 +70,11 @@ definitions:
       message:
         type: string
     type: object
+  model.IsEmailExistsResponse:
+    properties:
+      exists:
+        type: boolean
+    type: object
   model.ListEntriesResponse:
     properties:
       cursor:
@@ -100,6 +107,12 @@ definitions:
     type: object
   model.LoginResponse:
     properties:
+      identity:
+        $ref: '#/definitions/identity.Identity'
+      session_expires_at:
+        type: string
+      session_id:
+        type: string
       session_token:
         type: string
     type: object
@@ -489,7 +502,7 @@ paths:
       - file
   /files/metadata:
     get:
-      description: GetFile
+      description: GetMetadata
       parameters:
       - default: Bearer <session_token>
         description: Bearer token
@@ -497,9 +510,9 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: File path
+      - description: File or directory path
         in: query
-        name: file_path
+        name: path
         required: true
         type: string
       produces:
@@ -530,7 +543,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.ErrorResponse'
-      summary: GetFile
+      summary: GetMetadata
       tags:
       - file
   /users/change-password:
@@ -575,6 +588,38 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Change password
+      tags:
+      - user
+  /users/is-email-exists:
+    get:
+      description: Check if email exists
+      parameters:
+      - description: Email
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.IsEmailExistsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Check if email exists
       tags:
       - user
   /users/login:

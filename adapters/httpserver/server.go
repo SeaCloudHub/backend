@@ -62,7 +62,9 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 		[]string{
 			"/healthz",
 			"/swagger",
-			"/api/users/login"},
+			"/api/users/login",
+			"/api/users/is-email-exists",
+		},
 	).Middleware()
 
 	s.router.Use(authMiddleware)
@@ -99,22 +101,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) RegisterHealthCheck(router *echo.Group) {
 	router.GET("/healthz", func(c echo.Context) error {
 		return c.String(http.StatusOK, "OK!!!")
-	})
-}
-
-func (s *Server) handleError(c echo.Context, err error, status int) error {
-	s.Logger.Errorw(
-		err.Error(),
-		zap.String("request_id", s.requestID(c)),
-	)
-
-	if status >= http.StatusInternalServerError {
-		sentry.WithContext(c).Error(err)
-	}
-
-	return c.JSON(status, map[string]string{
-		"message": http.StatusText(status),
-		"info":    err.Error(),
 	})
 }
 

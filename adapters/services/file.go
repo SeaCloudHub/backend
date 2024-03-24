@@ -1,32 +1,31 @@
 package services
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"path/filepath"
-
-	"github.com/linxGnu/goseaweedfs"
-	"github.com/seaweedfs/seaweedfs/weed/filer"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/config"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"github.com/SeaCloudHub/backend/pkg/seaweedfs"
+	"github.com/pkg/errors"
 )
 
 type FileService struct {
-	sw    *goseaweedfs.Seaweed
-	filer *goseaweedfs.Filer
+	sw    *seaweedfs.Seaweed
+	filer *seaweedfs.Filer
 }
 
 func NewFileService(cfg *config.Config) *FileService {
-	sw, err := goseaweedfs.NewSeaweed(cfg.SeaweedFS.MasterServer,
-		[]string{cfg.SeaweedFS.FilerServer}, 8096, http.DefaultClient)
+	swcfg := seaweedfs.NewConfigWithFilerURL(cfg.SeaweedFS.MasterServer, cfg.SeaweedFS.FilerServer)
+
+	if cfg.DEBUG {
+		swcfg = swcfg.Debug()
+	}
+
+	sw, err := seaweedfs.NewSeaweed(swcfg)
 	if err != nil {
 		panic(err)
 	}
@@ -37,152 +36,100 @@ func NewFileService(cfg *config.Config) *FileService {
 	}
 }
 
-func (s *FileService) GetFile(ctx context.Context, filePath string) (*file.Entry, error) {
-	query := url.Values{}
-	query.Set("metadata", "true")
-
-	header := map[string]string{
-		"Accept": "application/json",
-	}
-
-	data, code, err := s.filer.Get(filePath, query, header)
+func (s *FileService) GetMetadata(ctx context.Context, fullPath string) (*file.Entry, error) {
+	resp, err := s.filer.GetMetadata(ctx, &seaweedfs.GetMetadataRequest{FullPath: fullPath})
 	if err != nil {
-		return nil, err
+		if errors.Is(err, seaweedfs.ErrNotFound) {
+			return nil, file.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("get metadata: %w", err)
 	}
 
-	if code == http.StatusNotFound {
-		return nil, file.ErrFileNotFound
-	}
+	entry := mapToEntry(resp)
 
-	if code != http.StatusOK {
-		return nil, errors.New("failed to get file")
-	}
-
-	var entry filer.Entry
-	if err := json.Unmarshal(data, &entry); err != nil {
-		return nil, err
-	}
-
-	return mapToEntry(entry), nil
+	return &entry, nil
 }
 
 func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.Reader, string, error) {
-	entry, err := s.GetFile(ctx, filePath)
-	if err != nil {
-		return nil, "", err
-	}
+	// entry, err := s.GetFile(ctx, filePath)
+	// if err != nil {
+	// 	return nil, "", err
+	// }
 
-	if entry.IsDir {
-		return nil, "", errors.New("cannot download a directory")
-	}
+	// if entry.IsDir {
+	// 	return nil, "", errors.New("cannot download a directory")
+	// }
 
-	var buf bytes.Buffer
+	// var buf bytes.Buffer
 
-	if err := s.filer.Download(filePath, nil, func(reader io.Reader) error {
-		_, err := io.Copy(&buf, reader)
-		return err
-	}); err != nil {
-		return nil, "", err
-	}
+	// if err := s.filer.Download(filePath, nil, func(reader io.Reader) error {
+	// 	_, err := io.Copy(&buf, reader)
+	// 	return err
+	// }); err != nil {
+	// 	return nil, "", err
+	// }
 
-	return &buf, entry.MimeType, nil
+	// return &buf, entry.MimeType, nil
+	return nil, "", nil
 }
 
 func (s *FileService) CreateFile(_ context.Context, content io.Reader, fullName string, fileSize int64) (int64, error) {
-	result, err := s.filer.Upload(content, fileSize, fullName, "", "")
-	if err != nil {
-		return 0, err
-	}
+	// result, err := s.filer.Upload(content, fileSize, fullName, "", "")
+	// if err != nil {
+	// 	return 0, err
+	// }
 
-	return result.Size, nil
+	// return result.Size, nil
+	return 0, nil
 }
 
-func (s *FileService) ListEntries(_ context.Context, dirpath string, limit int, cursor string) ([]file.Entry, string, error) {
+func (s *FileService) ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]file.Entry, string, error) {
 	// parse cursor
-	cursorObj, _ := decodeCursor(cursor)
-
-	query := url.Values{}
-	query.Set("limit", fmt.Sprintf("%d", limit))
-	if cursorObj != nil && cursorObj.LastFileName != nil {
-		query.Set("lastFileName", *cursorObj.LastFileName)
-	}
-
-	header := map[string]string{
-		"Accept": "application/json",
-	}
-
-	data, code, err := s.filer.Get(dirpath, query, header)
+	cursorObj, err := pagination.DecodeCursor[swCursor](cursor)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	if code != http.StatusOK {
-		return nil, "", errors.New("failed to list files and directories")
-	}
-
-	var resp listDirectoryEntriesResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, "", err
-	}
-
-	return resp.mapToEntries(), resp.mapToCursor(), nil
-}
-
-type cursor struct {
-	LastFileName *string
-}
-
-func newCursor(lastFileName string) *cursor {
-	return &cursor{LastFileName: &lastFileName}
-}
-
-func (c *cursor) encode() string {
-	data, _ := json.Marshal(c)
-	return base64.StdEncoding.EncodeToString(data)
-}
-
-func decodeCursor(cursorStr string) (*cursor, error) {
-	data, err := base64.StdEncoding.DecodeString(cursorStr)
+	resp, err := s.filer.ListEntries(ctx, &seaweedfs.ListEntriesRequest{
+		DirPath:      dirpath,
+		Limit:        limit,
+		LastFileName: cursorObj.LastFileName,
+	})
 	if err != nil {
-		return nil, err
+		if errors.Is(err, seaweedfs.ErrNotFound) {
+			return nil, "", file.ErrNotFound
+		}
+
+		return nil, "", fmt.Errorf("list entries: %w", err)
 	}
 
-	var cursorObj cursor
-	if err := json.Unmarshal(data, &cursorObj); err != nil {
-		return nil, err
+	return handleListEntriesResponse(resp)
+}
+
+func (s *FileService) CreateDirectory(_ context.Context, dirpath string) error {
+	return nil
+}
+
+func handleListEntriesResponse(resp *seaweedfs.ListEntriesResponse) ([]file.Entry, string, error) {
+	entries := make([]file.Entry, 0, len(resp.Entries))
+	for _, entry := range resp.Entries {
+		entries = append(entries, mapToEntry(&entry))
 	}
 
-	return &cursorObj, nil
-}
-
-type listDirectoryEntriesResponse struct {
-	Path                  string
-	Entries               []filer.Entry
-	Limit                 int
-	LastFileName          string
-	ShouldDisplayLoadMore bool
-	EmptyFolder           bool
-}
-
-func (r *listDirectoryEntriesResponse) mapToEntries() []file.Entry {
-	var entries []file.Entry
-	for _, entry := range r.Entries {
-		entries = append(entries, *mapToEntry(entry))
+	cursor := ""
+	if resp.ShouldDisplayLoadMore {
+		cursor = pagination.EncodeCursor[swCursor](swCursor{LastFileName: resp.LastFileName})
 	}
 
-	return entries
+	return entries, cursor, nil
 }
 
-func (r *listDirectoryEntriesResponse) mapToCursor() string {
-	var cursor string
-	if r.ShouldDisplayLoadMore {
-		cursor = newCursor(r.LastFileName).encode()
-	}
-
-	return cursor
+type swCursor struct {
+	LastFileName string `json:"lastFileName"`
 }
 
-func mapToEntry(entry filer.Entry) *file.Entry {
+func mapToEntry(entry *seaweedfs.Entry) file.Entry {
 	e := file.Entry{
 		Name:      entry.FullPath.Name(),
 		Size:      entry.FileSize,
@@ -199,5 +146,5 @@ func mapToEntry(entry filer.Entry) *file.Entry {
 	entryPath[0] = "/"
 	e.FullPath = filepath.ToSlash(filepath.Join(entryPath...))
 
-	return &e
+	return e
 }

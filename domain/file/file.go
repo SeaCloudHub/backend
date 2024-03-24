@@ -9,14 +9,16 @@ import (
 )
 
 var (
-	ErrFileNotFound = errors.New("no such file or directory")
+	ErrNotFound      = errors.New("no such file or directory")
+	ErrInvalidCursor = errors.New("invalid cursor")
 )
 
 type Service interface {
-	GetFile(ctx context.Context, filePath string) (*Entry, error)
+	GetMetadata(ctx context.Context, fullPath string) (*Entry, error)
 	DownloadFile(ctx context.Context, filePath string) (io.Reader, string, error)
 	CreateFile(ctx context.Context, content io.Reader, fullName string, fileSize int64) (int64, error)
 	ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]Entry, string, error)
+	CreateDirectory(ctx context.Context, dirpath string) error
 }
 
 type Entry struct {

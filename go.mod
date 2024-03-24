@@ -82,7 +82,7 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-resty/resty/v2 v2.11.0 // indirect
+	github.com/go-resty/resty/v2 v2.12.0 // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/gobuffalo/envy v1.10.2 // indirect
 	github.com/gobuffalo/fizz v1.14.4 // indirect

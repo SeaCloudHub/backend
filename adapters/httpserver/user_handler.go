@@ -44,7 +44,19 @@ func (s *Server) Login(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, model.LoginResponse{SessionToken: *session.Token})
+	isAdmin, err := s.PermissionService.IsManager(ctx, session.Identity.ID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	session.Identity.IsAdmin = isAdmin
+
+	return s.success(c, model.LoginResponse{
+		SessionToken:     *session.Token,
+		SessionID:        session.ID,
+		SessionExpiresAt: session.ExpiresAt,
+		Identity:         *session.Identity,
+	})
 }
 
 // Me godoc
@@ -116,8 +128,43 @@ func (s *Server) ChangePassword(c echo.Context) error {
 	return s.success(c, nil)
 }
 
+// IsEmailExists godoc
+// @Summary Check if email exists
+// @Description Check if email exists
+// @Tags user
+// @Produce json
+// @Param email query string true "Email"
+// @Success 200 {object} model.SuccessResponse{data=model.IsEmailExistsResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /users/is-email-exists [get]
+func (s *Server) IsEmailExists(c echo.Context) error {
+	var (
+		ctx = mycontext.NewEchoContextAdapter(c)
+		req model.IsEmailExistsRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	isExist, err := s.IdentityService.IsEmailExists(ctx, req.Email)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.IsEmailExistsResponse{
+		Exists: isExist,
+	})
+}
+
 func (s *Server) RegisterUserRoutes(router *echo.Group) {
 	router.POST("/login", s.Login)
 	router.GET("/me", s.Me)
 	router.POST("/change-password", s.ChangePassword)
+	router.GET("/is-email-exists", s.IsEmailExists)
 }
