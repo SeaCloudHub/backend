@@ -492,14 +492,14 @@ const docTemplate = `{
         },
         "/files/metadata": {
             "get": {
-                "description": "GetFile",
+                "description": "GetMetadata",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "file"
                 ],
-                "summary": "GetFile",
+                "summary": "GetMetadata",
                 "parameters": [
                     {
                         "type": "string",
@@ -511,8 +511,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "File path",
-                        "name": "file_path",
+                        "description": "File or directory path",
+                        "name": "path",
                         "in": "query",
                         "required": true
                     }
@@ -616,6 +616,59 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/is-email-exists": {
+            "get": {
+                "description": "Check if email exists",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Check if email exists",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Email",
+                        "name": "email",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.IsEmailExistsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -775,6 +828,9 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_admin": {
+                    "type": "boolean"
+                },
                 "password": {
                     "type": "string"
                 },
@@ -832,6 +888,14 @@ const docTemplate = `{
                 }
             }
         },
+        "model.IsEmailExistsResponse": {
+            "type": "object",
+            "properties": {
+                "exists": {
+                    "type": "boolean"
+                }
+            }
+        },
         "model.ListEntriesResponse": {
             "type": "object",
             "properties": {
@@ -880,6 +944,15 @@ const docTemplate = `{
         "model.LoginResponse": {
             "type": "object",
             "properties": {
+                "identity": {
+                    "$ref": "#/definitions/identity.Identity"
+                },
+                "session_expires_at": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
                 "session_token": {
                     "type": "string"
                 }

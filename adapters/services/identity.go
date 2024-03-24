@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
@@ -21,14 +20,9 @@ type IdentityService struct {
 }
 
 func NewIdentityService(cfg *config.Config) *IdentityService {
-	var debug bool
-	if strings.ToLower(cfg.AppEnv) == "local" {
-		debug = true
-	}
-
 	return &IdentityService{
-		publicClient: newKratosClient(cfg.Kratos.PublicURL, debug),
-		adminClient:  newKratosClient(cfg.Kratos.AdminURL, debug),
+		publicClient: newKratosClient(cfg.Kratos.PublicURL, cfg.DEBUG),
+		adminClient:  newKratosClient(cfg.Kratos.AdminURL, cfg.DEBUG),
 	}
 }
 
@@ -63,10 +57,16 @@ func (s *IdentityService) Login(ctx context.Context, email string, password stri
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
+	id, err := mapIdentity(result.Session.Identity)
+	if err != nil {
+		return nil, fmt.Errorf("map identity: %w", err)
+	}
+
 	return &identity.Session{
 		ID:        result.Session.Id,
 		Token:     result.SessionToken,
 		ExpiresAt: result.Session.ExpiresAt,
+		Identity:  id,
 	}, nil
 }
 
@@ -167,6 +167,23 @@ func (s *IdentityService) SetPasswordChangedAt(ctx context.Context, id *identity
 	}
 
 	return nil
+}
+
+func (s *IdentityService) IsEmailExists(ctx context.Context, email string) (bool, error) {
+	identities, _, err := s.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
+	if err != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return false, fmt.Errorf("error checking email: %s", genericErr.Error.GetReason())
+		}
+
+		return false, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(identities) > 0 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // Admin APIs

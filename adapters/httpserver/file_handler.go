@@ -16,23 +16,23 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// GetFile godoc
-// @Summary GetFile
-// @Description GetFile
+// GetMetadata godoc
+// @Summary GetMetadata
+// @Description GetMetadata
 // @Tags file
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param file_path query string true "File path"
+// @Param path query string true "File or directory path"
 // @Success 200 {object} model.SuccessResponse{data=file.Entry}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/metadata [get]
-func (s *Server) GetFile(c echo.Context) error {
+func (s *Server) GetMetadata(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
-		req model.GetFileRequest
+		req model.GetMetadata
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -45,9 +45,9 @@ func (s *Server) GetFile(c echo.Context) error {
 
 	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	f, err := s.FileService.GetFile(ctx, filepath.Join(id.ID, req.FilePath))
+	f, err := s.FileService.GetMetadata(ctx, filepath.Join(id.ID, req.Path))
 	if err != nil {
-		if errors.Is(err, file.ErrFileNotFound) {
+		if errors.Is(err, file.ErrNotFound) {
 			return s.error(c, apperror.ErrEntityNotFound(err))
 		}
 
@@ -87,7 +87,7 @@ func (s *Server) DownloadFile(c echo.Context) error {
 
 	f, mime, err := s.FileService.DownloadFile(ctx, filepath.Join(id.ID, req.FilePath))
 	if err != nil {
-		if errors.Is(err, file.ErrFileNotFound) {
+		if errors.Is(err, file.ErrNotFound) {
 			return s.error(c, apperror.ErrEntityNotFound(err))
 		}
 
@@ -190,6 +190,14 @@ func (s *Server) ListEntries(c echo.Context) error {
 
 	files, next, err := s.FileService.ListEntries(ctx, filepath.Join(identity.ID, req.DirPath), req.Limit, req.Cursor)
 	if err != nil {
+		if errors.Is(err, file.ErrInvalidCursor) {
+			return s.error(c, apperror.ErrInvalidParam(err))
+		}
+
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
@@ -199,10 +207,35 @@ func (s *Server) ListEntries(c echo.Context) error {
 	})
 }
 
+func (s *Server) CreateDirectory(c echo.Context) error {
+	var (
+		ctx = mycontext.NewEchoContextAdapter(c)
+		req model.CreateDirectoryRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	// Identity ID will be used as root directory
+	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
+
+	if err := s.FileService.CreateDirectory(ctx, filepath.Join(identity.ID, req.DirPath)); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, nil)
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.POST("", s.UploadFiles)
 	router.GET("", s.ListEntries)
-	router.GET("/metadata", s.GetFile)
+	router.POST("/directories", s.CreateDirectory)
+	router.GET("/metadata", s.GetMetadata)
 	router.GET("/download", s.DownloadFile)
 }

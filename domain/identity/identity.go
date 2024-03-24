@@ -19,6 +19,7 @@ type Service interface {
 	WhoAmI(ctx context.Context, token string) (*Identity, error)
 	ChangePassword(ctx context.Context, id *Identity, oldPassword string, newPassword string) error
 	SetPasswordChangedAt(ctx context.Context, id *Identity) error
+	IsEmailExists(ctx context.Context, email string) (bool, error)
 
 	// Admin APIs
 	CreateIdentity(ctx context.Context, email string, password string) (*Identity, error)
@@ -37,10 +38,12 @@ type Identity struct {
 	Password          string     `json:"password,omitempty"`
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 	Session           *Session   `json:"-"`
+	IsAdmin           bool       `json:"is_admin"`
 } // @name identity.Identity
 
 type Session struct {
 	ID        string     `json:"id"`
 	Token     *string    `json:"token"`
 	ExpiresAt *time.Time `json:"expires_at"`
+	Identity  *Identity  `json:"identity"`
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/SeaCloudHub/backend/pkg/config"
 	keto "github.com/ory/keto-client-go"
@@ -16,14 +15,9 @@ type PermissionService struct {
 }
 
 func NewPermissionService(cfg *config.Config) *PermissionService {
-	var debug bool
-	if strings.ToLower(cfg.AppEnv) == "local" {
-		debug = true
-	}
-
 	return &PermissionService{
-		readClient:  newKetoClient(cfg.Keto.ReadURL, debug),
-		writeClient: newKetoClient(cfg.Keto.WriteURL, debug),
+		readClient:  newKetoClient(cfg.Keto.ReadURL, cfg.DEBUG),
+		writeClient: newKetoClient(cfg.Keto.WriteURL, cfg.DEBUG),
 	}
 }
 
