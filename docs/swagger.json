@@ -879,7 +879,13 @@
         "identity.Identity": {
             "type": "object",
             "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
                 "email": {
+                    "type": "string"
+                },
+                "first_name": {
                     "type": "string"
                 },
                 "id": {
@@ -887,6 +893,9 @@
                 },
                 "is_admin": {
                     "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
                 },
                 "password": {
                     "type": "string"
@@ -922,12 +931,23 @@
                 "password"
             ],
             "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
+                "first_name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
                 "password": {
                     "type": "string",
-                    "minLength": 6
+                    "minLength": 8
                 }
             }
         },

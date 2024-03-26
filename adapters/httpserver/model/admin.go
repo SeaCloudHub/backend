@@ -25,8 +25,11 @@ type ListIdentitiesResponse struct {
 } // @name model.ListIdentitiesResponse
 
 type CreateIdentityRequest struct {
-	Email    string `json:"email" validate:"required,email" csv:"email"`
-	Password string `json:"password" validate:"required,min=6" csv:"password"`
+	Email     string `json:"email" validate:"required,email" csv:"email"`
+	Password  string `json:"password" validate:"required,min=8" csv:"password"`
+	FirstName string `json:"first_name" validate:"omitempty,max=50" csv:"first_name"`
+	LastName  string `json:"last_name" validate:"omitempty,max=50" csv:"last_name"`
+	AvatarURL string `json:"avatar_url" validate:"omitempty,url" csv:"avatar_url"`
 } // @name model.CreateIdentityRequest
 
 func (r *CreateIdentityRequest) Validate() error {
