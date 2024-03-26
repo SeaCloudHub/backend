@@ -48,7 +48,7 @@ type ListEntriesResponse struct {
 } // @name model.ListEntriesResponse
 
 type CreateDirectoryRequest struct {
-	DirPath string `json:"dirpath" validate:"required,dirpath"`
+	DirPath string `json:"dirpath" validate:"required,dirpath|filepath"`
 }
 
 func (r *CreateDirectoryRequest) Validate(ctx context.Context) error {

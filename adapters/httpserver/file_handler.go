@@ -93,6 +93,7 @@ func (s *Server) DownloadFile(c echo.Context) error {
 
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
+	defer f.Close()
 
 	return c.Stream(http.StatusOK, mime, f)
 }
@@ -118,7 +119,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 
 	// Directory
 	dirpath := c.FormValue("dirpath")
-	if err := validation.Validate().VarCtx(ctx, dirpath, "required,dirpath"); err != nil {
+	if err := validation.Validate().VarCtx(ctx, dirpath, "required,dirpath|filepath"); err != nil {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
@@ -143,7 +144,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		fullName := filepath.Join(identity.ID, dirpath, file.Filename)
 
 		// save files
-		size, err := s.FileService.CreateFile(ctx, src, fullName, file.Size)
+		size, err := s.FileService.CreateFile(ctx, src, fullName)
 		if err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}
@@ -207,6 +208,19 @@ func (s *Server) ListEntries(c echo.Context) error {
 	})
 }
 
+// CreateDirectory godoc
+// @Summary CreateDirectory
+// @Description CreateDirectory
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param dirpath body string true "Directory path"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/directories [post]
 func (s *Server) CreateDirectory(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)

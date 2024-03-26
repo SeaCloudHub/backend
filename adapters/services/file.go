@@ -51,37 +51,34 @@ func (s *FileService) GetMetadata(ctx context.Context, fullPath string) (*file.E
 	return &entry, nil
 }
 
-func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.Reader, string, error) {
-	// entry, err := s.GetFile(ctx, filePath)
-	// if err != nil {
-	// 	return nil, "", err
-	// }
+func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.ReadCloser, string, error) {
+	entry, err := s.GetMetadata(ctx, filePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("get metadata: %w", err)
+	}
 
-	// if entry.IsDir {
-	// 	return nil, "", errors.New("cannot download a directory")
-	// }
+	if entry.IsDir {
+		return nil, "", file.ErrNotFound
+	}
 
-	// var buf bytes.Buffer
+	rc, err := s.filer.DownloadFile(ctx, &seaweedfs.DownloadFileRequest{FullPath: filePath})
+	if err != nil {
+		return nil, "", fmt.Errorf("download file: %w", err)
+	}
 
-	// if err := s.filer.Download(filePath, nil, func(reader io.Reader) error {
-	// 	_, err := io.Copy(&buf, reader)
-	// 	return err
-	// }); err != nil {
-	// 	return nil, "", err
-	// }
-
-	// return &buf, entry.MimeType, nil
-	return nil, "", nil
+	return rc, entry.MimeType, nil
 }
 
-func (s *FileService) CreateFile(_ context.Context, content io.Reader, fullName string, fileSize int64) (int64, error) {
-	// result, err := s.filer.Upload(content, fileSize, fullName, "", "")
-	// if err != nil {
-	// 	return 0, err
-	// }
+func (s *FileService) CreateFile(ctx context.Context, content io.Reader, fullName string) (int64, error) {
+	result, err := s.filer.UploadFile(ctx, &seaweedfs.UploadFileRequest{
+		Content:      content,
+		FullFileName: fullName,
+	})
+	if err != nil {
+		return 0, err
+	}
 
-	// return result.Size, nil
-	return 0, nil
+	return result.Size, nil
 }
 
 func (s *FileService) ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]file.Entry, string, error) {
@@ -107,7 +104,12 @@ func (s *FileService) ListEntries(ctx context.Context, dirpath string, limit int
 	return handleListEntriesResponse(resp)
 }
 
-func (s *FileService) CreateDirectory(_ context.Context, dirpath string) error {
+func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error {
+	err := s.filer.CreateDirectory(ctx, &seaweedfs.CreateDirectoryRequest{DirPath: dirpath})
+	if err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+
 	return nil
 }
 

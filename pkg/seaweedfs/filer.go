@@ -3,6 +3,7 @@ package seaweedfs
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -78,4 +79,49 @@ func (f *Filer) ListEntries(ctx context.Context, in *ListEntriesRequest) (*ListE
 	}
 
 	return &result, nil
+}
+
+func (f *Filer) DownloadFile(ctx context.Context, in *DownloadFileRequest) (io.ReadCloser, error) {
+	resp, err := f.client.R().SetContext(ctx).SetDoNotParseResponse(true).
+		Get(in.FullPath)
+	if err != nil {
+		return nil, fmt.Errorf("download file: %w", err)
+	}
+
+	if resp.StatusCode() == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	return resp.RawBody(), nil
+}
+
+func (f *Filer) UploadFile(ctx context.Context, in *UploadFileRequest) (*UploadFileResponse, error) {
+	var result UploadFileResponse
+
+	resp, err := f.client.R().SetContext(ctx).SetFileReader("file", "", in.Content).
+		SetResult(&result).
+		Post(in.FullFileName)
+	if err != nil {
+		return nil, fmt.Errorf("upload file: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusCreated {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+	}
+
+	return &result, nil
+}
+
+func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest) error {
+	resp, err := f.client.R().SetContext(ctx).
+		Post(in.DirPath)
+	if err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusCreated {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+	}
+
+	return nil
 }
