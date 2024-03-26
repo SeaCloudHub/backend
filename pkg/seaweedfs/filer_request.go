@@ -1,5 +1,7 @@
 package seaweedfs
 
+import "io"
+
 type GetMetadataRequest struct {
 	FullPath string
 }
@@ -10,4 +12,13 @@ type ListEntriesRequest struct {
 	LastFileName       string
 	NamePattern        string
 	NamePatternExclude string
+}
+
+type DownloadFileRequest struct {
+	FullPath string
+}
+
+type UploadFileRequest struct {
+	Content      io.Reader
+	FullFileName string
 }

@@ -8,3 +8,8 @@ type ListEntriesResponse struct {
 	ShouldDisplayLoadMore bool
 	EmptyFolder           bool
 }
+
+type UploadFileResponse struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}

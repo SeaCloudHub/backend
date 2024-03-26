@@ -93,6 +93,7 @@ func (s *Server) DownloadFile(c echo.Context) error {
 
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
+	defer f.Close()
 
 	return c.Stream(http.StatusOK, mime, f)
 }
@@ -143,7 +144,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		fullName := filepath.Join(identity.ID, dirpath, file.Filename)
 
 		// save files
-		size, err := s.FileService.CreateFile(ctx, src, fullName, file.Size)
+		size, err := s.FileService.CreateFile(ctx, src, fullName)
 		if err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}

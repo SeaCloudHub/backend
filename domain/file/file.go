@@ -15,8 +15,8 @@ var (
 
 type Service interface {
 	GetMetadata(ctx context.Context, fullPath string) (*Entry, error)
-	DownloadFile(ctx context.Context, filePath string) (io.Reader, string, error)
-	CreateFile(ctx context.Context, content io.Reader, fullName string, fileSize int64) (int64, error)
+	DownloadFile(ctx context.Context, filePath string) (io.ReadCloser, string, error)
+	CreateFile(ctx context.Context, content io.Reader, fullName string) (int64, error)
 	ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]Entry, string, error)
 	CreateDirectory(ctx context.Context, dirpath string) error
 }
