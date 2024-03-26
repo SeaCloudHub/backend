@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/SeaCloudHub/backend/adapters/services"
+	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -42,7 +43,11 @@ func main() {
 	password := "plzdonthackme"
 
 	// create admin user
-	identity, err := identityService.CreateIdentity(ctx, email, password)
+	identity, err := identityService.CreateIdentity(ctx, identity.SimpleIdentity{
+		Email:     email,
+		Password:  password,
+		FirstName: "Admin",
+	})
 	if err != nil {
 		applog.Fatalf("cannot create admin user: %v", err)
 	}

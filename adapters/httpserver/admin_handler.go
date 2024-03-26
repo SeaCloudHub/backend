@@ -86,7 +86,7 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	id, err := s.IdentityService.CreateIdentity(ctx, req.Email, req.Password)
+	id, err := s.IdentityService.CreateIdentity(ctx, s.MapperService.ToIdentity(req))
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -116,7 +116,7 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 	}
 	defer file.Close()
 
-	var identities []*model.CreateIdentityRequest
+	var identities []model.CreateIdentityRequest
 
 	err = s.CSVService.CsvToEntities(&file, &identities)
 	if err != nil {

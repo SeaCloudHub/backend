@@ -26,18 +26,17 @@
 						}
 					}
 				},
-				"name": {
-					"type": "object",
-					"properties": {
-						"first": {
-							"title": "First Name",
-							"type": "string"
-						},
-						"last": {
-							"title": "Last Name",
-							"type": "string"
-						}
-					}
+				"first_name": {
+					"type": "string",
+					"title": "First Name"
+				},
+				"last_name": {
+					"type": "string",
+					"title": "Last Name"
+				},
+				"avatar_url": {
+					"type": "string",
+					"title": "Avatar URL"
 				},
 				"password_changed_at": {
 					"anyOf": [

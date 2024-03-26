@@ -157,6 +157,9 @@ func (s *IdentityService) SetPasswordChangedAt(ctx context.Context, id *identity
 				Method: "profile",
 				Traits: map[string]interface{}{
 					"email":               id.Email,
+					"first_name":          id.FirstName,
+					"last_name":           id.LastName,
+					"avatar_url":          id.AvatarURL,
 					"password_changed_at": time.Now().Format(time.RFC3339),
 				},
 			},
@@ -187,18 +190,21 @@ func (s *IdentityService) IsEmailExists(ctx context.Context, email string) (bool
 }
 
 // Admin APIs
-func (s *IdentityService) CreateIdentity(ctx context.Context, email string, password string) (*identity.Identity, error) {
+func (s *IdentityService) CreateIdentity(ctx context.Context, in identity.SimpleIdentity) (*identity.Identity, error) {
 	id, _, err := s.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(
 		kratos.CreateIdentityBody{
 			Credentials: &kratos.IdentityWithCredentials{
 				Password: &kratos.IdentityWithCredentialsPassword{
 					Config: &kratos.IdentityWithCredentialsPasswordConfig{
-						Password: kratos.PtrString(password),
+						Password: kratos.PtrString(in.Password),
 					},
 				},
 			},
 			Traits: map[string]interface{}{
-				"email":               email,
+				"email":               in.Email,
+				"first_name":          in.FirstName,
+				"last_name":           in.LastName,
+				"avatar_url":          in.AvatarURL,
 				"password_changed_at": nil,
 			},
 		},
@@ -282,19 +288,23 @@ func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, 
 func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {
 	traits, ok := id.GetTraits().(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("cannot get traits")
+		return nil, errors.New("get traits")
 	}
 
 	email, ok := traits["email"].(string)
 	if !ok {
-		return nil, fmt.Errorf("cannot get email")
+		return nil, errors.New("get email")
 	}
+
+	firstName, _ := traits["first_name"].(string)
+	lastName, _ := traits["last_name"].(string)
+	avatarURL, _ := traits["avatar_url"].(string)
 
 	var passwordChangedAt *time.Time
 	if pca, ok := traits["password_changed_at"]; ok && pca != nil && len(pca.(string)) > 0 {
 		t, err := time.Parse(time.RFC3339, pca.(string))
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse password_changed_at: %w", err)
+			return nil, fmt.Errorf("parse password_changed_at: %w", err)
 		}
 
 		passwordChangedAt = &t
@@ -303,6 +313,9 @@ func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {
 	return &identity.Identity{
 		ID:                id.Id,
 		Email:             email,
+		FirstName:         firstName,
+		LastName:          lastName,
+		AvatarURL:         avatarURL,
 		PasswordChangedAt: passwordChangedAt,
 	}, nil
 }
