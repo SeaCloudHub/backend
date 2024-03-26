@@ -34,13 +34,13 @@
                     {
                         "type": "string",
                         "description": "Page token",
-                        "name": "pageToken",
+                        "name": "page_token",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "description": "Page size",
-                        "name": "pageSize",
+                        "name": "page_size",
                         "in": "query"
                     }
                 ],

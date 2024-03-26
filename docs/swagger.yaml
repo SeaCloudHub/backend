@@ -233,11 +233,11 @@ paths:
         type: string
       - description: Page token
         in: query
-        name: pageToken
+        name: page_token
         type: string
       - description: Page size
         in: query
-        name: pageSize
+        name: page_size
         type: integer
       produces:
       - application/json
