@@ -104,7 +104,12 @@ func (s *FileService) ListEntries(ctx context.Context, dirpath string, limit int
 	return handleListEntriesResponse(resp)
 }
 
-func (s *FileService) CreateDirectory(_ context.Context, dirpath string) error {
+func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error {
+	err := s.filer.CreateDirectory(ctx, &seaweedfs.CreateDirectoryRequest{DirPath: dirpath})
+	if err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+
 	return nil
 }
 

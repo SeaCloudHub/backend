@@ -111,3 +111,17 @@ func (f *Filer) UploadFile(ctx context.Context, in *UploadFileRequest) (*UploadF
 
 	return &result, nil
 }
+
+func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest) error {
+	resp, err := f.client.R().SetContext(ctx).
+		Post(in.DirPath)
+	if err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusCreated {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+	}
+
+	return nil
+}
