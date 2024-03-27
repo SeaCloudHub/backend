@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/SeaCloudHub/backend/adapters/event"
 	"log"
 	"net/http"
 
@@ -56,12 +57,16 @@ func main() {
 		applog.Fatal(err)
 	}
 
+	// event bus
+	server.EventDispatcher = event.NewEventDispatcher()
+
 	// internal services
 	server.CSVService = services.NewCSVService()
 	server.MapperService = services.NewMapperService()
 
+
 	server.FileService = services.NewFileService(cfg)
-	server.IdentityService = services.NewIdentityService(cfg)
+	server.IdentityService = services.NewIdentityService(cfg, server.EventDispatcher)
 	server.PermissionService = services.NewPermissionService(cfg)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)

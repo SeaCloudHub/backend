@@ -26,3 +26,7 @@ type UploadFileRequest struct {
 type CreateDirectoryRequest struct {
 	DirPath string
 }
+
+type DeleteRequest struct {
+	FullPath string
+}

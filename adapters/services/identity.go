@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/SeaCloudHub/backend/domain"
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
@@ -15,14 +16,16 @@ import (
 )
 
 type IdentityService struct {
-	publicClient *kratos.APIClient
-	adminClient  *kratos.APIClient
+	publicClient    *kratos.APIClient
+	adminClient     *kratos.APIClient
+	eventDispatcher domain.EventDispatcher
 }
 
-func NewIdentityService(cfg *config.Config) *IdentityService {
+func NewIdentityService(cfg *config.Config, eventDispatcher domain.EventDispatcher) *IdentityService {
 	return &IdentityService{
-		publicClient: newKratosClient(cfg.Kratos.PublicURL, cfg.DEBUG),
-		adminClient:  newKratosClient(cfg.Kratos.AdminURL, cfg.DEBUG),
+		publicClient:    newKratosClient(cfg.Kratos.PublicURL, cfg.DEBUG),
+		adminClient:     newKratosClient(cfg.Kratos.AdminURL, cfg.DEBUG),
+		eventDispatcher: eventDispatcher,
 	}
 }
 
@@ -190,7 +193,7 @@ func (s *IdentityService) GetByEmail(ctx context.Context, email string) (*identi
 }
 
 // Admin APIs
-func (s *IdentityService) CreateIdentity(ctx context.Context, in identity.SimpleIdentity) (*identity.Identity, error) {
+func (s *IdentityService) CreateIdentity(ctx context.Context, in identity.SimpleIdentity, listener func(event domain.BaseDomainEvent) error) (*identity.Identity, error) {
 	id, _, err := s.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(
 		kratos.CreateIdentityBody{
 			Credentials: &kratos.IdentityWithCredentials{
@@ -217,10 +220,24 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, in identity.Simple
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
+	identityCreatedEvent := identity.NewIdentityCreatedEvent(id.Id)
+	s.eventDispatcher.Register(identityCreatedEvent.EventName(), listener)
+	err = s.eventDispatcher.Dispatch(identityCreatedEvent)
+	if err != nil {
+		if _, rollbackErr := s.adminClient.IdentityAPI.DeleteIdentity(ctx,
+			id.Id).Execute(); rollbackErr != nil {
+			return nil, fmt.Errorf("error creating identity: %w", rollbackErr)
+		}
+
+		return nil, fmt.Errorf("error creating identity: %w", err)
+	}
+
 	return mapIdentity(id)
 }
 
-func (s *IdentityService) CreateMultipleIdentities(ctx context.Context, simpleIdentities []identity.SimpleIdentity) ([]*identity.Identity, error) {
+func (s *IdentityService) CreateMultipleIdentities(ctx context.Context,
+	simpleIdentities []identity.SimpleIdentity, listener func(event domain.BaseDomainEvent) error) ([]*identity.Identity,
+	error) {
 	var identitiesPatch []kratos.IdentityPatch
 	for _, simpleIdentity := range simpleIdentities {
 		identitiesPatch = append(identitiesPatch, kratos.IdentityPatch{
@@ -249,6 +266,22 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context, simpleId
 		}
 
 		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	Ids := make([]string, 0)
+	for _, id := range res.Identities {
+		Ids = append(Ids, *id.Identity)
+	}
+	identitiesPatchedEvent := identity.NewIdentitiesPatchedEvent(Ids)
+	s.eventDispatcher.Register(identitiesPatchedEvent.EventName(), listener)
+	err = s.eventDispatcher.Dispatch(identitiesPatchedEvent)
+	if err != nil {
+		rollbackErr := s.rollbackIdentities(ctx, res.Identities)
+		if rollbackErr != nil {
+			return nil, rollbackErr
+		}
+
+		return nil, fmt.Errorf("error creating identities: %w", err)
 	}
 
 	return mapIdentityFromPatchRes(res)
@@ -282,7 +315,15 @@ func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, 
 	pagination := keysetpagination.ParseHeader(resp)
 
 	return result, pagination.NextToken, nil
+}
 
+func (s *IdentityService) rollbackIdentities(ctx context.Context, identities []kratos.IdentityPatchResponse) error {
+	for _, id := range identities {
+		if _, rollbackErr := s.adminClient.IdentityAPI.DeleteIdentity(ctx, *id.Identity).Execute(); rollbackErr != nil {
+			return fmt.Errorf("error deleting identity: %w", rollbackErr)
+		}
+	}
+	return nil
 }
 
 func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {

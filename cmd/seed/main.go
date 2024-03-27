@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/SeaCloudHub/backend/adapters/event"
+	"github.com/SeaCloudHub/backend/adapters/event/listeners"
 	"log"
 
 	"github.com/SeaCloudHub/backend/adapters/services"
@@ -35,8 +37,9 @@ func main() {
 	}
 	defer sentrygo.Flush(sentry.FlushTime)
 
-	identityService := services.NewIdentityService(cfg)
+	identityService := services.NewIdentityService(cfg, event.NewEventDispatcher())
 	permissionService := services.NewPermissionService(cfg)
+	fileService := services.NewFileService(cfg)
 
 	ctx := context.Background()
 	email := "admin@seacloudhub.com"
@@ -47,7 +50,7 @@ func main() {
 		Email:     email,
 		Password:  password,
 		FirstName: "Admin",
-	})
+	}, listeners.NewIdentityCreatedEventListener(fileService).EventHandler)
 	if err != nil {
 		applog.Fatalf("cannot create admin user: %v", err)
 	}

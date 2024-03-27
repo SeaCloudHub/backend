@@ -125,3 +125,17 @@ func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest)
 
 	return nil
 }
+
+func (f *Filer) Delete(ctx context.Context, in *DeleteRequest) error {
+	resp, err := f.client.R().SetContext(ctx).
+		Delete(in.FullPath)
+	if err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+
+	if resp.StatusCode() == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	return nil
+}
