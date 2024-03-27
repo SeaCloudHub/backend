@@ -14,6 +14,7 @@ const (
 	ForbiddenCode            = "403005"
 	RefreshTokenRequiredCode = "403008"
 	EntityNotFoundCode       = "404006"
+	IdentityNotFoundCode     = "404007"
 )
 
 // 400 Bad Request
@@ -54,4 +55,8 @@ func ErrSessionRefreshRequired(err error) Error {
 // 404 Not Found
 func ErrEntityNotFound(err error) Error {
 	return NewError(err, http.StatusNotFound, EntityNotFoundCode, "No such file or directory")
+}
+
+func ErrIdentityNotFound(err error) Error {
+	return NewError(err, http.StatusNotFound, IdentityNotFoundCode, "Identity not found")
 }

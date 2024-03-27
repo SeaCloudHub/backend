@@ -12,6 +12,7 @@ var (
 	ErrInvalidPassword    = errors.New("invalid password")
 	ErrInvalidSession     = errors.New("invalid session")
 	ErrSessionTooOld      = errors.New("session too old")
+	ErrIdentityNotFound   = errors.New("identity not found")
 )
 
 type Service interface {
@@ -19,7 +20,7 @@ type Service interface {
 	WhoAmI(ctx context.Context, token string) (*Identity, error)
 	ChangePassword(ctx context.Context, id *Identity, oldPassword string, newPassword string) error
 	SetPasswordChangedAt(ctx context.Context, id *Identity) error
-	IsEmailExists(ctx context.Context, email string) (bool, error)
+	GetByEmail(ctx context.Context, email string) (*Identity, error)
 
 	// Admin APIs
 	CreateIdentity(ctx context.Context, in SimpleIdentity) (*Identity, error)

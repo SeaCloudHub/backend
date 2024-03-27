@@ -84,10 +84,18 @@ definitions:
       message:
         type: string
     type: object
-  model.IsEmailExistsResponse:
+  model.GetByEmailResponse:
     properties:
-      exists:
-        type: boolean
+      avatar_url:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password_changed_at:
+        type: string
     type: object
   model.ListEntriesResponse:
     properties:
@@ -644,9 +652,9 @@ paths:
       summary: Change password
       tags:
       - user
-  /users/is-email-exists:
+  /users/email:
     get:
-      description: Check if email exists
+      description: Get user by email
       parameters:
       - description: Email
         in: query
@@ -663,7 +671,7 @@ paths:
             - $ref: '#/definitions/model.SuccessResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/model.IsEmailExistsResponse'
+                  $ref: '#/definitions/model.GetByEmailResponse'
               type: object
         "400":
           description: Bad Request
@@ -673,7 +681,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.ErrorResponse'
-      summary: Check if email exists
+      summary: Get user by email
       tags:
       - user
   /users/login:
