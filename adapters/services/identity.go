@@ -288,7 +288,12 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context,
 }
 
 func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.Identity, string, error) {
-	req := s.adminClient.IdentityAPI.ListIdentities(ctx).PageSize(pageSize)
+	req := s.adminClient.IdentityAPI.ListIdentities(ctx)
+
+	if pageSize > 0 {
+		req = req.PageSize(pageSize)
+	}
+
 	if len(pageToken) > 0 {
 		req = req.PageToken(pageToken)
 	}

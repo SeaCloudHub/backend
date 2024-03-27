@@ -76,6 +76,7 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))
+	s.RegisterMainRoutes(s.router.Group("/api/main"))
 
 	return &s, nil
 }
