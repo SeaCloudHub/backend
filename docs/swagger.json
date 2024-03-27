@@ -686,16 +686,16 @@
                 }
             }
         },
-        "/users/is-email-exists": {
+        "/users/email": {
             "get": {
-                "description": "Check if email exists",
+                "description": "Get user by email",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "user"
                 ],
-                "summary": "Check if email exists",
+                "summary": "Get user by email",
                 "parameters": [
                     {
                         "type": "string",
@@ -717,7 +717,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/model.IsEmailExistsResponse"
+                                            "$ref": "#/definitions/model.GetByEmailResponse"
                                         }
                                     }
                                 }
@@ -965,11 +965,23 @@
                 }
             }
         },
-        "model.IsEmailExistsResponse": {
+        "model.GetByEmailResponse": {
             "type": "object",
             "properties": {
-                "exists": {
-                    "type": "boolean"
+                "avatar_url": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "password_changed_at": {
+                    "type": "string"
                 }
             }
         },

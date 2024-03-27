@@ -128,20 +128,20 @@ func (s *Server) ChangePassword(c echo.Context) error {
 	return s.success(c, nil)
 }
 
-// IsEmailExists godoc
-// @Summary Check if email exists
-// @Description Check if email exists
+// GetByEmail godoc
+// @Summary Get user by email
+// @Description Get user by email
 // @Tags user
 // @Produce json
 // @Param email query string true "Email"
-// @Success 200 {object} model.SuccessResponse{data=model.IsEmailExistsResponse}
+// @Success 200 {object} model.SuccessResponse{data=model.GetByEmailResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
-// @Router /users/is-email-exists [get]
-func (s *Server) IsEmailExists(c echo.Context) error {
+// @Router /users/email [get]
+func (s *Server) GetByEmail(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
-		req model.IsEmailExistsRequest
+		req model.GetByEmailRequest
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -152,13 +152,21 @@ func (s *Server) IsEmailExists(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	isExist, err := s.IdentityService.IsEmailExists(ctx, req.Email)
+	id, err := s.IdentityService.GetByEmail(ctx, req.Email)
 	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, model.IsEmailExistsResponse{
-		Exists: isExist,
+	return s.success(c, model.GetByEmailResponse{
+		Email:             id.Email,
+		FirstName:         id.FirstName,
+		LastName:          id.LastName,
+		AvatarURL:         id.AvatarURL,
+		PasswordChangedAt: id.PasswordChangedAt,
 	})
 }
 
@@ -166,5 +174,5 @@ func (s *Server) RegisterUserRoutes(router *echo.Group) {
 	router.POST("/login", s.Login)
 	router.GET("/me", s.Me)
 	router.POST("/change-password", s.ChangePassword)
-	router.GET("/is-email-exists", s.IsEmailExists)
+	router.GET("/email", s.GetByEmail)
 }

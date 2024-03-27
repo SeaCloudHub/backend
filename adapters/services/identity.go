@@ -172,21 +172,21 @@ func (s *IdentityService) SetPasswordChangedAt(ctx context.Context, id *identity
 	return nil
 }
 
-func (s *IdentityService) IsEmailExists(ctx context.Context, email string) (bool, error) {
+func (s *IdentityService) GetByEmail(ctx context.Context, email string) (*identity.Identity, error) {
 	identities, _, err := s.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
 		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
-			return false, fmt.Errorf("error checking email: %s", genericErr.Error.GetReason())
+			return nil, fmt.Errorf("list identities: %s", genericErr.Error.GetReason())
 		}
 
-		return false, fmt.Errorf("unexpected error: %w", err)
+		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
-	if len(identities) > 0 {
-		return true, nil
+	if len(identities) == 0 {
+		return nil, identity.ErrIdentityNotFound
 	}
 
-	return false, nil
+	return mapIdentity(&identities[0])
 }
 
 // Admin APIs

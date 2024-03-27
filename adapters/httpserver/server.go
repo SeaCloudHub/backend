@@ -63,7 +63,7 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 			"/healthz",
 			"/swagger",
 			"/api/users/login",
-			"/api/users/is-email-exists",
+			"/api/users/email",
 		},
 	).Middleware()
 

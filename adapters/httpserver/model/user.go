@@ -32,14 +32,18 @@ func (r *ChangePasswordRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
 
-type IsEmailExistsRequest struct {
+type GetByEmailRequest struct {
 	Email string `query:"email" validate:"required,email"`
-} // @name model.IsEmailExistsRequest
+} // @name model.GetByEmailRequest
 
-func (r *IsEmailExistsRequest) Validate() error {
+func (r *GetByEmailRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
 
-type IsEmailExistsResponse struct {
-	Exists bool `json:"exists"`
-} // @name model.IsEmailExistsResponse
+type GetByEmailResponse struct {
+	Email             string     `json:"email"`
+	FirstName         string     `json:"first_name"`
+	LastName          string     `json:"last_name"`
+	AvatarURL         string     `json:"avatar_url"`
+	PasswordChangedAt *time.Time `json:"password_changed_at"`
+} // @name model.GetByEmailResponse
