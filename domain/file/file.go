@@ -19,6 +19,7 @@ type Service interface {
 	CreateFile(ctx context.Context, content io.Reader, fullName string) (int64, error)
 	ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]Entry, string, error)
 	CreateDirectory(ctx context.Context, dirpath string) error
+	Delete(ctx context.Context, fullPath string) error
 }
 
 type Entry struct {

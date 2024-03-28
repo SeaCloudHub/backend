@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"github.com/SeaCloudHub/backend/domain"
 	"time"
 )
 
@@ -23,9 +24,10 @@ type Service interface {
 	GetByEmail(ctx context.Context, email string) (*Identity, error)
 
 	// Admin APIs
-	CreateIdentity(ctx context.Context, in SimpleIdentity) (*Identity, error)
+	CreateIdentity(ctx context.Context, in SimpleIdentity, listener func(event domain.BaseDomainEvent) error) (*Identity, error)
 	ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]Identity, string, error)
-	CreateMultipleIdentities(ctx context.Context, simpleIdentities []SimpleIdentity) ([]*Identity, error)
+	CreateMultipleIdentities(ctx context.Context,
+		simpleIdentities []SimpleIdentity, listener func(event domain.BaseDomainEvent) error) ([]*Identity, error)
 }
 
 type SimpleIdentity struct {

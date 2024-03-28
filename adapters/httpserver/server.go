@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/SeaCloudHub/backend/domain"
 	"net/http"
 	"strings"
 
@@ -39,6 +40,9 @@ type Server struct {
 	FileService       file.Service
 	IdentityService   identity.Service
 	PermissionService permission.Service
+
+	// event bus
+	EventDispatcher domain.EventDispatcher
 }
 
 func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Server, error) {
@@ -72,6 +76,7 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))
+	s.RegisterMainRoutes(s.router.Group("/api/main"))
 
 	return &s, nil
 }

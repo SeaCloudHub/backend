@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/SeaCloudHub/backend/adapters/event/listeners"
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	_ "github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
@@ -27,8 +28,8 @@ func (s *Server) AdminMe(c echo.Context) error {
 // @Tags admin
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param pageToken query string false "Page token"
-// @Param pageSize query int false "Page size"
+// @Param page_token query string false "Page token"
+// @Param page_size query int false "Page size"
 // @Success 200 {object} model.SuccessResponse{data=model.ListIdentitiesResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -86,7 +87,8 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	id, err := s.IdentityService.CreateIdentity(ctx, s.MapperService.ToIdentity(req))
+	id, err := s.IdentityService.CreateIdentity(ctx,
+		s.MapperService.ToIdentity(req), listeners.NewIdentityCreatedEventListener(s.FileService).EventHandler)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -128,7 +130,8 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	ids, err := s.IdentityService.CreateMultipleIdentities(mycontext.NewEchoContextAdapter(c), simpleIdentities)
+	ids, err := s.IdentityService.CreateMultipleIdentities(mycontext.
+		NewEchoContextAdapter(c), simpleIdentities, listeners.NewIdentitiesPatchedListener(s.FileService).EventHandler)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}

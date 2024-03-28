@@ -113,6 +113,15 @@ func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error
 	return nil
 }
 
+func (s *FileService) Delete(ctx context.Context, fullPath string) error {
+	err := s.filer.Delete(ctx, &seaweedfs.DeleteRequest{FullPath: fullPath})
+	if err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+
+	return nil
+}
+
 func handleListEntriesResponse(resp *seaweedfs.ListEntriesResponse) ([]file.Entry, string, error) {
 	entries := make([]file.Entry, 0, len(resp.Entries))
 	for _, entry := range resp.Entries {

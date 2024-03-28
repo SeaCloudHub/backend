@@ -37,13 +37,13 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Page token",
-                        "name": "pageToken",
+                        "name": "page_token",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "description": "Page size",
-                        "name": "pageSize",
+                        "name": "page_size",
                         "in": "query"
                     }
                 ],
@@ -610,6 +610,48 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/main/trigger/create-user-directory": {
+            "post": {
+                "description": "TriggerCreateUserDirectory",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "main"
+                ],
+                "summary": "TriggerCreateUserDirectory",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
