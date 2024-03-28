@@ -24,6 +24,12 @@ type Config struct {
 		EnableSSL bool   `envconfig:"ENABLE_SSL"`
 	}
 
+	Redis struct {
+		Addr string `envconfig:"REDIS_ADDR"`
+		Db   int    `envconfig:"REDIS_DB"`
+		Pass string `envconfig:"REDIS_PASS"`
+	}
+
 	SeaweedFS struct {
 		MasterServer string `envconfig:"MASTER_SERVER"`
 		FilerServer  string `envconfig:"FILER_SERVER"`

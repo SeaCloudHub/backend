@@ -7,7 +7,8 @@ import (
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver"
 	"github.com/SeaCloudHub/backend/adapters/postgrestore"
-	"github.com/SeaCloudHub/backend/adapters/services"
+	redisstore "github.com/SeaCloudHub/backend/adapters/redis_store"
+
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -48,10 +49,12 @@ func main() {
 	}
 
 	server.BookStore = postgrestore.NewBookStore(db)
-	server.FileService = services.NewFileService(cfg)
-	server.IdentityService = services.NewIdentityService(cfg)
-	server.PermissionService = services.NewPermissionService(cfg)
 
+	redisSvc, err := redisstore.NewRedisStorage(cfg)
+	if err != nil {
+		applog.Fatal(err)
+	}
+	server.RedisSvc = redisSvc
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	applog.Info("server started!")
 	applog.Fatal(http.ListenAndServe(addr, server))

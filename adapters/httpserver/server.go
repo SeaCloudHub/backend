@@ -25,7 +25,8 @@ type Server struct {
 
 	// storage adapters
 	BookStore book.Storage
-
+	//redis
+	RedisSvc Rediser
 	// services
 	FileService       file.Service
 	IdentityService   identity.Service
@@ -58,8 +59,6 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 
 	s.RegisterBookRoutes(s.router.Group("/api/books"))
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
-	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
-	s.RegisterFileRoutes(s.router.Group("/api/files"))
 
 	return &s, nil
 }
