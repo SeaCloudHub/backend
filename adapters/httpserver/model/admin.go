@@ -20,8 +20,8 @@ func (r *ListIdentitiesRequest) Validate() error {
 }
 
 type ListIdentitiesResponse struct {
-	Identities []identity.Identity `json:"identities"`
-	NextToken  string              `json:"next_token"`
+	Identities []identity.ExtendedIdentity `json:"identities"`
+	NextToken  string                      `json:"next_token"`
 } // @name model.ListIdentitiesResponse
 
 type CreateIdentityRequest struct {

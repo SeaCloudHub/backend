@@ -5,7 +5,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain"
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
-	"path"
+	"github.com/SeaCloudHub/backend/pkg/util"
 )
 
 type IdentityCreatedEventListener struct {
@@ -21,10 +21,9 @@ func (l IdentityCreatedEventListener) EventHandler(event domain.BaseDomainEvent)
 	if !ok {
 		return nil
 	}
-
-	dirpath := path.Join("/", identityCreatedEvent.ID) + "/"
-
-	err := l.fileService.CreateDirectory(context.Background(), dirpath)
+	
+	err := l.fileService.CreateDirectory(context.Background(),
+		util.GetIdentityDirPath(identityCreatedEvent.ID))
 	if err != nil {
 		return err
 	}

@@ -39,3 +39,7 @@ func BindMultipartFile(c echo.Context, key string) (*bufio.Reader, string, error
 
 	return buf, contentType, nil
 }
+
+func GetIdentityDirPath(identityID string) string {
+	return fmt.Sprintf("/%s/", identityID)
+}

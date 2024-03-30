@@ -5,6 +5,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain"
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
+	"github.com/SeaCloudHub/backend/pkg/util"
 )
 
 type IdentitiesPatchedListener struct {
@@ -22,11 +23,10 @@ func (l IdentitiesPatchedListener) EventHandler(event domain.BaseDomainEvent) er
 	}
 
 	for _, id := range identitiesPatchedEvent.IDs {
-		dirpath := "/" + id + "/"
-		if err := l.fileService.CreateDirectory(context.Background(), dirpath); err != nil {
+		if err := l.fileService.CreateDirectory(context.Background(), util.GetIdentityDirPath(id)); err != nil {
 			// If an error occurs while creating the directory, delete previously created directories
 			for _, delID := range identitiesPatchedEvent.IDs[:len(identitiesPatchedEvent.IDs)] {
-				_ = l.fileService.Delete(context.Background(), "/"+delID+"/")
+				_ = l.fileService.Delete(context.Background(), util.GetIdentityDirPath(delID))
 			}
 			return err
 		}
