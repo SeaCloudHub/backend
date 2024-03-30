@@ -1,9 +1,10 @@
 package httpserver
 
 import (
-	"github.com/SeaCloudHub/backend/domain"
 	"net/http"
 	"strings"
+
+	"github.com/SeaCloudHub/backend/domain"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	_ "github.com/SeaCloudHub/backend/docs"
@@ -68,6 +69,7 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 			"/swagger",
 			"/api/users/login",
 			"/api/users/email",
+			"/api/assets",
 		},
 	).Middleware()
 
@@ -77,6 +79,7 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))
 	s.RegisterMainRoutes(s.router.Group("/api/main"))
+	s.RegisterAssetRoutes(s.router.Group("/api/assets"))
 
 	return &s, nil
 }

@@ -10,6 +10,7 @@ const (
 	InvalidCredentialsCode   = "400003"
 	IncorrectPasswordCode    = "400007"
 	InvalidPasswordCode      = "400009"
+	InvalidImageCode         = "400010"
 	UnauthorizedCode         = "401004"
 	ForbiddenCode            = "403005"
 	RefreshTokenRequiredCode = "403008"
@@ -32,6 +33,10 @@ func ErrIncorrectPassword(err error) Error {
 
 func ErrInvalidPassword(err error) Error {
 	return NewError(err, http.StatusBadRequest, InvalidPasswordCode, "Invalid new password, please use a different one")
+}
+
+func ErrInvalidImage(err error) Error {
+	return NewError(err, http.StatusBadRequest, InvalidImageCode, "Invalid image")
 }
 
 // 401 Unauthorized
