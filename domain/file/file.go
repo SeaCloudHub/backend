@@ -5,12 +5,14 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
 var (
 	ErrNotFound      = errors.New("no such file or directory")
 	ErrInvalidCursor = errors.New("invalid cursor")
+	ErrNotAnImage    = errors.New("only image file is allowed")
 )
 
 type Service interface {
@@ -33,3 +35,7 @@ type Entry struct {
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
 } // @name file.Entry
+
+func IsImage(mimeType string) bool {
+	return !strings.HasPrefix(mimeType, "image/")
+}

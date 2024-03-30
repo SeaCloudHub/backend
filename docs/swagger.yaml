@@ -23,6 +23,17 @@ definitions:
       updated_at:
         type: string
     type: object
+  github_com_SeaCloudHub_backend_adapters_httpserver_model.UploadImageResponse:
+    properties:
+      file_name:
+        type: string
+      file_path:
+        type: string
+      mime_type:
+        type: string
+      size:
+        type: integer
+    type: object
   identity.Identity:
     properties:
       avatar_url:
@@ -385,6 +396,65 @@ paths:
       summary: AdminMe
       tags:
       - admin
+  /assets/images:
+    post:
+      consumes:
+      - multipart/form-data
+      description: UploadImage
+      parameters:
+      - description: Image file
+        in: formData
+        name: image
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_SeaCloudHub_backend_adapters_httpserver_model.UploadImageResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: UploadImage
+      tags:
+      - assets
+  /assets/images/{name}:
+    get:
+      description: GetImage
+      parameters:
+      - description: Image name
+        in: path
+        name: name
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: GetImage
+      tags:
+      - assets
   /files:
     get:
       description: ListEntries
