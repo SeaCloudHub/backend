@@ -205,5 +205,6 @@ jobs:
             fi
             
             docker run -d --name ${{ env.CONTAINER_NAME }} --network my-net --env-file ~/.env -e VIRTUAL_HOST=${{ secrets.VIRTUAL_HOST }} -e LETSENCRYPT_HOST=${{ secrets.LETSENCRYPT_HOST }} -e LETSENCRYPT_EMAIL=${{ secrets.LETSENCRYPT_EMAIL }} -p ${{ env.PORT }}:8088 ${{ env.IMAGE_NAME }}
+
             docker image prune -f
             rm ~/.env
