@@ -54,15 +54,15 @@ func (s *Server) ListIdentities(c echo.Context) error {
 	}
 
 	identities, nextToken, err := s.IdentityService.ListIdentities(ctx, req.PageToken, req.PageSize)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
 	for i := range identities {
 		identities[i].UsedCapacity, err = s.FileService.GetDirectorySize(ctx, util.GetIdentityDirPath(identities[i].ID))
 		if err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}
 		identities[i].MaximumCapacity = maxCapacity
-	}
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	return s.success(c, model.ListIdentitiesResponse{
