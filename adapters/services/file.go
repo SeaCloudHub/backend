@@ -107,6 +107,10 @@ func (s *FileService) ListEntries(ctx context.Context, dirpath string, limit int
 func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error {
 	err := s.filer.CreateDirectory(ctx, &seaweedfs.CreateDirectoryRequest{DirPath: dirpath})
 	if err != nil {
+		if errors.Is(err, seaweedfs.ErrDirAlreadyExists) {
+			return file.ErrDirAlreadyExists
+		}
+
 		return fmt.Errorf("create directory: %w", err)
 	}
 

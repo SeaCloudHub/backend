@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("no such file or directory")
+	ErrNotFound         = errors.New("no such file or directory")
+	ErrDirAlreadyExists = errors.New("directory already exists")
 )
 
 type FullPath string

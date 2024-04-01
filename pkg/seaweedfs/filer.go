@@ -119,6 +119,10 @@ func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest)
 		return fmt.Errorf("create directory: %w", err)
 	}
 
+	if resp.StatusCode() == http.StatusConflict {
+		return ErrDirAlreadyExists
+	}
+
 	if resp.StatusCode() != http.StatusCreated {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode())
 	}
