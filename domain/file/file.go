@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("no such file or directory")
-	ErrInvalidCursor = errors.New("invalid cursor")
-	ErrNotAnImage    = errors.New("only image file is allowed")
+	ErrNotFound         = errors.New("no such file or directory")
+	ErrInvalidCursor    = errors.New("invalid cursor")
+	ErrNotAnImage       = errors.New("only image file is allowed")
+	ErrDirAlreadyExists = errors.New("directory already exists")
 )
 
 type Service interface {

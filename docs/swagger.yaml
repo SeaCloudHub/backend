@@ -67,6 +67,13 @@ definitions:
     - new_password
     - old_password
     type: object
+  model.CreateDirectoryRequest:
+    properties:
+      dirpath:
+        type: string
+    required:
+    - dirpath
+    type: object
   model.CreateIdentityRequest:
     properties:
       avatar_url:
@@ -565,12 +572,12 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: Directory path
+      - description: Create directory request
         in: body
-        name: dirpath
+        name: payload
         required: true
         schema:
-          type: string
+          $ref: '#/definitions/model.CreateDirectoryRequest'
       produces:
       - application/json
       responses:

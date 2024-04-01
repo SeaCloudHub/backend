@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/SeaCloudHub/backend/pkg/apperror"
@@ -215,7 +216,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param dirpath body string true "Directory path"
+// @Param payload body model.CreateDirectoryRequest true "Create directory request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -238,7 +239,8 @@ func (s *Server) CreateDirectory(c echo.Context) error {
 	// Identity ID will be used as root directory
 	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	if err := s.FileService.CreateDirectory(ctx, filepath.Join(identity.ID, req.DirPath)); err != nil {
+	fullPath := filepath.Join(identity.ID, req.DirPath) + string(os.PathSeparator)
+	if err := s.FileService.CreateDirectory(ctx, fullPath); err != nil && !errors.Is(err, file.ErrDirAlreadyExists) {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 

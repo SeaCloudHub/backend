@@ -549,12 +549,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Directory path",
-                        "name": "dirpath",
+                        "description": "Create directory request",
+                        "name": "payload",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/model.CreateDirectoryRequest"
                         }
                     }
                 ],
@@ -1077,6 +1077,17 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 32,
                     "minLength": 6
+                }
+            }
+        },
+        "model.CreateDirectoryRequest": {
+            "type": "object",
+            "required": [
+                "dirpath"
+            ],
+            "properties": {
+                "dirpath": {
+                    "type": "string"
                 }
             }
         },
