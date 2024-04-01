@@ -216,7 +216,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param payload body model.CreateDirectoryRequest "Create directory request" true
+// @Param payload body model.CreateDirectoryRequest true "Create directory request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse

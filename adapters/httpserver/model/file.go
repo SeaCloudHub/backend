@@ -49,7 +49,7 @@ type ListEntriesResponse struct {
 
 type CreateDirectoryRequest struct {
 	DirPath string `json:"dirpath" validate:"required,dirpath|filepath"`
-}
+} // @name model.CreateDirectoryRequest
 
 func (r *CreateDirectoryRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
