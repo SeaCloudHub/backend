@@ -251,6 +251,9 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context,
 				},
 				Traits: map[string]interface{}{
 					"email":               simpleIdentity.Email,
+					"first_name":          simpleIdentity.FirstName,
+					"last_name":           simpleIdentity.LastName,
+					"avatar_url":          simpleIdentity.AvatarURL,
 					"password_changed_at": nil,
 				},
 			},
@@ -287,7 +290,7 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context,
 	return mapIdentityFromPatchRes(res)
 }
 
-func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.Identity, string, error) {
+func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.ExtendedIdentity, string, error) {
 	req := s.adminClient.IdentityAPI.ListIdentities(ctx)
 
 	if pageSize > 0 {
@@ -307,14 +310,22 @@ func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, 
 		return nil, "", fmt.Errorf("unexpected error: %w", err)
 	}
 
-	var result []identity.Identity
+	var result []identity.ExtendedIdentity
 	for _, id := range identities {
+		identitySession, _, _ := s.adminClient.IdentityAPI.ListIdentitySessions(
+			ctx, id.Id).Execute()
+		lastAccessAt := time.Time{}
+		if len(identitySession) > 0 {
+			lastAccessAt = *identitySession[0].AuthenticatedAt
+		} else {
+			lastAccessAt = time.Time{}
+		}
 		i, err := mapIdentity(&id)
 		if err != nil {
 			return nil, "", err
 		}
 
-		result = append(result, *i)
+		result = append(result, *i.WithLastAccessAt(lastAccessAt))
 	}
 
 	pagination := keysetpagination.ParseHeader(resp)

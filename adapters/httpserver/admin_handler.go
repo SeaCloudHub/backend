@@ -6,6 +6,7 @@ import (
 	_ "github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
+	"github.com/SeaCloudHub/backend/pkg/util"
 	"github.com/labstack/echo/v4"
 )
 
@@ -40,6 +41,9 @@ func (s *Server) ListIdentities(c echo.Context) error {
 		ctx = mycontext.NewEchoContextAdapter(c)
 		req model.ListIdentitiesRequest
 	)
+	// TODO: get maxCapacity from config of identity storage size
+	// max capacity is 10GB for now
+	const maxCapacity = 10 * 1024 * 1024 * 1024
 
 	if err := c.Bind(&req); err != nil {
 		return s.error(c, apperror.ErrInvalidRequest(err))
@@ -52,6 +56,13 @@ func (s *Server) ListIdentities(c echo.Context) error {
 	identities, nextToken, err := s.IdentityService.ListIdentities(ctx, req.PageToken, req.PageSize)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
+	}
+	for i := range identities {
+		identities[i].UsedCapacity, err = s.FileService.GetDirectorySize(ctx, util.GetIdentityDirPath(identities[i].ID))
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+		identities[i].MaximumCapacity = maxCapacity
 	}
 
 	return s.success(c, model.ListIdentitiesResponse{

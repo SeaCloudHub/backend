@@ -25,7 +25,7 @@ type Service interface {
 
 	// Admin APIs
 	CreateIdentity(ctx context.Context, in SimpleIdentity, listener func(event domain.BaseDomainEvent) error) (*Identity, error)
-	ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]Identity, string, error)
+	ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]ExtendedIdentity, string, error)
 	CreateMultipleIdentities(ctx context.Context,
 		simpleIdentities []SimpleIdentity, listener func(event domain.BaseDomainEvent) error) ([]*Identity, error)
 }
@@ -55,4 +55,20 @@ type Session struct {
 	Token     *string    `json:"token"`
 	ExpiresAt *time.Time `json:"expires_at"`
 	Identity  *Identity  `json:"identity"`
+}
+
+type ExtendedIdentity struct {
+	Identity        `json:",inline"`
+	LastAccessAt    *time.Time `json:"last_access_at"`
+	UsedCapacity    uint64     `json:"used_capacity"`
+	MaximumCapacity uint64     `json:"maximum_capacity"`
+} // @name identity.ExtendedIdentity
+
+func (i *Identity) WithLastAccessAt(t time.Time) *ExtendedIdentity {
+	return &ExtendedIdentity{
+		Identity:        *i,
+		LastAccessAt:    &t,
+		UsedCapacity:    0,
+		MaximumCapacity: 0,
+	}
 }

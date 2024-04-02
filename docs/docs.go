@@ -1032,6 +1032,44 @@ const docTemplate = `{
                 }
             }
         },
+        "identity.ExtendedIdentity": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "last_access_at": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "maximum_capacity": {
+                    "type": "integer"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "password_changed_at": {
+                    "type": "string"
+                },
+                "used_capacity": {
+                    "type": "integer"
+                }
+            }
+        },
         "identity.Identity": {
             "type": "object",
             "properties": {
@@ -1172,7 +1210,7 @@ const docTemplate = `{
                 "identities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/identity.Identity"
+                        "$ref": "#/definitions/identity.ExtendedIdentity"
                     }
                 },
                 "next_token": {

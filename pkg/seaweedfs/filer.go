@@ -143,3 +143,14 @@ func (f *Filer) Delete(ctx context.Context, in *DeleteRequest) error {
 
 	return nil
 }
+
+func (f *Filer) GetDirectorySize(ctx context.Context, in *GetDirectorySizeRequest) (uint64, error) {
+	listEntry, err := f.ListEntries(ctx, &ListEntriesRequest{
+		DirPath: in.DirPath,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("get directory size: %w", err)
+	}
+
+	return listEntry.GetTotalSize(), nil
+}

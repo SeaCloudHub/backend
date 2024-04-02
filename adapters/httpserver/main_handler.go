@@ -5,8 +5,8 @@ import (
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
+	"github.com/SeaCloudHub/backend/pkg/util"
 	"github.com/labstack/echo/v4"
-	"path"
 )
 
 // TriggerCreateUserDirectory godoc
@@ -27,7 +27,7 @@ func (s *Server) TriggerCreateUserDirectory(c echo.Context) error {
 	}
 
 	for _, identity := range identities {
-		dirPath := path.Join("/", identity.ID) + "/"
+		dirPath := util.GetIdentityDirPath(identity.ID)
 		_, err := s.FileService.GetMetadata(ctx, dirPath)
 		if err != nil {
 			if errors.Is(err, file.ErrNotFound) {

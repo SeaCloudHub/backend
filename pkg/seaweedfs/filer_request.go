@@ -30,3 +30,7 @@ type CreateDirectoryRequest struct {
 type DeleteRequest struct {
 	FullPath string
 }
+
+type GetDirectorySizeRequest struct {
+	DirPath string
+}
