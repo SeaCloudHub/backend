@@ -399,6 +399,30 @@ paths:
       summary: CreateMultipleIdentities
       tags:
       - admin
+  /admin/identities/template:
+    get:
+      description: Download a CSV template file for creating identities.
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: CSV file
+          schema:
+            type: file
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Download Identities Template CSV
+      tags:
+      - admin
   /admin/me:
     get:
       description: AdminMe

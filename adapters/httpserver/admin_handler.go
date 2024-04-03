@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"fmt"
 	"github.com/SeaCloudHub/backend/adapters/event/listeners"
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	_ "github.com/SeaCloudHub/backend/domain/identity"
@@ -8,6 +9,7 @@ import (
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
 	"github.com/SeaCloudHub/backend/pkg/util"
 	"github.com/labstack/echo/v4"
+	"net/http"
 )
 
 // AdminMe godoc
@@ -155,6 +157,30 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 	return s.success(c, ids)
 }
 
+// DownloadIdentitiesTemplate godoc
+// @Summary Download Identities Template CSV
+// @Description Download a CSV template file for creating identities.
+// @Tags admin
+// @Produce text/csv
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {file} file "CSV file"
+// @Failure 401 {object} model.ErrorResponse
+// @Router /admin/identities/template [get]
+func (s *Server) DownloadIdentitiesTemplate(c echo.Context) error {
+	templateData := []model.CreateIdentityRequest{{}}
+
+	buf, err := s.CSVService.EntitiesToCsv(templateData)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Set the headers
+	c.Response().Header().Set(echo.HeaderContentType, "text/csv")
+	c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf("attachment; filename=%s", "identities.csv"))
+
+	return c.Blob(http.StatusOK, "text/csv", buf)
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
@@ -163,4 +189,5 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.GET("/identities", s.ListIdentities)
 	router.POST("/identities", s.CreateIdentity)
 	router.POST("/identities/bulk", s.CreateMultipleIdentities)
+	router.GET("/identities/template", s.DownloadIdentitiesTemplate)
 }

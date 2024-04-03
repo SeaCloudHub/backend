@@ -227,6 +227,42 @@
                 }
             }
         },
+        "/admin/identities/template": {
+            "get": {
+                "description": "Download a CSV template file for creating identities.",
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Download Identities Template CSV",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/me": {
             "get": {
                 "description": "AdminMe",
