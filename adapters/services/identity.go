@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/SeaCloudHub/backend/domain"
 	"time"
+
+	"github.com/SeaCloudHub/backend/domain"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"golang.org/x/crypto/bcrypt"
@@ -134,9 +135,14 @@ func (s *IdentityService) ChangePassword(ctx context.Context, id *identity.Ident
 			return identity.ErrInvalidPassword
 		}
 
-		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil &&
-			genericErr.Error.GetId() == "session_refresh_required" {
-			return identity.ErrSessionTooOld
+		if gErr, genericErr := assertKratosError[kratos.ErrorGeneric](err); gErr != nil {
+			if gErr.Error() == "data matches more than one schema in oneOf(ContinueWith)" {
+				return nil
+			}
+
+			if genericErr != nil && genericErr.Error.GetId() == "session_refresh_required" {
+				return identity.ErrSessionTooOld
+			}
 		}
 
 		return fmt.Errorf("unexpected error: %w", err)
