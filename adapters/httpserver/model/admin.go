@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/SeaCloudHub/backend/domain/identity"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/validation"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
@@ -21,7 +22,7 @@ func (r *ListIdentitiesRequest) Validate() error {
 
 type ListIdentitiesResponse struct {
 	Identities []identity.ExtendedIdentity `json:"identities"`
-	NextToken  string                      `json:"next_token"`
+	Paging     pagination.Paging           `json:"paging"`
 } // @name model.ListIdentitiesResponse
 
 type CreateIdentityRequest struct {

@@ -34,6 +34,13 @@ definitions:
       size:
         type: integer
     type: object
+  github_com_SeaCloudHub_backend_pkg_pagination.Paging:
+    properties:
+      cursor:
+        type: string
+      limit:
+        type: integer
+    type: object
   identity.ExtendedIdentity:
     properties:
       avatar_url:
@@ -155,8 +162,8 @@ definitions:
         items:
           $ref: '#/definitions/identity.ExtendedIdentity'
         type: array
-      next_token:
-        type: string
+      paging:
+        $ref: '#/definitions/github_com_SeaCloudHub_backend_pkg_pagination.Paging'
     type: object
   model.LoginRequest:
     properties:
@@ -274,13 +281,11 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: Page token
-        in: query
-        name: page_token
+      - in: query
+        name: cursor
         type: string
-      - description: Page size
-        in: query
-        name: page_size
+      - in: query
+        name: limit
         type: integer
       produces:
       - application/json

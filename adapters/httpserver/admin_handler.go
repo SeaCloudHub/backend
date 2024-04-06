@@ -7,6 +7,7 @@ import (
 	_ "github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/util"
 	"github.com/labstack/echo/v4"
 	"net/http"
@@ -31,8 +32,7 @@ func (s *Server) AdminMe(c echo.Context) error {
 // @Tags admin
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param page_token query string false "Page token"
-// @Param page_size query int false "Page size"
+// @Param paging query pagination.Paging false "Paging"
 // @Success 200 {object} model.SuccessResponse{data=model.ListIdentitiesResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -41,7 +41,7 @@ func (s *Server) AdminMe(c echo.Context) error {
 func (s *Server) ListIdentities(c echo.Context) error {
 	var (
 		ctx = mycontext.NewEchoContextAdapter(c)
-		req model.ListIdentitiesRequest
+		req pagination.Paging
 	)
 	// TODO: get maxCapacity from config of identity storage size
 	// max capacity is 10GB for now
@@ -55,7 +55,7 @@ func (s *Server) ListIdentities(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	identities, nextToken, err := s.IdentityService.ListIdentities(ctx, req.PageToken, req.PageSize)
+	identities, err := s.IdentityService.ListIdentities(ctx, &req)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -69,7 +69,7 @@ func (s *Server) ListIdentities(c echo.Context) error {
 
 	return s.success(c, model.ListIdentitiesResponse{
 		Identities: identities,
-		NextToken:  nextToken,
+		Paging:     req,
 	})
 }
 

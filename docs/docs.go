@@ -36,14 +36,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Page token",
-                        "name": "page_token",
+                        "name": "cursor",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Page size",
-                        "name": "page_size",
+                        "name": "limit",
                         "in": "query"
                     }
                 ],
@@ -1068,6 +1066,17 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_SeaCloudHub_backend_pkg_pagination.Paging": {
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                }
+            }
+        },
         "identity.ExtendedIdentity": {
             "type": "object",
             "properties": {
@@ -1249,8 +1258,8 @@ const docTemplate = `{
                         "$ref": "#/definitions/identity.ExtendedIdentity"
                     }
                 },
-                "next_token": {
-                    "type": "string"
+                "paging": {
+                    "$ref": "#/definitions/github_com_SeaCloudHub_backend_pkg_pagination.Paging"
                 }
             }
         },
