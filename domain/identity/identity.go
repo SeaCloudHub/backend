@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/SeaCloudHub/backend/domain"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"time"
 )
 
@@ -25,7 +26,7 @@ type Service interface {
 
 	// Admin APIs
 	CreateIdentity(ctx context.Context, in SimpleIdentity, listener func(event domain.BaseDomainEvent) error) (*Identity, error)
-	ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]ExtendedIdentity, string, error)
+	ListIdentities(ctx context.Context, paging *pagination.Paging) ([]ExtendedIdentity, error)
 	CreateMultipleIdentities(ctx context.Context,
 		simpleIdentities []SimpleIdentity, listener func(event domain.BaseDomainEvent) error) ([]*Identity, error)
 }
@@ -64,10 +65,10 @@ type ExtendedIdentity struct {
 	MaximumCapacity uint64     `json:"maximum_capacity"`
 } // @name identity.ExtendedIdentity
 
-func (i *Identity) WithLastAccessAt(t time.Time) *ExtendedIdentity {
+func (i *Identity) WithLastAccessAt(t *time.Time) *ExtendedIdentity {
 	return &ExtendedIdentity{
 		Identity:        *i,
-		LastAccessAt:    &t,
+		LastAccessAt:    t,
 		UsedCapacity:    0,
 		MaximumCapacity: 0,
 	}

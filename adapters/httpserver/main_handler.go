@@ -5,6 +5,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/util"
 	"github.com/labstack/echo/v4"
 )
@@ -21,7 +22,7 @@ import (
 // @Router /main/trigger/create-user-directory [post]
 func (s *Server) TriggerCreateUserDirectory(c echo.Context) error {
 	ctx := mycontext.NewEchoContextAdapter(c)
-	identities, _, err := s.IdentityService.ListIdentities(ctx, "", 0)
+	identities, err := s.IdentityService.ListIdentities(ctx, &pagination.Paging{})
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}

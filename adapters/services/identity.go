@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
 	"github.com/SeaCloudHub/backend/domain"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"time"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"golang.org/x/crypto/bcrypt"
@@ -296,47 +296,45 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context,
 	return mapIdentityFromPatchRes(res)
 }
 
-func (s *IdentityService) ListIdentities(ctx context.Context, pageToken string, pageSize int64) ([]identity.ExtendedIdentity, string, error) {
+func (s *IdentityService) ListIdentities(ctx context.Context, paging *pagination.Paging) ([]identity.ExtendedIdentity, error) {
 	req := s.adminClient.IdentityAPI.ListIdentities(ctx)
 
-	if pageSize > 0 {
-		req = req.PageSize(pageSize)
+	if paging.Limit > 0 {
+		req = req.PageSize(paging.Limit)
 	}
 
-	if len(pageToken) > 0 {
-		req = req.PageToken(pageToken)
+	if len(paging.Cursor) > 0 {
+		req = req.PageToken(paging.Cursor)
 	}
 
 	identities, resp, err := req.Execute()
 	if err != nil {
 		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
-			return nil, "", fmt.Errorf("error listing identities: %s", genericErr.Error.GetReason())
+			return nil, fmt.Errorf("error listing identities: %s", genericErr.Error.GetReason())
 		}
 
-		return nil, "", fmt.Errorf("unexpected error: %w", err)
+		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
 	var result []identity.ExtendedIdentity
 	for _, id := range identities {
 		identitySession, _, _ := s.adminClient.IdentityAPI.ListIdentitySessions(
 			ctx, id.Id).Execute()
-		lastAccessAt := time.Time{}
+		var lastAccessAt *time.Time
 		if len(identitySession) > 0 {
-			lastAccessAt = *identitySession[0].AuthenticatedAt
-		} else {
-			lastAccessAt = time.Time{}
+			lastAccessAt = identitySession[0].AuthenticatedAt
 		}
 		i, err := mapIdentity(&id)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
 
 		result = append(result, *i.WithLastAccessAt(lastAccessAt))
 	}
 
-	pagination := keysetpagination.ParseHeader(resp)
+	paging.NextCursor = keysetpagination.ParseHeader(resp).NextToken
 
-	return result, pagination.NextToken, nil
+	return result, nil
 }
 
 func (s *IdentityService) rollbackIdentities(ctx context.Context, identities []kratos.IdentityPatchResponse) error {
