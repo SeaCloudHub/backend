@@ -21,7 +21,7 @@ type FileService struct {
 func NewFileService(cfg *config.Config) *FileService {
 	swcfg := seaweedfs.NewConfigWithFilerURL(cfg.SeaweedFS.MasterServer, cfg.SeaweedFS.FilerServer)
 
-	if cfg.DEBUG {
+	if cfg.Debug {
 		swcfg = swcfg.Debug()
 	}
 
@@ -81,27 +81,31 @@ func (s *FileService) CreateFile(ctx context.Context, content io.Reader, fullNam
 	return result.Size, nil
 }
 
-func (s *FileService) ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]file.Entry, string, error) {
+func (s *FileService) ListEntries(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]file.Entry, error) {
 	// parse cursor
-	cursorObj, err := pagination.DecodeCursor[swCursor](cursor)
+	cursorObj, err := pagination.DecodeToken[swCursor](cursor.Token)
 	if err != nil {
-		return nil, "", fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
 	resp, err := s.filer.ListEntries(ctx, &seaweedfs.ListEntriesRequest{
 		DirPath:      dirpath,
-		Limit:        limit,
+		Limit:        cursor.Limit,
 		LastFileName: cursorObj.LastFileName,
 	})
 	if err != nil {
 		if errors.Is(err, seaweedfs.ErrNotFound) {
-			return nil, "", file.ErrNotFound
+			return nil, file.ErrNotFound
 		}
 
-		return nil, "", fmt.Errorf("list entries: %w", err)
+		return nil, fmt.Errorf("list entries: %w", err)
 	}
 
-	return handleListEntriesResponse(resp)
+	if resp.ShouldDisplayLoadMore {
+		cursor.SetNextToken(pagination.EncodeToken[swCursor](swCursor{LastFileName: resp.LastFileName}))
+	}
+
+	return mapEntries(resp), nil
 }
 
 func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error {
@@ -140,18 +144,13 @@ func (s *FileService) GetDirectorySize(ctx context.Context, dirpath string) (uin
 	return size, nil
 }
 
-func handleListEntriesResponse(resp *seaweedfs.ListEntriesResponse) ([]file.Entry, string, error) {
+func mapEntries(resp *seaweedfs.ListEntriesResponse) []file.Entry {
 	entries := make([]file.Entry, 0, len(resp.Entries))
 	for _, entry := range resp.Entries {
 		entries = append(entries, mapToEntry(&entry))
 	}
 
-	cursor := ""
-	if resp.ShouldDisplayLoadMore {
-		cursor = pagination.EncodeCursor[swCursor](swCursor{LastFileName: resp.LastFileName})
-	}
-
-	return entries, cursor, nil
+	return entries
 }
 
 type swCursor struct {

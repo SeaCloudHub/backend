@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/SeaCloudHub/backend/adapters/event"
 	"log"
 	"net/http"
+
+	"github.com/SeaCloudHub/backend/adapters/event"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver"
 	"github.com/SeaCloudHub/backend/adapters/postgrestore"
@@ -50,8 +51,6 @@ func main() {
 		applog.Fatal(err)
 	}
 
-	_ = db
-
 	server, err := httpserver.New(cfg, applog)
 	if err != nil {
 		applog.Fatal(err)
@@ -60,13 +59,15 @@ func main() {
 	// event bus
 	server.EventDispatcher = event.NewEventDispatcher()
 
+	// store adapters
+	server.UserStore = postgrestore.NewUserStore(db)
+
 	// internal services
 	server.CSVService = services.NewCSVService()
 	server.MapperService = services.NewMapperService()
 
-
 	server.FileService = services.NewFileService(cfg)
-	server.IdentityService = services.NewIdentityService(cfg, server.EventDispatcher)
+	server.IdentityService = services.NewIdentityService(cfg)
 	server.PermissionService = services.NewPermissionService(cfg)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)

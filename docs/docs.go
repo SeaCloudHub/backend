@@ -35,14 +35,19 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "name": "cursor",
-                        "in": "query"
-                    },
-                    {
+                        "maximum": 100,
+                        "minimum": 1,
                         "type": "integer",
                         "name": "limit",
-                        "in": "query"
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "page",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -296,7 +301,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/identity.Identity"
+                                            "$ref": "#/definitions/github_com_SeaCloudHub_backend_domain_identity.User"
                                         }
                                     }
                                 }
@@ -611,6 +616,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -738,48 +749,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/main/trigger/create-user-directory": {
-            "post": {
-                "description": "TriggerCreateUserDirectory",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "main"
-                ],
-                "summary": "TriggerCreateUserDirectory",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "default": "Bearer \u003csession_token\u003e",
-                        "description": "Bearer token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.SuccessResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -996,7 +965,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/identity.Identity"
+                                            "$ref": "#/definitions/github_com_SeaCloudHub_backend_domain_identity.User"
                                         }
                                     }
                                 }
@@ -1066,21 +1035,13 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_SeaCloudHub_backend_pkg_pagination.Paging": {
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "type": "string"
-                },
-                "limit": {
-                    "type": "integer"
-                }
-            }
-        },
-        "identity.ExtendedIdentity": {
+        "github_com_SeaCloudHub_backend_domain_identity.User": {
             "type": "object",
             "properties": {
                 "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
                     "type": "string"
                 },
                 "email": {
@@ -1092,54 +1053,109 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "is_admin": {
+                "is_active": {
                     "type": "boolean"
                 },
-                "last_access_at": {
-                    "type": "string"
+                "is_admin": {
+                    "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"
                 },
-                "maximum_capacity": {
-                    "type": "integer"
-                },
-                "password": {
+                "last_sign_in_at": {
                     "type": "string"
                 },
                 "password_changed_at": {
                     "type": "string"
                 },
-                "used_capacity": {
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_SeaCloudHub_backend_pkg_pagination.PageInfo": {
+            "type": "object",
+            "properties": {
+                "current_page": {
                     "type": "integer"
+                },
+                "first_page": {
+                    "type": "integer"
+                },
+                "last_page": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "next_page": {
+                    "type": "integer"
+                },
+                "previous_page": {
+                    "type": "integer"
+                },
+                "total_items": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "identity.ExtendedUser": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "last_sign_in_at": {
+                    "type": "string"
+                },
+                "password_changed_at": {
+                    "type": "string"
+                },
+                "storage_capacity": {
+                    "type": "integer"
+                },
+                "storage_used": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
         "identity.Identity": {
             "type": "object",
             "properties": {
-                "avatar_url": {
-                    "type": "string"
-                },
                 "email": {
-                    "type": "string"
-                },
-                "first_name": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
-                "is_admin": {
-                    "type": "boolean"
-                },
-                "last_name": {
-                    "type": "string"
-                },
                 "password": {
-                    "type": "string"
-                },
-                "password_changed_at": {
                     "type": "string"
                 }
             }
@@ -1255,11 +1271,11 @@ const docTemplate = `{
                 "identities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/identity.ExtendedIdentity"
+                        "$ref": "#/definitions/identity.ExtendedUser"
                     }
                 },
-                "paging": {
-                    "$ref": "#/definitions/github_com_SeaCloudHub_backend_pkg_pagination.Paging"
+                "pagination": {
+                    "$ref": "#/definitions/github_com_SeaCloudHub_backend_pkg_pagination.PageInfo"
                 }
             }
         },
@@ -1276,7 +1292,7 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "maxLength": 32,
-                    "minLength": 6
+                    "minLength": 8
                 }
             }
         },
@@ -1284,7 +1300,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "identity": {
-                    "$ref": "#/definitions/identity.Identity"
+                    "$ref": "#/definitions/github_com_SeaCloudHub_backend_domain_identity.User"
                 },
                 "session_expires_at": {
                     "type": "string"

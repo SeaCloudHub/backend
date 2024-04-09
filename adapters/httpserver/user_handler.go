@@ -7,6 +7,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
+	"github.com/google/uuid"
 
 	"github.com/labstack/echo/v4"
 )
@@ -44,18 +45,36 @@ func (s *Server) Login(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	isAdmin, err := s.PermissionService.IsManager(ctx, session.Identity.ID)
+	// get user from db
+	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(session.Identity.ID))
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	session.Identity.IsAdmin = isAdmin
+	isAdmin, err := s.PermissionService.IsAdmin(ctx, session.Identity.ID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if user.IsAdmin != isAdmin {
+		// update user is_admin
+		if err := s.UserStore.UpdateAdmin(ctx, uuid.MustParse(session.Identity.ID)); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	user.IsAdmin = isAdmin
+
+	// update last login
+	if err := s.UserStore.UpdateLastSignInAt(ctx, uuid.MustParse(session.Identity.ID)); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
 
 	return s.success(c, model.LoginResponse{
 		SessionToken:     *session.Token,
 		SessionID:        session.ID,
 		SessionExpiresAt: session.ExpiresAt,
-		Identity:         *session.Identity,
+		Identity:         user,
 	})
 }
 
@@ -65,11 +84,11 @@ func (s *Server) Login(c echo.Context) error {
 // @Tags user
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Success 200 {object} model.SuccessResponse{data=identity.Identity}
+// @Success 200 {object} model.SuccessResponse{data=identity.User}
 // @Failure 401 {object} model.ErrorResponse
 // @Router /users/me [get]
 func (s *Server) Me(c echo.Context) error {
-	return s.success(c, c.Get(ContextKeyIdentity))
+	return s.success(c, c.Get(ContextKeyUser))
 }
 
 // ChangePassword godoc
@@ -121,7 +140,7 @@ func (s *Server) ChangePassword(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	if err := s.IdentityService.SetPasswordChangedAt(ctx, id); err != nil {
+	if err := s.UserStore.UpdatePasswordChangedAt(ctx, uuid.MustParse(id.ID)); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
@@ -152,7 +171,7 @@ func (s *Server) GetByEmail(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	id, err := s.IdentityService.GetByEmail(ctx, req.Email)
+	user, err := s.UserStore.GetByEmail(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -162,11 +181,11 @@ func (s *Server) GetByEmail(c echo.Context) error {
 	}
 
 	return s.success(c, model.GetByEmailResponse{
-		Email:             id.Email,
-		FirstName:         id.FirstName,
-		LastName:          id.LastName,
-		AvatarURL:         id.AvatarURL,
-		PasswordChangedAt: id.PasswordChangedAt,
+		Email:             user.Email,
+		FirstName:         user.FirstName,
+		LastName:          user.LastName,
+		AvatarURL:         user.AvatarURL,
+		PasswordChangedAt: user.PasswordChangedAt,
 	})
 }
 

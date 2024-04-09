@@ -3,10 +3,10 @@ package httpserver
 import (
 	"errors"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/SeaCloudHub/backend/pkg/apperror"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -190,7 +190,18 @@ func (s *Server) ListEntries(c echo.Context) error {
 	// Identity ID will be used as root directory
 	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	files, next, err := s.FileService.ListEntries(ctx, filepath.Join(identity.ID, req.DirPath), req.Limit, req.Cursor)
+	fullPath := filepath.Join(string(filepath.Separator), identity.ID, req.DirPath) + string(filepath.Separator)
+	canView, err := s.PermissionService.CanViewDirectory(ctx, identity.ID, fullPath)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	files, err := s.FileService.ListEntries(ctx, fullPath, cursor)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -205,7 +216,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 
 	return s.success(c, model.ListEntriesResponse{
 		Entries: files,
-		Cursor:  next,
+		Cursor:  cursor.NextToken(),
 	})
 }
 
@@ -220,6 +231,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/directories [post]
 func (s *Server) CreateDirectory(c echo.Context) error {
@@ -239,8 +251,23 @@ func (s *Server) CreateDirectory(c echo.Context) error {
 	// Identity ID will be used as root directory
 	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	fullPath := filepath.Join(identity.ID, req.DirPath) + string(os.PathSeparator)
+	fullPath := filepath.Join(string(filepath.Separator), identity.ID, req.DirPath) + string(filepath.Separator)
+
+	parent := filepath.Join(fullPath, "..") + string(filepath.Separator)
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, identity.ID, parent)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to edit")))
+	}
+
 	if err := s.FileService.CreateDirectory(ctx, fullPath); err != nil && !errors.Is(err, file.ErrDirAlreadyExists) {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if err := s.PermissionService.CreateDirectoryPermissions(ctx, identity.ID, fullPath); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
