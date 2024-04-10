@@ -8,4 +8,7 @@ type Service interface {
 	CreateDirectoryPermissions(ctx context.Context, userID string, fullPath string) error
 	CanEditDirectory(ctx context.Context, userID string, fullPath string) (bool, error)
 	CanViewDirectory(ctx context.Context, userID string, fullPath string) (bool, error)
+	CreateFilePermissions(ctx context.Context, userID string, fullPath string) error
+	CanEditFile(ctx context.Context, userID string, fullPath string) (bool, error)
+	CanViewFile(ctx context.Context, userID string, fullPath string) (bool, error)
 }

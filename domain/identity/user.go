@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type UserStore interface {
+type Store interface {
 	Create(ctx context.Context, user *User) error
 	UpdateAdmin(ctx context.Context, userID uuid.UUID) error
 	UpdatePasswordChangedAt(ctx context.Context, userID uuid.UUID) error

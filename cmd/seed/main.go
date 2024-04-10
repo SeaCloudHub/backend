@@ -44,6 +44,7 @@ func main() {
 	}
 
 	userStore := postgrestore.NewUserStore(db)
+	fileStore := postgrestore.NewFileStore(db)
 	identityService := services.NewIdentityService(cfg)
 	permissionService := services.NewPermissionService(cfg)
 	fileService := services.NewFileService(cfg)
@@ -88,6 +89,18 @@ func main() {
 	// create user root directory permissions
 	if err := permissionService.CreateDirectoryPermissions(ctx, identity.ID, fullPath); err != nil {
 		applog.Fatalf("cannot create user root directory permissions: %v", err)
+	}
+
+	// get metadata
+	entry, err := fileService.GetMetadata(ctx, fullPath)
+	if err != nil {
+		applog.Fatalf("cannot get metadata: %v", err)
+	}
+
+	// create files row
+	f := entry.ToFile().WithPath("/")
+	if err := fileStore.Create(ctx, f); err != nil {
+		applog.Fatalf("cannot create files row: %v", err)
 	}
 
 	applog.Info("admin user created successfully")

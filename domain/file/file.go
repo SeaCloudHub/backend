@@ -2,34 +2,25 @@ package file
 
 import (
 	"context"
-	"errors"
-	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"github.com/SeaCloudHub/backend/pkg/util"
 )
 
-var (
-	ErrNotFound         = errors.New("no such file or directory")
-	ErrInvalidCursor    = errors.New("invalid cursor")
-	ErrNotAnImage       = errors.New("only image file is allowed")
-	ErrDirAlreadyExists = errors.New("directory already exists")
-)
-
-type Service interface {
-	GetMetadata(ctx context.Context, fullPath string) (*Entry, error)
-	DownloadFile(ctx context.Context, filePath string) (io.ReadCloser, string, error)
-	CreateFile(ctx context.Context, content io.Reader, fullName string) (int64, error)
-	ListEntries(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]Entry, error)
-	CreateDirectory(ctx context.Context, dirpath string) error
-	Delete(ctx context.Context, fullPath string) error
-	GetDirectorySize(ctx context.Context, dirpath string) (uint64, error)
+type Store interface {
+	Create(ctx context.Context, file *File) error
+	ListPager(ctx context.Context, dirpath string, pager *pagination.Pager) ([]File, error)
+	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]File, error)
+	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
 }
 
-type Entry struct {
+type File struct {
+	ID        int         `json:"id"`
 	Name      string      `json:"name"`
+	Path      string      `json:"path"`
 	FullPath  string      `json:"full_path"`
 	Size      uint64      `json:"size"`
 	Mode      os.FileMode `json:"mode"`
@@ -38,8 +29,21 @@ type Entry struct {
 	IsDir     bool        `json:"is_dir"`
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
-} // @name file.Entry
+} // @name file.File
 
-func IsImage(mimeType string) bool {
-	return !strings.HasPrefix(mimeType, "image/")
+func (f *File) WithPath(path string) *File {
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+
+	f.Path = path
+
+	return f
+}
+
+func (f *File) RemoveRootPath() *File {
+	f.FullPath = util.RemoveRootPath(f.FullPath)
+	f.Path = util.RemoveRootPath(f.Path)
+
+	return f
 }

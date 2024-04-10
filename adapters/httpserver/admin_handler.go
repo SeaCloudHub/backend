@@ -135,6 +135,18 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// get metadata
+	entry, err := s.FileService.GetMetadata(ctx, fullPath)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// create files row
+	f := entry.ToFile().WithPath("/")
+	if err := s.FileStore.Create(ctx, f); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
 	return s.success(c, id)
 }
 
@@ -195,6 +207,18 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 
 		// create user root directory permission
 		if err := s.PermissionService.CreateDirectoryPermissions(ctx, ids[i].ID, fullPath); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		// get metadata
+		entry, err := s.FileService.GetMetadata(ctx, fullPath)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		// create files row
+		f := entry.ToFile().WithPath("/")
+		if err := s.FileStore.Create(ctx, f); err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}
 	}

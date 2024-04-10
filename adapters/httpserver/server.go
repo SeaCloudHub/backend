@@ -36,7 +36,8 @@ type Server struct {
 	CSVService    internal.CSVService
 
 	// storage adapters
-	UserStore identity.UserStore
+	UserStore identity.Store
+	FileStore file.Store
 
 	// services
 	FileService       file.Service

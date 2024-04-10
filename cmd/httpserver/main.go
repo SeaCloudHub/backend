@@ -61,6 +61,7 @@ func main() {
 
 	// store adapters
 	server.UserStore = postgrestore.NewUserStore(db)
+	server.FileStore = postgrestore.NewFileStore(db)
 
 	// internal services
 	server.CSVService = services.NewCSVService()

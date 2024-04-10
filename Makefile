@@ -8,7 +8,7 @@ test:
 	go test -cover ./...
 
 db:
-	docker compose --env-file ./.env -f ./tools/compose/docker-compose.yml down
+	docker compose --env-file ./.env -f ./tools/compose/docker-compose.yml down -v
 	docker compose --env-file ./.env -f ./tools/compose/docker-compose.yml up -d
 
 db-down:

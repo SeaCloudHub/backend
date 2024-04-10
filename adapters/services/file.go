@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/config"
@@ -102,7 +101,7 @@ func (s *FileService) ListEntries(ctx context.Context, dirpath string, cursor *p
 	}
 
 	if resp.ShouldDisplayLoadMore {
-		cursor.SetNextToken(pagination.EncodeToken[swCursor](swCursor{LastFileName: resp.LastFileName}))
+		cursor.SetNextToken(pagination.EncodeToken(swCursor{LastFileName: resp.LastFileName}))
 	}
 
 	return mapEntries(resp), nil
@@ -160,6 +159,7 @@ type swCursor struct {
 func mapToEntry(entry *seaweedfs.Entry) file.Entry {
 	e := file.Entry{
 		Name:      entry.FullPath.Name(),
+		FullPath:  string(entry.FullPath),
 		Size:      entry.FileSize,
 		Mode:      entry.Mode,
 		MimeType:  entry.Mime,
@@ -168,11 +168,6 @@ func mapToEntry(entry *seaweedfs.Entry) file.Entry {
 		CreatedAt: entry.Crtime,
 		UpdatedAt: entry.Mtime,
 	}
-
-	// remove the root path from the full path
-	entryPath := entry.FullPath.Split()
-	entryPath[0] = "/"
-	e.FullPath = filepath.ToSlash(filepath.Join(entryPath...))
 
 	return e
 }
