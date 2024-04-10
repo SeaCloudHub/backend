@@ -1,6 +1,7 @@
 package seaweedfs
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -26,4 +27,26 @@ func NewMaster(masterURL string) (*Master, error) {
 
 func (m *Master) SetDebug(debug bool) {
 	m.client.SetDebug(debug)
+}
+
+func (f *Master) DirStatus(ctx context.Context) (map[string]interface{}, error) {
+	var result map[string]interface{}
+
+	_, err := f.client.R().SetContext(ctx).SetResult(&result).Get("/dir/status")
+	if err != nil {
+		return result, fmt.Errorf("get dir status: %w", err)
+	}
+
+	return result, nil
+}
+
+func (f *Master) VolStatus(ctx context.Context) (map[string]interface{}, error) {
+	var result map[string]interface{}
+
+	_, err := f.client.R().SetContext(ctx).SetResult(&result).Get("/vol/status")
+	if err != nil {
+		return result, fmt.Errorf("get vol status: %w", err)
+	}
+
+	return result, nil
 }

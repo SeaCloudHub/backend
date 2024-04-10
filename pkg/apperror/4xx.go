@@ -12,6 +12,7 @@ const (
 	InvalidPasswordCode      = "400009"
 	InvalidImageCode         = "400010"
 	UnauthorizedCode         = "401004"
+	IdentityWasDisableCode   = "401009"
 	ForbiddenCode            = "403005"
 	RefreshTokenRequiredCode = "403008"
 	EntityNotFoundCode       = "404006"
@@ -46,6 +47,10 @@ func ErrInvalidCredentials(err error) Error {
 
 func ErrUnauthorized(err error) Error {
 	return NewError(err, http.StatusUnauthorized, UnauthorizedCode, "Unauthorized")
+}
+
+func ErrIdentityWasDisabled(err error) Error {
+	return NewError(err, http.StatusUnauthorized, IdentityWasDisableCode, "Identity was disabled")
 }
 
 // 403 Forbidden

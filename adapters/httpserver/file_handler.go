@@ -3,10 +3,12 @@ package httpserver
 import (
 	"errors"
 	"net/http"
-	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/SeaCloudHub/backend/pkg/apperror"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"github.com/SeaCloudHub/backend/pkg/util"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -24,16 +26,19 @@ import (
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param path query string true "File or directory path"
-// @Success 200 {object} model.SuccessResponse{data=file.Entry}
+// @Success 200 {object} model.SuccessResponse{data=file.File}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/metadata [get]
 func (s *Server) GetMetadata(c echo.Context) error {
 	var (
-		ctx = mycontext.NewEchoContextAdapter(c)
-		req model.GetMetadata
+		ctx     = mycontext.NewEchoContextAdapter(c)
+		req     model.GetMetadata
+		canView bool
+		err     error
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -46,7 +51,25 @@ func (s *Server) GetMetadata(c echo.Context) error {
 
 	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	f, err := s.FileService.GetMetadata(ctx, filepath.Join(id.ID, req.Path))
+	fullPath := filepath.Join(string(filepath.Separator), id.ID, req.Path)
+	if !strings.HasSuffix(req.Path, "/") {
+		canView, err = s.PermissionService.CanViewFile(ctx, id.ID, fullPath)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	} else {
+		fullPath = util.GetFullRoot(req.Path, id.ID)
+		canView, err = s.PermissionService.CanViewDirectory(ctx, id.ID, fullPath)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+	}
+
+	f, err := s.FileStore.GetByFullPath(ctx, fullPath)
 	if err != nil {
 		if errors.Is(err, file.ErrNotFound) {
 			return s.error(c, apperror.ErrEntityNotFound(err))
@@ -55,7 +78,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, f)
+	return s.success(c, f.RemoveRootPath())
 }
 
 // DownloadFile godoc
@@ -67,6 +90,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 // @Success 200 {file} file
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/download [get]
@@ -86,7 +110,18 @@ func (s *Server) DownloadFile(c echo.Context) error {
 
 	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	f, mime, err := s.FileService.DownloadFile(ctx, filepath.Join(id.ID, req.FilePath))
+	filePath := filepath.Join(string(filepath.Separator), id.ID, req.FilePath)
+
+	canView, err := s.PermissionService.CanViewFile(ctx, id.ID, filePath)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+	}
+
+	f, mime, err := s.FileService.DownloadFile(ctx, filePath)
 	if err != nil {
 		if errors.Is(err, file.ErrNotFound) {
 			return s.error(c, apperror.ErrEntityNotFound(err))
@@ -107,9 +142,10 @@ func (s *Server) DownloadFile(c echo.Context) error {
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param dirpath formData string true "Directory path"
 // @Param files formData file true "Files"
-// @Success 200 {object} model.SuccessResponse{data=[]model.UploadFileResponse}
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files [post]
 func (s *Server) UploadFiles(c echo.Context) error {
@@ -120,8 +156,24 @@ func (s *Server) UploadFiles(c echo.Context) error {
 
 	// Directory
 	dirpath := c.FormValue("dirpath")
-	if err := validation.Validate().VarCtx(ctx, dirpath, "required,dirpath|filepath"); err != nil {
+	if !strings.HasSuffix(dirpath, "/") {
+		dirpath = dirpath + "/"
+	}
+
+	if err := validation.Validate().VarCtx(ctx, dirpath, "required,dirpath"); err != nil {
 		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	dirpath = util.GetFullRoot(dirpath, identity.ID)
+
+	// Check if user has permission to upload files
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, identity.ID, dirpath)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to edit")))
 	}
 
 	// Files
@@ -130,7 +182,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 
-	var resp []model.UploadFileResponse
+	var resp []file.File
 
 	// TODO: add workerpool to handle multiple file uploads concurrently
 	files := form.File["files"]
@@ -142,18 +194,32 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		}
 		defer src.Close()
 
-		fullName := filepath.Join(identity.ID, dirpath, file.Filename)
+		fullPath := filepath.Join(dirpath, file.Filename)
+
+		// TODO: handle file already exists
 
 		// save files
-		size, err := s.FileService.CreateFile(ctx, src, fullName)
+		_, err = s.FileService.CreateFile(ctx, src, fullPath)
 		if err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
-		resp = append(resp, model.UploadFileResponse{
-			Name: file.Filename,
-			Size: size,
-		})
+		// create file permissions
+		if err := s.PermissionService.CreateFilePermissions(ctx, identity.ID, fullPath); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		entry, err := s.FileService.GetMetadata(ctx, fullPath)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		f := entry.ToFile().WithPath(dirpath)
+		if err := s.FileStore.Create(ctx, f); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		resp = append(resp, *f.RemoveRootPath())
 	}
 
 	return s.success(c, resp)
@@ -171,6 +237,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 // @Success 200 {object} model.SuccessResponse{data=model.ListEntriesResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files [get]
 func (s *Server) ListEntries(c echo.Context) error {
@@ -190,7 +257,18 @@ func (s *Server) ListEntries(c echo.Context) error {
 	// Identity ID will be used as root directory
 	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	files, next, err := s.FileService.ListEntries(ctx, filepath.Join(identity.ID, req.DirPath), req.Limit, req.Cursor)
+	dirpath := util.GetFullRoot(req.DirPath, identity.ID)
+	canView, err := s.PermissionService.CanViewDirectory(ctx, identity.ID, dirpath)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	files, err := s.FileStore.ListCursor(ctx, dirpath, cursor)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -203,9 +281,13 @@ func (s *Server) ListEntries(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	for i := range files {
+		files[i] = *files[i].RemoveRootPath()
+	}
+
 	return s.success(c, model.ListEntriesResponse{
 		Entries: files,
-		Cursor:  next,
+		Cursor:  cursor.NextToken(),
 	})
 }
 
@@ -217,9 +299,10 @@ func (s *Server) ListEntries(c echo.Context) error {
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param payload body model.CreateDirectoryRequest true "Create directory request"
-// @Success 200 {object} model.SuccessResponse
+// @Success 200 {object} model.SuccessResponse{data=file.File}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/directories [post]
 func (s *Server) CreateDirectory(c echo.Context) error {
@@ -239,12 +322,37 @@ func (s *Server) CreateDirectory(c echo.Context) error {
 	// Identity ID will be used as root directory
 	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
-	fullPath := filepath.Join(identity.ID, req.DirPath) + string(os.PathSeparator)
+	fullPath := filepath.Join(string(filepath.Separator), identity.ID, req.DirPath) + string(filepath.Separator)
+
+	parent := filepath.Join(fullPath, "..") + string(filepath.Separator)
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, identity.ID, parent)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to edit")))
+	}
+
 	if err := s.FileService.CreateDirectory(ctx, fullPath); err != nil && !errors.Is(err, file.ErrDirAlreadyExists) {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, nil)
+	if err := s.PermissionService.CreateDirectoryPermissions(ctx, identity.ID, fullPath); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	entry, err := s.FileService.GetMetadata(ctx, fullPath)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	f := entry.ToFile().WithPath(parent)
+	if err := s.FileStore.Create(ctx, f); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, f.RemoveRootPath())
 }
 
 func (s *Server) RegisterFileRoutes(router *echo.Group) {

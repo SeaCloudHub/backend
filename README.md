@@ -49,7 +49,7 @@ make lint
 sql-migrate new -env="development" create-users-table
 ```
 
-- Result: `Created migration migrations/20230908204301-create-user-table.sql`
+- Result: `Created migration migrations/20230908204301-create-users-table.sql`
 
 ### Swagger
 

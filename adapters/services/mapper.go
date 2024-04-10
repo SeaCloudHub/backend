@@ -23,11 +23,8 @@ func NewMapperService() *mapper {
 
 func (s *mapper) ToIdentity(request model.CreateIdentityRequest) identity.SimpleIdentity {
 	return identity.SimpleIdentity{
-		Email:     request.Email,
-		Password:  request.Password,
-		FirstName: request.FirstName,
-		LastName:  request.LastName,
-		AvatarURL: request.AvatarURL,
+		Email:    request.Email,
+		Password: request.Password,
 	}
 }
 

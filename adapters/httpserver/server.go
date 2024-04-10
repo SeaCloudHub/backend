@@ -36,6 +36,8 @@ type Server struct {
 	CSVService    internal.CSVService
 
 	// storage adapters
+	UserStore identity.Store
+	FileStore file.Store
 
 	// services
 	FileService       file.Service
@@ -78,7 +80,6 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))
-	s.RegisterMainRoutes(s.router.Group("/api/main"))
 	s.RegisterAssetRoutes(s.router.Group("/api/assets"))
 
 	return &s, nil

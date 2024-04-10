@@ -32,14 +32,19 @@ func main() {
 		SSLMode:  false,
 	})
 	if err != nil {
-		applogger.Fatalf("cannot connecting to db: %v\n", err)
+		applogger.Fatalf("cannot connect to db: %v\n", err)
+	}
+
+	pgDB, err := db.DB()
+	if err != nil {
+		applogger.Fatalf("cannot get db: %v\n", err)
 	}
 
 	migrations := &migrate.FileMigrationSource{
 		Dir: "migrations",
 	}
 
-	total, err := migrate.Exec(db.DB, "postgres", migrations, migrate.Up)
+	total, err := migrate.Exec(pgDB, "postgres", migrations, migrate.Up)
 	if err != nil {
 		applogger.Fatalf("cannot execute migration: %v\n", err)
 	}
