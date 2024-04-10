@@ -3,10 +3,11 @@ package postgrestore
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/SeaCloudHub/backend/pkg/config"
-
-	"github.com/jmoiron/sqlx"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 type Options struct {
@@ -16,6 +17,7 @@ type Options struct {
 	Host     string
 	Port     string
 	SSLMode  bool
+	Debug    bool
 }
 
 func ParseFromConfig(c *config.Config) Options {
@@ -26,19 +28,43 @@ func ParseFromConfig(c *config.Config) Options {
 		Host:     c.DB.Host,
 		Port:     strconv.Itoa(c.DB.Port),
 		SSLMode:  c.DB.EnableSSL,
+		Debug:    c.Debug,
 	}
 }
 
-func NewConnection(opts Options) (*sqlx.DB, error) {
+func NewConnection(opts Options) (*gorm.DB, error) {
 	sslmode := "disable"
 	if opts.SSLMode {
 		sslmode = "enable"
 	}
 
-	datasource := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		opts.Host, opts.Port, opts.DBUser, opts.Password, opts.DBName, sslmode,
+	connectionString := fmt.Sprintf(
+		"postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+		opts.DBUser, opts.Password, opts.Host, opts.Port, opts.DBName, sslmode,
 	)
 
-	return sqlx.Connect("postgres", datasource)
+	db, err := gorm.Open(postgres.New(
+		postgres.Config{DSN: connectionString, PreferSimpleProtocol: true}),
+		&gorm.Config{TranslateError: true},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("connect to db: %w", err)
+	}
+
+	if opts.Debug {
+		db = db.Debug()
+	}
+
+	rawDB, _ := db.DB()
+	// rawDB.SetConnMaxIdleTime(time.Hour)
+	// rawDB.SetMaxIdleConns(cfg.PostgreSQL.DBMaxIdleConns)
+	// rawDB.SetMaxOpenConns(cfg.PostgreSQL.DBMaxOpenConns)
+	rawDB.SetConnMaxLifetime(time.Minute * 5)
+
+	err = rawDB.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("ping db: %w", err)
+	}
+
+	return db, nil
 }

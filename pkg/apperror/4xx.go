@@ -10,10 +10,13 @@ const (
 	InvalidCredentialsCode   = "400003"
 	IncorrectPasswordCode    = "400007"
 	InvalidPasswordCode      = "400009"
+	InvalidImageCode         = "400010"
 	UnauthorizedCode         = "401004"
+	IdentityWasDisableCode   = "401009"
 	ForbiddenCode            = "403005"
 	RefreshTokenRequiredCode = "403008"
 	EntityNotFoundCode       = "404006"
+	IdentityNotFoundCode     = "404007"
 )
 
 // 400 Bad Request
@@ -33,6 +36,10 @@ func ErrInvalidPassword(err error) Error {
 	return NewError(err, http.StatusBadRequest, InvalidPasswordCode, "Invalid new password, please use a different one")
 }
 
+func ErrInvalidImage(err error) Error {
+	return NewError(err, http.StatusBadRequest, InvalidImageCode, "Invalid image")
+}
+
 // 401 Unauthorized
 func ErrInvalidCredentials(err error) Error {
 	return NewError(err, http.StatusUnauthorized, InvalidCredentialsCode, "Invalid credentials")
@@ -40,6 +47,10 @@ func ErrInvalidCredentials(err error) Error {
 
 func ErrUnauthorized(err error) Error {
 	return NewError(err, http.StatusUnauthorized, UnauthorizedCode, "Unauthorized")
+}
+
+func ErrIdentityWasDisabled(err error) Error {
+	return NewError(err, http.StatusUnauthorized, IdentityWasDisableCode, "Identity was disabled")
 }
 
 // 403 Forbidden
@@ -54,4 +65,8 @@ func ErrSessionRefreshRequired(err error) Error {
 // 404 Not Found
 func ErrEntityNotFound(err error) Error {
 	return NewError(err, http.StatusNotFound, EntityNotFoundCode, "No such file or directory")
+}
+
+func ErrIdentityNotFound(err error) Error {
+	return NewError(err, http.StatusNotFound, IdentityNotFoundCode, "Identity not found")
 }

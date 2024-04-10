@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/SeaCloudHub/backend/adapters/event"
+
 	"github.com/SeaCloudHub/backend/adapters/httpserver"
 	"github.com/SeaCloudHub/backend/adapters/postgrestore"
 	"github.com/SeaCloudHub/backend/adapters/services"
@@ -49,12 +51,17 @@ func main() {
 		applog.Fatal(err)
 	}
 
-	_ = db
-
 	server, err := httpserver.New(cfg, applog)
 	if err != nil {
 		applog.Fatal(err)
 	}
+
+	// event bus
+	server.EventDispatcher = event.NewEventDispatcher()
+
+	// store adapters
+	server.UserStore = postgrestore.NewUserStore(db)
+	server.FileStore = postgrestore.NewFileStore(db)
 
 	// internal services
 	server.CSVService = services.NewCSVService()

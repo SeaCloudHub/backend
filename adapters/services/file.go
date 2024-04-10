@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/config"
@@ -21,7 +20,7 @@ type FileService struct {
 func NewFileService(cfg *config.Config) *FileService {
 	swcfg := seaweedfs.NewConfigWithFilerURL(cfg.SeaweedFS.MasterServer, cfg.SeaweedFS.FilerServer)
 
-	if cfg.DEBUG {
+	if cfg.Debug {
 		swcfg = swcfg.Debug()
 	}
 
@@ -81,50 +80,84 @@ func (s *FileService) CreateFile(ctx context.Context, content io.Reader, fullNam
 	return result.Size, nil
 }
 
-func (s *FileService) ListEntries(ctx context.Context, dirpath string, limit int, cursor string) ([]file.Entry, string, error) {
+func (s *FileService) ListEntries(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]file.Entry, error) {
 	// parse cursor
-	cursorObj, err := pagination.DecodeCursor[swCursor](cursor)
+	cursorObj, err := pagination.DecodeToken[swCursor](cursor.Token)
 	if err != nil {
-		return nil, "", fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
 	resp, err := s.filer.ListEntries(ctx, &seaweedfs.ListEntriesRequest{
 		DirPath:      dirpath,
-		Limit:        limit,
+		Limit:        cursor.Limit,
 		LastFileName: cursorObj.LastFileName,
 	})
 	if err != nil {
 		if errors.Is(err, seaweedfs.ErrNotFound) {
-			return nil, "", file.ErrNotFound
+			return nil, file.ErrNotFound
 		}
 
-		return nil, "", fmt.Errorf("list entries: %w", err)
+		return nil, fmt.Errorf("list entries: %w", err)
 	}
 
-	return handleListEntriesResponse(resp)
+	if resp.ShouldDisplayLoadMore {
+		cursor.SetNextToken(pagination.EncodeToken(swCursor{LastFileName: resp.LastFileName}))
+	}
+
+	return mapEntries(resp), nil
 }
 
 func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error {
 	err := s.filer.CreateDirectory(ctx, &seaweedfs.CreateDirectoryRequest{DirPath: dirpath})
 	if err != nil {
+		if errors.Is(err, seaweedfs.ErrDirAlreadyExists) {
+			return file.ErrDirAlreadyExists
+		}
+
 		return fmt.Errorf("create directory: %w", err)
 	}
 
 	return nil
 }
 
-func handleListEntriesResponse(resp *seaweedfs.ListEntriesResponse) ([]file.Entry, string, error) {
+func (s *FileService) Delete(ctx context.Context, fullPath string) error {
+	err := s.filer.Delete(ctx, &seaweedfs.DeleteRequest{FullPath: fullPath})
+	if err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileService) GetDirectorySize(ctx context.Context, dirpath string) (uint64, error) {
+	size, err := s.filer.GetDirectorySize(ctx,
+		&seaweedfs.GetDirectorySizeRequest{DirPath: dirpath})
+	if err != nil {
+		if errors.Is(err, seaweedfs.ErrNotFound) {
+			return 0, file.ErrNotFound
+		}
+
+		return 0, fmt.Errorf("get directory size: %w", err)
+	}
+
+	return size, nil
+}
+
+func (s *FileService) DirStatus(ctx context.Context) (map[string]interface{}, error) {
+	return s.sw.Master().DirStatus(ctx)
+}
+
+func (s *FileService) VolStatus(ctx context.Context) (map[string]interface{}, error) {
+	return s.sw.Master().VolStatus(ctx)
+}
+
+func mapEntries(resp *seaweedfs.ListEntriesResponse) []file.Entry {
 	entries := make([]file.Entry, 0, len(resp.Entries))
 	for _, entry := range resp.Entries {
 		entries = append(entries, mapToEntry(&entry))
 	}
 
-	cursor := ""
-	if resp.ShouldDisplayLoadMore {
-		cursor = pagination.EncodeCursor[swCursor](swCursor{LastFileName: resp.LastFileName})
-	}
-
-	return entries, cursor, nil
+	return entries
 }
 
 type swCursor struct {
@@ -134,6 +167,7 @@ type swCursor struct {
 func mapToEntry(entry *seaweedfs.Entry) file.Entry {
 	e := file.Entry{
 		Name:      entry.FullPath.Name(),
+		FullPath:  string(entry.FullPath),
 		Size:      entry.FileSize,
 		Mode:      entry.Mode,
 		MimeType:  entry.Mime,
@@ -142,11 +176,6 @@ func mapToEntry(entry *seaweedfs.Entry) file.Entry {
 		CreatedAt: entry.Crtime,
 		UpdatedAt: entry.Mtime,
 	}
-
-	// remove the root path from the full path
-	entryPath := entry.FullPath.Split()
-	entryPath[0] = "/"
-	e.FullPath = filepath.ToSlash(filepath.Join(entryPath...))
 
 	return e
 }

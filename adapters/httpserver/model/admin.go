@@ -1,27 +1,34 @@
 package model
 
 import (
+	"context"
+
 	"github.com/SeaCloudHub/backend/domain/identity"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/validation"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 type ListIdentitiesRequest struct {
-	PageToken string `query:"page_token" validate:"omitempty"`
-	PageSize  int64  `query:"page_size" validate:"omitempty,min=1,max=100"`
+	Limit int `query:"limit" validate:"required,min=1,max=100"`
+	Page  int `query:"page" validate:"required,min=1"`
 }
 
 func (r *ListIdentitiesRequest) Validate() error {
-	if r.PageSize == 0 {
-		r.PageSize = 10
+	if r.Limit == 0 {
+		r.Limit = 10
+	}
+
+	if r.Page == 0 {
+		r.Page = 1
 	}
 
 	return validation.Validate().Struct(r)
 }
 
 type ListIdentitiesResponse struct {
-	Identities []identity.Identity `json:"identities"`
-	NextToken  string              `json:"next_token"`
+	Identities []identity.ExtendedUser `json:"identities"`
+	Pagination pagination.PageInfo     `json:"pagination"`
 } // @name model.ListIdentitiesResponse
 
 type CreateIdentityRequest struct {
@@ -38,4 +45,13 @@ func (r *CreateIdentityRequest) Validate() error {
 	}
 
 	return validation.Validate().Struct(r)
+}
+
+type UpdateIdentityStateRequest struct {
+	ID    string `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
+	State string `json:"state" validate:"required,oneof=active inactive"`
+} // @name model.UpdateIdentityStateRequest
+
+func (r *UpdateIdentityStateRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
 }

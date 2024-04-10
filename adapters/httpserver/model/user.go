@@ -9,7 +9,7 @@ import (
 
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6,max=32"`
+	Password string `json:"password" validate:"required,min=8,max=32"`
 } // @name model.LoginRequest
 
 func (r *LoginRequest) Validate() error {
@@ -17,10 +17,10 @@ func (r *LoginRequest) Validate() error {
 }
 
 type LoginResponse struct {
-	SessionID        string            `json:"session_id"`
-	SessionToken     string            `json:"session_token"`
-	SessionExpiresAt *time.Time        `json:"session_expires_at"`
-	Identity         identity.Identity `json:"identity"`
+	SessionID        string         `json:"session_id"`
+	SessionToken     string         `json:"session_token"`
+	SessionExpiresAt *time.Time     `json:"session_expires_at"`
+	Identity         *identity.User `json:"identity"`
 } // @name model.LoginResponse
 
 type ChangePasswordRequest struct {
@@ -32,14 +32,18 @@ func (r *ChangePasswordRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
 
-type IsEmailExistsRequest struct {
+type GetByEmailRequest struct {
 	Email string `query:"email" validate:"required,email"`
-} // @name model.IsEmailExistsRequest
+} // @name model.GetByEmailRequest
 
-func (r *IsEmailExistsRequest) Validate() error {
+func (r *GetByEmailRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
 
-type IsEmailExistsResponse struct {
-	Exists bool `json:"exists"`
-} // @name model.IsEmailExistsResponse
+type GetByEmailResponse struct {
+	Email             string     `json:"email"`
+	FirstName         string     `json:"first_name"`
+	LastName          string     `json:"last_name"`
+	AvatarURL         string     `json:"avatar_url"`
+	PasswordChangedAt *time.Time `json:"password_changed_at"`
+} // @name model.GetByEmailResponse

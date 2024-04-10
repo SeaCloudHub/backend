@@ -25,30 +25,6 @@
 							"via": "email"
 						}
 					}
-				},
-				"first_name": {
-					"type": "string",
-					"title": "First Name"
-				},
-				"last_name": {
-					"type": "string",
-					"title": "Last Name"
-				},
-				"avatar_url": {
-					"type": "string",
-					"title": "Avatar URL"
-				},
-				"password_changed_at": {
-					"anyOf": [
-						{
-							"type": "string",
-							"format": "date-time"
-						},
-						{
-							"type": "null"
-						}
-					],
-					"title": "Password Changed At"
 				}
 			},
 			"required": ["email"],

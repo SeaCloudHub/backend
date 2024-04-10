@@ -11,7 +11,7 @@ var Empty = new(Config)
 
 type Config struct {
 	AppEnv       string `envconfig:"APP_ENV"`
-	DEBUG        bool   `envconfig:"DEBUG"`
+	Debug        bool   `envconfig:"DEBUG"`
 	Port         int    `envconfig:"PORT"`
 	SentryDSN    string `envconfig:"SENTRY_DSN"`
 	AllowOrigins string `envconfig:"ALLOW_ORIGINS"`

@@ -15,6 +15,61 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/dashboard": {
+            "get": {
+                "description": "Dashboard",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": true
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/identities": {
             "get": {
                 "description": "ListIdentities",
@@ -35,16 +90,19 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "description": "Page token",
-                        "name": "pageToken",
-                        "in": "query"
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "limit",
+                        "in": "query",
+                        "required": true
                     },
                     {
+                        "minimum": 1,
                         "type": "integer",
-                        "description": "Page size",
-                        "name": "pageSize",
-                        "in": "query"
+                        "name": "page",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -230,6 +288,109 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/identities/template": {
+            "get": {
+                "description": "Download a CSV template file for creating identities.",
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Download Identities Template CSV",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/identities/{identity_id}/state": {
+            "patch": {
+                "description": "UpdateIdentityState",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "UpdateIdentityState",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Identity ID",
+                        "name": "identity_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update identity state request",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.UpdateIdentityStateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/me": {
             "get": {
                 "description": "AdminMe",
@@ -262,7 +423,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/identity.Identity"
+                                            "$ref": "#/definitions/identity.User"
                                         }
                                     }
                                 }
@@ -271,6 +432,100 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/images": {
+            "post": {
+                "description": "UploadImage",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "UploadImage",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Image file",
+                        "name": "image",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.UploadImageResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/images/{name}": {
+            "get": {
+                "description": "GetImage",
+                "tags": [
+                    "assets"
+                ],
+                "summary": "GetImage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Image name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -348,6 +603,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -403,7 +664,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/model.UploadFileResponse"
+                                                "$ref": "#/definitions/file.File"
                                             }
                                         }
                                     }
@@ -419,6 +680,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -455,12 +722,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Directory path",
-                        "name": "dirpath",
+                        "description": "Create directory request",
+                        "name": "payload",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/model.CreateDirectoryRequest"
                         }
                     }
                 ],
@@ -468,7 +735,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.SuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/file.File"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -479,6 +758,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -531,6 +816,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -589,7 +880,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/file.Entry"
+                                            "$ref": "#/definitions/file.File"
                                         }
                                     }
                                 }
@@ -604,6 +895,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -689,16 +986,16 @@ const docTemplate = `{
                 }
             }
         },
-        "/users/is-email-exists": {
+        "/users/email": {
             "get": {
-                "description": "Check if email exists",
+                "description": "Get user by email",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "user"
                 ],
-                "summary": "Check if email exists",
+                "summary": "Get user by email",
                 "parameters": [
                     {
                         "type": "string",
@@ -720,7 +1017,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/model.IsEmailExistsResponse"
+                                            "$ref": "#/definitions/model.GetByEmailResponse"
                                         }
                                     }
                                 }
@@ -790,6 +1087,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -826,7 +1135,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/identity.Identity"
+                                            "$ref": "#/definitions/identity.User"
                                         }
                                     }
                                 }
@@ -844,7 +1153,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "file.Entry": {
+        "file.File": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -852,6 +1161,9 @@ const docTemplate = `{
                 },
                 "full_path": {
                     "type": "string"
+                },
+                "id": {
+                    "type": "integer"
                 },
                 "is_dir": {
                     "type": "boolean"
@@ -871,6 +1183,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "path": {
+                    "type": "string"
+                },
                 "size": {
                     "type": "integer"
                 },
@@ -879,10 +1194,13 @@ const docTemplate = `{
                 }
             }
         },
-        "identity.Identity": {
+        "identity.ExtendedUser": {
             "type": "object",
             "properties": {
                 "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
                     "type": "string"
                 },
                 "email": {
@@ -894,16 +1212,80 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "is_admin": {
                     "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"
                 },
-                "password": {
+                "last_sign_in_at": {
                     "type": "string"
                 },
                 "password_changed_at": {
+                    "type": "string"
+                },
+                "storage_capacity": {
+                    "type": "integer"
+                },
+                "storage_used": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "identity.Identity": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "identity.User": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "last_sign_in_at": {
+                    "type": "string"
+                },
+                "password_changed_at": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -924,6 +1306,17 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 32,
                     "minLength": 6
+                }
+            }
+        },
+        "model.CreateDirectoryRequest": {
+            "type": "object",
+            "required": [
+                "dirpath"
+            ],
+            "properties": {
+                "dirpath": {
+                    "type": "string"
                 }
             }
         },
@@ -968,11 +1361,23 @@ const docTemplate = `{
                 }
             }
         },
-        "model.IsEmailExistsResponse": {
+        "model.GetByEmailResponse": {
             "type": "object",
             "properties": {
-                "exists": {
-                    "type": "boolean"
+                "avatar_url": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "password_changed_at": {
+                    "type": "string"
                 }
             }
         },
@@ -985,7 +1390,7 @@ const docTemplate = `{
                 "entries": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/file.Entry"
+                        "$ref": "#/definitions/file.File"
                     }
                 }
             }
@@ -996,11 +1401,11 @@ const docTemplate = `{
                 "identities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/identity.Identity"
+                        "$ref": "#/definitions/identity.ExtendedUser"
                     }
                 },
-                "next_token": {
-                    "type": "string"
+                "pagination": {
+                    "$ref": "#/definitions/pagination.PageInfo"
                 }
             }
         },
@@ -1017,7 +1422,7 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "maxLength": 32,
-                    "minLength": 6
+                    "minLength": 8
                 }
             }
         },
@@ -1025,7 +1430,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "identity": {
-                    "$ref": "#/definitions/identity.Identity"
+                    "$ref": "#/definitions/identity.User"
                 },
                 "session_expires_at": {
                     "type": "string"
@@ -1047,10 +1452,31 @@ const docTemplate = `{
                 }
             }
         },
-        "model.UploadFileResponse": {
+        "model.UpdateIdentityStateRequest": {
+            "type": "object",
+            "required": [
+                "state"
+            ],
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "inactive"
+                    ]
+                }
+            }
+        },
+        "model.UploadImageResponse": {
             "type": "object",
             "properties": {
-                "name": {
+                "file_name": {
+                    "type": "string"
+                },
+                "file_path": {
+                    "type": "string"
+                },
+                "mime_type": {
                     "type": "string"
                 },
                 "size": {
@@ -1125,6 +1551,35 @@ const docTemplate = `{
                 "ModeType",
                 "ModePerm"
             ]
+        },
+        "pagination.PageInfo": {
+            "type": "object",
+            "properties": {
+                "current_page": {
+                    "type": "integer"
+                },
+                "first_page": {
+                    "type": "integer"
+                },
+                "last_page": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "next_page": {
+                    "type": "integer"
+                },
+                "previous_page": {
+                    "type": "integer"
+                },
+                "total_items": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
         }
     }
 }`

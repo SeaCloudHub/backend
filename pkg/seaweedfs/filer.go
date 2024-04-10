@@ -119,9 +119,38 @@ func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest)
 		return fmt.Errorf("create directory: %w", err)
 	}
 
+	if resp.StatusCode() == http.StatusConflict {
+		return ErrDirAlreadyExists
+	}
+
 	if resp.StatusCode() != http.StatusCreated {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode())
 	}
 
 	return nil
+}
+
+func (f *Filer) Delete(ctx context.Context, in *DeleteRequest) error {
+	resp, err := f.client.R().SetContext(ctx).
+		Delete(in.FullPath)
+	if err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+
+	if resp.StatusCode() == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (f *Filer) GetDirectorySize(ctx context.Context, in *GetDirectorySizeRequest) (uint64, error) {
+	listEntry, err := f.ListEntries(ctx, &ListEntriesRequest{
+		DirPath: in.DirPath,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("get directory size: %w", err)
+	}
+
+	return listEntry.GetTotalSize(), nil
 }

@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/SeaCloudHub/backend/domain"
+
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	_ "github.com/SeaCloudHub/backend/docs"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
@@ -34,11 +36,16 @@ type Server struct {
 	CSVService    internal.CSVService
 
 	// storage adapters
+	UserStore identity.Store
+	FileStore file.Store
 
 	// services
 	FileService       file.Service
 	IdentityService   identity.Service
 	PermissionService permission.Service
+
+	// event bus
+	EventDispatcher domain.EventDispatcher
 }
 
 func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Server, error) {
@@ -63,7 +70,8 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 			"/healthz",
 			"/swagger",
 			"/api/users/login",
-			"/api/users/is-email-exists",
+			"/api/users/email",
+			"/api/assets",
 		},
 	).Middleware()
 
@@ -72,6 +80,7 @@ func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Se
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
 	s.RegisterFileRoutes(s.router.Group("/api/files"))
+	s.RegisterAssetRoutes(s.router.Group("/api/assets"))
 
 	return &s, nil
 }
