@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/SeaCloudHub/backend/adapters/event"
+
 	"github.com/SeaCloudHub/backend/adapters/httpserver"
 	"github.com/SeaCloudHub/backend/adapters/postgrestore"
 	"github.com/SeaCloudHub/backend/adapters/services"
@@ -15,6 +17,13 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// @title SeaCloud APIs
+// @version 1.0
+
+// @BasePath /api
+// @schemes http https
+
+// @description Transaction API.
 func main() {
 	applog, err := logger.NewAppLogger()
 	if err != nil {
@@ -42,20 +51,25 @@ func main() {
 		applog.Fatal(err)
 	}
 
-	//db, err := inmemstore.NewConnection()
-
-	server, err := httpserver.New()
+	server, err := httpserver.New(cfg, applog)
 	if err != nil {
 		applog.Fatal(err)
 	}
 
-	server.Logger = applog
-	server.Config = cfg
-	server.BookStore = postgrestore.NewBookStore(db)
+	// event bus
+	server.EventDispatcher = event.NewEventDispatcher()
+
+	// store adapters
+	server.UserStore = postgrestore.NewUserStore(db)
+	server.FileStore = postgrestore.NewFileStore(db)
+
+	// internal services
+	server.CSVService = services.NewCSVService()
+	server.MapperService = services.NewMapperService()
+
 	server.FileService = services.NewFileService(cfg)
 	server.IdentityService = services.NewIdentityService(cfg)
 	server.PermissionService = services.NewPermissionService(cfg)
-	//server.BookStore = inmemstore.NewBookStore(db)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	applog.Info("server started!")

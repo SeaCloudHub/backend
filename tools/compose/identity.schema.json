@@ -25,31 +25,6 @@
 							"via": "email"
 						}
 					}
-				},
-				"name": {
-					"type": "object",
-					"properties": {
-						"first": {
-							"title": "First Name",
-							"type": "string"
-						},
-						"last": {
-							"title": "Last Name",
-							"type": "string"
-						}
-					}
-				},
-				"password_changed_at": {
-					"anyOf": [
-						{
-							"type": "string",
-							"format": "date-time"
-						},
-						{
-							"type": "null"
-						}
-					],
-					"title": "Password Changed At"
 				}
 			},
 			"required": ["email"],

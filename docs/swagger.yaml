@@ -1,0 +1,1036 @@
+basePath: /api
+definitions:
+  file.File:
+    properties:
+      created_at:
+        type: string
+      full_path:
+        type: string
+      id:
+        type: integer
+      is_dir:
+        type: boolean
+      md5:
+        items:
+          type: integer
+        type: array
+      mime_type:
+        type: string
+      mode:
+        $ref: '#/definitions/os.FileMode'
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  identity.ExtendedUser:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_admin:
+        type: boolean
+      last_name:
+        type: string
+      last_sign_in_at:
+        type: string
+      password_changed_at:
+        type: string
+      storage_capacity:
+        type: integer
+      storage_used:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  identity.Identity:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      password:
+        type: string
+    type: object
+  identity.User:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_admin:
+        type: boolean
+      last_name:
+        type: string
+      last_sign_in_at:
+        type: string
+      password_changed_at:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.ChangePasswordRequest:
+    properties:
+      new_password:
+        maxLength: 32
+        minLength: 6
+        type: string
+      old_password:
+        maxLength: 32
+        minLength: 6
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
+  model.CreateDirectoryRequest:
+    properties:
+      dirpath:
+        type: string
+    required:
+    - dirpath
+    type: object
+  model.CreateIdentityRequest:
+    properties:
+      avatar_url:
+        type: string
+      email:
+        type: string
+      first_name:
+        maxLength: 50
+        type: string
+      last_name:
+        maxLength: 50
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  model.ErrorResponse:
+    properties:
+      code:
+        type: string
+      info:
+        type: string
+      message:
+        type: string
+    type: object
+  model.GetByEmailResponse:
+    properties:
+      avatar_url:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password_changed_at:
+        type: string
+    type: object
+  model.ListEntriesResponse:
+    properties:
+      cursor:
+        type: string
+      entries:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
+    type: object
+  model.ListIdentitiesResponse:
+    properties:
+      identities:
+        items:
+          $ref: '#/definitions/identity.ExtendedUser'
+        type: array
+      pagination:
+        $ref: '#/definitions/pagination.PageInfo'
+    type: object
+  model.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 32
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  model.LoginResponse:
+    properties:
+      identity:
+        $ref: '#/definitions/identity.User'
+      session_expires_at:
+        type: string
+      session_id:
+        type: string
+      session_token:
+        type: string
+    type: object
+  model.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  model.UpdateIdentityStateRequest:
+    properties:
+      state:
+        enum:
+        - active
+        - inactive
+        type: string
+    required:
+    - state
+    type: object
+  model.UploadImageResponse:
+    properties:
+      file_name:
+        type: string
+      file_path:
+        type: string
+      mime_type:
+        type: string
+      size:
+        type: integer
+    type: object
+  os.FileMode:
+    enum:
+    - 2147483648
+    - 1073741824
+    - 536870912
+    - 268435456
+    - 134217728
+    - 67108864
+    - 33554432
+    - 16777216
+    - 8388608
+    - 4194304
+    - 2097152
+    - 1048576
+    - 524288
+    - 2401763328
+    - 511
+    - 2147483648
+    - 1073741824
+    - 536870912
+    - 268435456
+    - 134217728
+    - 67108864
+    - 33554432
+    - 16777216
+    - 8388608
+    - 4194304
+    - 2097152
+    - 1048576
+    - 524288
+    - 2401763328
+    - 511
+    type: integer
+    x-enum-comments:
+      ModeAppend: 'a: append-only'
+      ModeCharDevice: 'c: Unix character device, when ModeDevice is set'
+      ModeDevice: 'D: device file'
+      ModeDir: 'd: is a directory'
+      ModeExclusive: 'l: exclusive use'
+      ModeIrregular: '?: non-regular file; nothing else is known about this file'
+      ModeNamedPipe: 'p: named pipe (FIFO)'
+      ModePerm: Unix permission bits, 0o777
+      ModeSetgid: 'g: setgid'
+      ModeSetuid: 'u: setuid'
+      ModeSocket: 'S: Unix domain socket'
+      ModeSticky: 't: sticky'
+      ModeSymlink: 'L: symbolic link'
+      ModeTemporary: 'T: temporary file; Plan 9 only'
+    x-enum-varnames:
+    - ModeDir
+    - ModeAppend
+    - ModeExclusive
+    - ModeTemporary
+    - ModeSymlink
+    - ModeDevice
+    - ModeNamedPipe
+    - ModeSocket
+    - ModeSetuid
+    - ModeSetgid
+    - ModeCharDevice
+    - ModeSticky
+    - ModeIrregular
+    - ModeType
+    - ModePerm
+  pagination.PageInfo:
+    properties:
+      current_page:
+        type: integer
+      first_page:
+        type: integer
+      last_page:
+        type: integer
+      limit:
+        type: integer
+      next_page:
+        type: integer
+      previous_page:
+        type: integer
+      total_items:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: Transaction API.
+  title: SeaCloud APIs
+  version: "1.0"
+paths:
+  /admin/dashboard:
+    get:
+      description: Dashboard
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Dashboard
+      tags:
+      - admin
+  /admin/identities:
+    get:
+      description: ListIdentities
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        required: true
+        type: integer
+      - in: query
+        minimum: 1
+        name: page
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListIdentitiesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListIdentities
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: CreateIdentity
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Create identity request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateIdentityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/identity.Identity'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: CreateIdentity
+      tags:
+      - admin
+  /admin/identities/{identity_id}/state:
+    patch:
+      consumes:
+      - application/json
+      description: UpdateIdentityState
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      - description: Update identity state request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateIdentityStateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: UpdateIdentityState
+      tags:
+      - admin
+  /admin/identities/bulk:
+    post:
+      consumes:
+      - multipart/form-data
+      description: CreateMultipleIdentities
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: CSV file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/identity.Identity'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: CreateMultipleIdentities
+      tags:
+      - admin
+  /admin/identities/template:
+    get:
+      description: Download a CSV template file for creating identities.
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: CSV file
+          schema:
+            type: file
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Download Identities Template CSV
+      tags:
+      - admin
+  /admin/me:
+    get:
+      description: AdminMe
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/identity.User'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: AdminMe
+      tags:
+      - admin
+  /assets/images:
+    post:
+      consumes:
+      - multipart/form-data
+      description: UploadImage
+      parameters:
+      - description: Image file
+        in: formData
+        name: image
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.UploadImageResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: UploadImage
+      tags:
+      - assets
+  /assets/images/{name}:
+    get:
+      description: GetImage
+      parameters:
+      - description: Image name
+        in: path
+        name: name
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: GetImage
+      tags:
+      - assets
+  /files:
+    get:
+      description: ListEntries
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Directory path
+        in: query
+        name: dirpath
+        required: true
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Cursor
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListEntriesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListEntries
+      tags:
+      - file
+    post:
+      consumes:
+      - multipart/form-data
+      description: UploadFiles
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Directory path
+        in: formData
+        name: dirpath
+        required: true
+        type: string
+      - description: Files
+        in: formData
+        name: files
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: UploadFiles
+      tags:
+      - file
+  /files/directories:
+    post:
+      consumes:
+      - application/json
+      description: CreateDirectory
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Create directory request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateDirectoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/file.File'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: CreateDirectory
+      tags:
+      - file
+  /files/download:
+    get:
+      description: DownloadFile
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File path
+        in: query
+        name: file_path
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: DownloadFile
+      tags:
+      - file
+  /files/metadata:
+    get:
+      description: GetMetadata
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File or directory path
+        in: query
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/file.File'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: GetMetadata
+      tags:
+      - file
+  /users/change-password:
+    post:
+      consumes:
+      - application/json
+      description: Change password
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Change password request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Change password
+      tags:
+      - user
+  /users/email:
+    get:
+      description: Get user by email
+      parameters:
+      - description: Email
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.GetByEmailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get user by email
+      tags:
+      - user
+  /users/login:
+    post:
+      consumes:
+      - application/json
+      description: Login
+      parameters:
+      - description: Login request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Login
+      tags:
+      - user
+  /users/me:
+    get:
+      description: Me
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/identity.User'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Me
+      tags:
+      - user
+schemes:
+- http
+- https
+swagger: "2.0"

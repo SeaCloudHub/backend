@@ -1,8 +1,13 @@
 package httpserver
 
 import (
-	"net/http"
+	"errors"
+	"fmt"
 	"strings"
+
+	"github.com/SeaCloudHub/backend/domain/identity"
+	"github.com/SeaCloudHub/backend/pkg/apperror"
+	"github.com/google/uuid"
 
 	"github.com/SeaCloudHub/backend/pkg/mycontext"
 	"github.com/labstack/echo/v4"
@@ -11,6 +16,7 @@ import (
 
 const (
 	ContextKeyIdentity string = "identity"
+	ContextKeyUser     string = "user"
 )
 
 type Authentication struct {
@@ -40,9 +46,7 @@ func (a *Authentication) Middleware() echo.MiddlewareFunc {
 			return nil
 		}
 
-		//logger.EchoContext(c).Error(err)
-
-		_ = a.server.handleError(c, err, http.StatusUnauthorized)
+		_ = a.server.error(c, apperror.ErrUnauthorized(err))
 
 		return err
 	}
@@ -57,18 +61,52 @@ func (a *Authentication) Middleware() echo.MiddlewareFunc {
 }
 
 func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (bool, error) {
-	var (
-		ctx = mycontext.NewEchoContextAdapter(c)
-	)
+	var ctx = mycontext.NewEchoContextAdapter(c)
 
-	identity, err := a.server.IdentityService.WhoAmI(ctx, token)
+	id, err := a.server.IdentityService.WhoAmI(ctx, token)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("invalid token: %w", err)
 	}
 
-	c.Set(ContextKeyIdentity, identity)
+	user, err := a.server.UserStore.GetByID(ctx, uuid.MustParse(id.ID))
+	if err != nil {
+		return false, fmt.Errorf("user not found: %w", err)
+	}
+
+	c.Set(ContextKeyIdentity, id)
+	c.Set(ContextKeyUser, user)
 
 	return true, nil
+}
+
+func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		user, ok := c.Get(ContextKeyUser).(*identity.User)
+		if !ok {
+			return s.error(c, apperror.ErrInternalServer(errors.New("user not found")))
+		}
+
+		if !user.IsAdmin {
+			return s.error(c, apperror.ErrForbidden(errors.New("not an admin")))
+		}
+
+		return next(c)
+	}
+}
+
+func (s *Server) passwordChangedAtMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		user, ok := c.Get(ContextKeyUser).(*identity.User)
+		if !ok {
+			return s.error(c, apperror.ErrInternalServer(errors.New("identity not found")))
+		}
+
+		if user.PasswordChangedAt == nil {
+			return s.error(c, apperror.ErrForbidden(errors.New("default password not changed")))
+		}
+
+		return next(c)
+	}
 }
 
 func containFirst(elems []string, v string) bool {

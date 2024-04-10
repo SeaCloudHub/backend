@@ -49,4 +49,20 @@ make lint
 sql-migrate new -env="development" create-users-table
 ```
 
-- Result: `Created migration migrations/20230908204301-create-user-table.sql`
+- Result: `Created migration migrations/20230908204301-create-users-table.sql`
+
+### Swagger
+
+- Access to `{host}/swagger/index.html`
+
+- Install swag CLI
+
+```shell
+go install github.com/swaggo/swag/cmd/swag@latest
+```
+
+- Generate swagger docs
+
+```shell
+make swagger
+```

@@ -11,6 +11,7 @@ var Empty = new(Config)
 
 type Config struct {
 	AppEnv       string `envconfig:"APP_ENV"`
+	Debug        bool   `envconfig:"DEBUG"`
 	Port         int    `envconfig:"PORT"`
 	SentryDSN    string `envconfig:"SENTRY_DSN"`
 	AllowOrigins string `envconfig:"ALLOW_ORIGINS"`
@@ -25,7 +26,8 @@ type Config struct {
 	}
 
 	SeaweedFS struct {
-		FilerServer string `envconfig:"FILER_SERVER"`
+		MasterServer string `envconfig:"MASTER_SERVER"`
+		FilerServer  string `envconfig:"FILER_SERVER"`
 	}
 
 	Kratos struct {

@@ -8,11 +8,11 @@ test:
 	go test -cover ./...
 
 db:
-	docker-compose --env-file ./.env -f ./tools/compose/docker-compose.yml down
-	docker-compose --env-file ./.env -f ./tools/compose/docker-compose.yml up -d
+	docker compose --env-file ./.env -f ./tools/compose/docker-compose.yml down
+	docker compose --env-file ./.env -f ./tools/compose/docker-compose.yml up -d
 
 db-down:
-	docker-compose --env-file ./.env -f ./tools/compose/docker-compose.yml down
+	docker compose --env-file ./.env -f ./tools/compose/docker-compose.yml down
 
 lint:
 	@(hash golangci-lint 2>/dev/null || \
@@ -25,3 +25,6 @@ migrate:
 
 seed:
 	go run ./cmd/seed/main.go
+
+swagger:
+	swag init -g cmd/httpserver/main.go --parseDependency --parseInternal --parseDepth 2

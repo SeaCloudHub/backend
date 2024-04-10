@@ -4,12 +4,19 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/SeaCloudHub/backend/domain/book"
+	"github.com/SeaCloudHub/backend/domain"
+
+	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
+	_ "github.com/SeaCloudHub/backend/docs"
+	"github.com/SeaCloudHub/backend/pkg/apperror"
+	"github.com/pkg/errors"
+	echoSwagger "github.com/swaggo/echo-swagger"
+
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
+	"github.com/SeaCloudHub/backend/internal"
 	"github.com/SeaCloudHub/backend/pkg/config"
-	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
 	sentryecho "github.com/getsentry/sentry-go/echo"
 	"github.com/labstack/echo/v4"
@@ -24,20 +31,28 @@ type Server struct {
 	Config *config.Config
 	Logger *zap.SugaredLogger
 
+	// internal services
+	MapperService internal.Mapper
+	CSVService    internal.CSVService
+
 	// storage adapters
-	BookStore book.Storage
+	UserStore identity.Store
+	FileStore file.Store
 
 	// services
 	FileService       file.Service
 	IdentityService   identity.Service
 	PermissionService permission.Service
+
+	// event bus
+	EventDispatcher domain.EventDispatcher
 }
 
-func New(options ...Options) (*Server, error) {
+func New(cfg *config.Config, logger *zap.SugaredLogger, options ...Options) (*Server, error) {
 	s := Server{
 		router: echo.New(),
-		Config: config.Empty,
-		Logger: logger.NOOPLogger,
+		Config: cfg,
+		Logger: logger,
 	}
 
 	for _, fn := range options {
@@ -47,18 +62,25 @@ func New(options ...Options) (*Server, error) {
 	}
 
 	s.RegisterGlobalMiddlewares()
+	s.RegisterHealthCheck(s.router.Group(""))
+	s.router.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	authMiddleware := s.NewAuthentication("header:Authorization", "Bearer",
-		[]string{"/api/users/login"},
+		[]string{
+			"/healthz",
+			"/swagger",
+			"/api/users/login",
+			"/api/users/email",
+			"/api/assets",
+		},
 	).Middleware()
 
 	s.router.Use(authMiddleware)
 
-	s.RegisterHealthCheck(s.router.Group(""))
-	s.RegisterBookRoutes(s.router.Group("/api/books"))
-	s.RegisterFileRoutes(s.router.Group("/api/files"))
 	s.RegisterUserRoutes(s.router.Group("/api/users"))
 	s.RegisterAdminRoutes(s.router.Group("/api/admin"))
+	s.RegisterFileRoutes(s.router.Group("/api/files"))
+	s.RegisterAssetRoutes(s.router.Group("/api/assets"))
 
 	return &s, nil
 }
@@ -67,7 +89,9 @@ func (s *Server) RegisterGlobalMiddlewares() {
 	s.router.Use(middleware.Recover())
 	s.router.Use(middleware.Secure())
 	s.router.Use(middleware.RequestID())
-	s.router.Use(middleware.Gzip())
+	s.router.Use(middleware.GzipWithConfig(middleware.GzipConfig{
+		Skipper: func(c echo.Context) bool { return strings.Contains(c.Request().URL.Path, "swagger") },
+	}))
 	s.router.Use(sentryecho.New(sentryecho.Options{Repanic: true}))
 
 	// CORS
@@ -89,26 +113,43 @@ func (s *Server) RegisterHealthCheck(router *echo.Group) {
 	})
 }
 
-func (s *Server) handleError(c echo.Context, err error, status int) error {
+func (s *Server) error(c echo.Context, err error) error {
 	s.Logger.Errorw(
 		err.Error(),
 		zap.String("request_id", s.requestID(c)),
 	)
 
-	if status >= http.StatusInternalServerError {
+	var appErr apperror.Error
+	if !errors.As(err, &appErr) {
+		sentry.WithContext(c).Error(err)
+
+		return c.JSON(http.StatusInternalServerError, model.ErrorResponse{
+			Code:    "000000",
+			Message: "Internal Server Error",
+			Info:    err.Error(),
+		})
+	}
+
+	if appErr.HTTPCode >= http.StatusInternalServerError {
 		sentry.WithContext(c).Error(err)
 	}
 
-	return c.JSON(status, map[string]string{
-		"message": http.StatusText(status),
-		"info":    err.Error(),
+	var errMessage string
+	if appErr.Raw != nil {
+		errMessage = appErr.Raw.Error()
+	}
+
+	return c.JSON(appErr.HTTPCode, model.ErrorResponse{
+		Code:    appErr.ErrorCode,
+		Message: appErr.Message,
+		Info:    errMessage,
 	})
 }
 
 func (s *Server) success(c echo.Context, data interface{}) error {
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message": "success",
-		"data":    data,
+	return c.JSON(http.StatusOK, model.SuccessResponse{
+		Message: "OK",
+		Data:    data,
 	})
 }
 

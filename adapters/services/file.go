@@ -1,76 +1,181 @@
 package services
 
 import (
-	"bytes"
+	"context"
+	"fmt"
 	"io"
-	"mime/multipart"
-	"net/http"
 
+	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/config"
+	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"github.com/SeaCloudHub/backend/pkg/seaweedfs"
+	"github.com/pkg/errors"
 )
 
 type FileService struct {
-	FilerServer string
-
-	client *http.Client
+	sw    *seaweedfs.Seaweed
+	filer *seaweedfs.Filer
 }
 
 func NewFileService(cfg *config.Config) *FileService {
+	swcfg := seaweedfs.NewConfigWithFilerURL(cfg.SeaweedFS.MasterServer, cfg.SeaweedFS.FilerServer)
+
+	if cfg.Debug {
+		swcfg = swcfg.Debug()
+	}
+
+	sw, err := seaweedfs.NewSeaweed(swcfg)
+	if err != nil {
+		panic(err)
+	}
+
 	return &FileService{
-		FilerServer: cfg.SeaweedFS.FilerServer,
-		client:      http.DefaultClient,
+		sw:    sw,
+		filer: sw.Filers()[0],
 	}
 }
 
-func (s *FileService) GetFile(filename string) (io.ReadCloser, error) {
-	req, err := http.NewRequest("GET", s.FilerServer+"/"+filename, nil)
+func (s *FileService) GetMetadata(ctx context.Context, fullPath string) (*file.Entry, error) {
+	resp, err := s.filer.GetMetadata(ctx, &seaweedfs.GetMetadataRequest{FullPath: fullPath})
 	if err != nil {
-		return nil, err
+		if errors.Is(err, seaweedfs.ErrNotFound) {
+			return nil, file.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("get metadata: %w", err)
 	}
 
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
+	entry := mapToEntry(resp)
 
-	return resp.Body, nil
+	return &entry, nil
 }
 
-func (s *FileService) UploadFile(file *multipart.FileHeader) error {
-	var (
-		buf = new(bytes.Buffer)
-		w   = multipart.NewWriter(buf)
-	)
-
-	f, err := file.Open()
+func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.ReadCloser, string, error) {
+	entry, err := s.GetMetadata(ctx, filePath)
 	if err != nil {
-		return err
+		return nil, "", fmt.Errorf("get metadata: %w", err)
 	}
-	defer f.Close()
 
-	part, err := w.CreateFormFile("file", file.Filename)
+	if entry.IsDir {
+		return nil, "", file.ErrNotFound
+	}
+
+	rc, err := s.filer.DownloadFile(ctx, &seaweedfs.DownloadFileRequest{FullPath: filePath})
 	if err != nil {
-		return err
+		return nil, "", fmt.Errorf("download file: %w", err)
 	}
 
-	if _, err := io.Copy(part, f); err != nil {
-		return err
-	}
+	return rc, entry.MimeType, nil
+}
 
-	w.Close()
-
-	req, err := http.NewRequest("POST", s.FilerServer+"/upload/", buf)
+func (s *FileService) CreateFile(ctx context.Context, content io.Reader, fullName string) (int64, error) {
+	result, err := s.filer.UploadFile(ctx, &seaweedfs.UploadFileRequest{
+		Content:      content,
+		FullFileName: fullName,
+	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	req.Header.Set("Content-Type", w.FormDataContentType())
+	return result.Size, nil
+}
 
-	resp, err := s.client.Do(req)
+func (s *FileService) ListEntries(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]file.Entry, error) {
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[swCursor](cursor.Token)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
-	defer resp.Body.Close()
+
+	resp, err := s.filer.ListEntries(ctx, &seaweedfs.ListEntriesRequest{
+		DirPath:      dirpath,
+		Limit:        cursor.Limit,
+		LastFileName: cursorObj.LastFileName,
+	})
+	if err != nil {
+		if errors.Is(err, seaweedfs.ErrNotFound) {
+			return nil, file.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("list entries: %w", err)
+	}
+
+	if resp.ShouldDisplayLoadMore {
+		cursor.SetNextToken(pagination.EncodeToken(swCursor{LastFileName: resp.LastFileName}))
+	}
+
+	return mapEntries(resp), nil
+}
+
+func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error {
+	err := s.filer.CreateDirectory(ctx, &seaweedfs.CreateDirectoryRequest{DirPath: dirpath})
+	if err != nil {
+		if errors.Is(err, seaweedfs.ErrDirAlreadyExists) {
+			return file.ErrDirAlreadyExists
+		}
+
+		return fmt.Errorf("create directory: %w", err)
+	}
 
 	return nil
+}
+
+func (s *FileService) Delete(ctx context.Context, fullPath string) error {
+	err := s.filer.Delete(ctx, &seaweedfs.DeleteRequest{FullPath: fullPath})
+	if err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileService) GetDirectorySize(ctx context.Context, dirpath string) (uint64, error) {
+	size, err := s.filer.GetDirectorySize(ctx,
+		&seaweedfs.GetDirectorySizeRequest{DirPath: dirpath})
+	if err != nil {
+		if errors.Is(err, seaweedfs.ErrNotFound) {
+			return 0, file.ErrNotFound
+		}
+
+		return 0, fmt.Errorf("get directory size: %w", err)
+	}
+
+	return size, nil
+}
+
+func (s *FileService) DirStatus(ctx context.Context) (map[string]interface{}, error) {
+	return s.sw.Master().DirStatus(ctx)
+}
+
+func (s *FileService) VolStatus(ctx context.Context) (map[string]interface{}, error) {
+	return s.sw.Master().VolStatus(ctx)
+}
+
+func mapEntries(resp *seaweedfs.ListEntriesResponse) []file.Entry {
+	entries := make([]file.Entry, 0, len(resp.Entries))
+	for _, entry := range resp.Entries {
+		entries = append(entries, mapToEntry(&entry))
+	}
+
+	return entries
+}
+
+type swCursor struct {
+	LastFileName string `json:"lastFileName"`
+}
+
+func mapToEntry(entry *seaweedfs.Entry) file.Entry {
+	e := file.Entry{
+		Name:      entry.FullPath.Name(),
+		FullPath:  string(entry.FullPath),
+		Size:      entry.FileSize,
+		Mode:      entry.Mode,
+		MimeType:  entry.Mime,
+		MD5:       entry.Md5,
+		IsDir:     entry.IsDirectory(),
+		CreatedAt: entry.Crtime,
+		UpdatedAt: entry.Mtime,
+	}
+
+	return e
 }
