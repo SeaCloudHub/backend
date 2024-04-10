@@ -30,7 +30,7 @@ type User struct {
 	LastSignInAt      *time.Time `json:"last_sign_in_at"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
-}
+} // @name identity.User
 
 func (u *User) WithName(firstName, lastName string) *User {
 	u.FirstName = firstName

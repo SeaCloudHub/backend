@@ -15,6 +15,61 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/dashboard": {
+            "get": {
+                "description": "Dashboard",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": true
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/identities": {
             "get": {
                 "description": "ListIdentities",
@@ -269,6 +324,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/identities/{identity_id}/state": {
+            "patch": {
+                "description": "UpdateIdentityState",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "UpdateIdentityState",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Identity ID",
+                        "name": "identity_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update identity state request",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.UpdateIdentityStateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/me": {
             "get": {
                 "description": "AdminMe",
@@ -301,7 +423,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_SeaCloudHub_backend_domain_identity.User"
+                                            "$ref": "#/definitions/identity.User"
                                         }
                                     }
                                 }
@@ -350,7 +472,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/github_com_SeaCloudHub_backend_adapters_httpserver_model.UploadImageResponse"
+                                                "$ref": "#/definitions/model.UploadImageResponse"
                                             }
                                         }
                                     }
@@ -481,6 +603,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -536,7 +664,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/model.UploadFileResponse"
+                                                "$ref": "#/definitions/file.File"
                                             }
                                         }
                                     }
@@ -552,6 +680,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -601,7 +735,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.SuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/file.File"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -674,6 +820,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -728,7 +880,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/file.Entry"
+                                            "$ref": "#/definitions/file.File"
                                         }
                                     }
                                 }
@@ -743,6 +895,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -929,6 +1087,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -965,7 +1135,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/github_com_SeaCloudHub_backend_domain_identity.User"
+                                            "$ref": "#/definitions/identity.User"
                                         }
                                     }
                                 }
@@ -983,7 +1153,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "file.Entry": {
+        "file.File": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -991,6 +1161,9 @@ const docTemplate = `{
                 },
                 "full_path": {
                     "type": "string"
+                },
+                "id": {
+                    "type": "integer"
                 },
                 "is_dir": {
                     "type": "boolean"
@@ -1010,95 +1183,14 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "path": {
+                    "type": "string"
+                },
                 "size": {
                     "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"
-                }
-            }
-        },
-        "github_com_SeaCloudHub_backend_adapters_httpserver_model.UploadImageResponse": {
-            "type": "object",
-            "properties": {
-                "file_name": {
-                    "type": "string"
-                },
-                "file_path": {
-                    "type": "string"
-                },
-                "mime_type": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_SeaCloudHub_backend_domain_identity.User": {
-            "type": "object",
-            "properties": {
-                "avatar_url": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "first_name": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "is_admin": {
-                    "type": "boolean"
-                },
-                "last_name": {
-                    "type": "string"
-                },
-                "last_sign_in_at": {
-                    "type": "string"
-                },
-                "password_changed_at": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_SeaCloudHub_backend_pkg_pagination.PageInfo": {
-            "type": "object",
-            "properties": {
-                "current_page": {
-                    "type": "integer"
-                },
-                "first_page": {
-                    "type": "integer"
-                },
-                "last_page": {
-                    "type": "integer"
-                },
-                "limit": {
-                    "type": "integer"
-                },
-                "next_page": {
-                    "type": "integer"
-                },
-                "previous_page": {
-                    "type": "integer"
-                },
-                "total_items": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
                 }
             }
         },
@@ -1156,6 +1248,44 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "identity.User": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "last_sign_in_at": {
+                    "type": "string"
+                },
+                "password_changed_at": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -1260,7 +1390,7 @@ const docTemplate = `{
                 "entries": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/file.Entry"
+                        "$ref": "#/definitions/file.File"
                     }
                 }
             }
@@ -1275,7 +1405,7 @@ const docTemplate = `{
                     }
                 },
                 "pagination": {
-                    "$ref": "#/definitions/github_com_SeaCloudHub_backend_pkg_pagination.PageInfo"
+                    "$ref": "#/definitions/pagination.PageInfo"
                 }
             }
         },
@@ -1300,7 +1430,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "identity": {
-                    "$ref": "#/definitions/github_com_SeaCloudHub_backend_domain_identity.User"
+                    "$ref": "#/definitions/identity.User"
                 },
                 "session_expires_at": {
                     "type": "string"
@@ -1322,10 +1452,31 @@ const docTemplate = `{
                 }
             }
         },
-        "model.UploadFileResponse": {
+        "model.UpdateIdentityStateRequest": {
+            "type": "object",
+            "required": [
+                "state"
+            ],
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "inactive"
+                    ]
+                }
+            }
+        },
+        "model.UploadImageResponse": {
             "type": "object",
             "properties": {
-                "name": {
+                "file_name": {
+                    "type": "string"
+                },
+                "file_path": {
+                    "type": "string"
+                },
+                "mime_type": {
                     "type": "string"
                 },
                 "size": {
@@ -1400,6 +1551,35 @@ const docTemplate = `{
                 "ModeType",
                 "ModePerm"
             ]
+        },
+        "pagination.PageInfo": {
+            "type": "object",
+            "properties": {
+                "current_page": {
+                    "type": "integer"
+                },
+                "first_page": {
+                    "type": "integer"
+                },
+                "last_page": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "next_page": {
+                    "type": "integer"
+                },
+                "previous_page": {
+                    "type": "integer"
+                },
+                "total_items": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
         }
     }
 }`

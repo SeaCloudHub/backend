@@ -143,6 +143,14 @@ func (s *FileService) GetDirectorySize(ctx context.Context, dirpath string) (uin
 	return size, nil
 }
 
+func (s *FileService) DirStatus(ctx context.Context) (map[string]interface{}, error) {
+	return s.sw.Master().DirStatus(ctx)
+}
+
+func (s *FileService) VolStatus(ctx context.Context) (map[string]interface{}, error) {
+	return s.sw.Master().VolStatus(ctx)
+}
+
 func mapEntries(resp *seaweedfs.ListEntriesResponse) []file.Entry {
 	entries := make([]file.Entry, 0, len(resp.Entries))
 	for _, entry := range resp.Entries {

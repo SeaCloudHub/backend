@@ -26,7 +26,7 @@ import (
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param path query string true "File or directory path"
-// @Success 200 {object} model.SuccessResponse{data=file.Entry}
+// @Success 200 {object} model.SuccessResponse{data=file.File}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse

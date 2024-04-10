@@ -1,6 +1,8 @@
 package model
 
 import (
+	"context"
+
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/validation"
@@ -43,4 +45,13 @@ func (r *CreateIdentityRequest) Validate() error {
 	}
 
 	return validation.Validate().Struct(r)
+}
+
+type UpdateIdentityStateRequest struct {
+	ID    string `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
+	State string `json:"state" validate:"required,oneof=active inactive"`
+} // @name model.UpdateIdentityStateRequest
+
+func (r *UpdateIdentityStateRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
 }

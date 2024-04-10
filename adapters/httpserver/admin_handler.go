@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
@@ -226,6 +227,39 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 	return s.success(c, ids)
 }
 
+// UpdateIdentityState godoc
+// @Summary UpdateIdentityState
+// @Description UpdateIdentityState
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param identity_id path string true "Identity ID"
+// @Param payload body model.UpdateIdentityStateRequest true "Update identity state request"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id}/state [patch]
+func (s *Server) UpdateIdentityState(c echo.Context) error {
+	ctx := mycontext.NewEchoContextAdapter(c)
+
+	var req model.UpdateIdentityStateRequest
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	if err := s.IdentityService.UpdateIdentityState(ctx, req.ID, req.State); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, nil)
+}
+
 // DownloadIdentitiesTemplate godoc
 // @Summary Download Identities Template CSV
 // @Description Download a CSV template file for creating identities.
@@ -250,13 +284,43 @@ func (s *Server) DownloadIdentitiesTemplate(c echo.Context) error {
 	return c.Blob(http.StatusOK, "text/csv", buf)
 }
 
+// Dashboard godoc
+// @Summary Dashboard
+// @Description Dashboard
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=map[string]interface{}}
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/dashboard [get]
+func (s *Server) Dashboard(c echo.Context) error {
+	var ctx = mycontext.NewEchoContextAdapter(c)
+
+	dirStatus, err := s.FileService.DirStatus(ctx)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	volStatus, err := s.FileService.VolStatus(ctx)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	maps.Copy(dirStatus, volStatus)
+
+	return s.success(c, dirStatus)
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
+	router.GET("/dashboard", s.Dashboard)
 
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)
 	router.POST("/identities", s.CreateIdentity)
 	router.POST("/identities/bulk", s.CreateMultipleIdentities)
 	router.GET("/identities/template", s.DownloadIdentitiesTemplate)
+	router.PATCH("/identities/:identity_id/state", s.UpdateIdentityState)
 }

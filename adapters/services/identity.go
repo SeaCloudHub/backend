@@ -55,6 +55,14 @@ func (s *IdentityService) Login(ctx context.Context, email string, password stri
 			return nil, identity.ErrInvalidCredentials
 		}
 
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			if genericErr.Error.GetMessage() == "identity is disabled" {
+				return nil, identity.ErrIdentityWasDisabled
+			}
+
+			return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
@@ -250,6 +258,27 @@ func (s *IdentityService) ListIdentities(ctx context.Context, pager *pagination.
 	pager.SetNextToken(keysetpagination.ParseHeader(resp).NextToken)
 
 	return mapIdentities(identities)
+}
+
+func (s *IdentityService) UpdateIdentityState(ctx context.Context, id string, state string) error {
+	_, _, err := s.adminClient.IdentityAPI.PatchIdentity(ctx, id).JsonPatch(
+		[]kratos.JsonPatch{
+			{
+				Op:    "replace",
+				Path:  "/state",
+				Value: state,
+			},
+		},
+	).Execute()
+	if err != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("error disabling identity: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
 }
 
 func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {

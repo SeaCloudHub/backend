@@ -17,7 +17,7 @@ type PageInfo struct {
 	FirstPage    int   `json:"first_page"`
 	LastPage     int   `json:"last_page"`
 	Limit        int   `json:"limit"`
-}
+} // @name pagination.PageInfo
 
 func NewPager(page int, limit int) *Pager {
 	return &Pager{

@@ -21,6 +21,8 @@ import (
 // @Param payload body model.LoginRequest true "Login request"
 // @Success 200 {object} model.SuccessResponse{data=model.LoginResponse}
 // @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
 // @Router /users/login [post]
 func (s *Server) Login(c echo.Context) error {
 	var (
@@ -40,6 +42,10 @@ func (s *Server) Login(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, identity.ErrInvalidCredentials) {
 			return s.error(c, apperror.ErrInvalidCredentials(err))
+		}
+
+		if errors.Is(err, identity.ErrIdentityWasDisabled) {
+			return s.error(c, apperror.ErrIdentityWasDisabled(err))
 		}
 
 		return s.error(c, apperror.ErrInternalServer(err))
