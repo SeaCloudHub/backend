@@ -10,7 +10,9 @@ import (
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type FileStore struct {
@@ -116,7 +118,7 @@ func (s *FileStore) GetByID(ctx context.Context, id string) (*file.File, error) 
 		Preload("Owner").
 		Where("id = ?", id).
 		First(&fileSchema).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
 		}
 
@@ -132,7 +134,7 @@ func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.F
 	if err := s.db.WithContext(ctx).
 		Where("full_path = ?", fullPath).
 		First(&fileSchema).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
 		}
 
@@ -140,6 +142,67 @@ func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.F
 	}
 
 	return fileSchema.ToDomainFile(), nil
+}
+
+func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
+	if err := s.db.WithContext(ctx).
+		Model(&FileSchema{}).
+		Where("id = ?", fileID).
+		Update("general_access", generalAccess).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error {
+	var shareSchemas []ShareSchema
+
+	for _, userID := range userIDs {
+		shareSchemas = append(shareSchemas, ShareSchema{
+			FileID: fileID,
+			UserID: userID,
+			Role:   role,
+		})
+	}
+
+	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "file_id"}, {Name: "user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"role"}),
+	}).Create(&shareSchemas).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) GetShare(ctx context.Context, fileID, userID uuid.UUID) (*file.Share, error) {
+	var shareSchema ShareSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ? AND user_id = ?", fileID, userID).
+		First(&shareSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, file.ErrNotFound
+		}
+	}
+
+	return &file.Share{
+		FileID:    shareSchema.FileID,
+		UserID:    shareSchema.UserID,
+		Role:      shareSchema.Role,
+		CreatedAt: shareSchema.CreatedAt,
+	}, nil
+}
+
+func (s *FileStore) DeleteShare(ctx context.Context, fileID, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ? AND user_id = ?", fileID, userID).
+		Delete(&ShareSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
 }
 
 type fsCursor struct {

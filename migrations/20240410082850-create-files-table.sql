@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS "files"
     "mime_type"         VARCHAR(255) NOT NULL,
     "md5"               VARCHAR(32) NOT NULL,
     "is_dir"            BOOLEAN NOT NULL DEFAULT FALSE,
-    "general_access"    VARCHAR(255) NOT NULL DEFAULT 'restricted', -- restricted, everyone
+    "general_access"    VARCHAR(255) NOT NULL DEFAULT 'restricted', -- restricted, everyone-can-view, everyone-can-edit
     "owner_id"          UUID NOT NULL,
     "created_at"        TIMESTAMPTZ DEFAULT NOW(),
     "updated_at"        TIMESTAMPTZ DEFAULT NOW(),

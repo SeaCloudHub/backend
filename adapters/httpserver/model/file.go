@@ -33,7 +33,7 @@ func (r *UploadFilesRequest) Validate(ctx context.Context) error {
 }
 
 type ListEntriesRequest struct {
-	ID     string `param:"id" validate:"required,uuid"`
+	ID     string `param:"id" validate:"required,uuid" swaggerignore:"true"`
 	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
 	Cursor string `query:"cursor" validate:"omitempty,base64url"`
 }
@@ -52,10 +52,10 @@ type ListEntriesResponse struct {
 } // @name model.ListEntriesResponse
 
 type ListPageEntriesRequest struct {
-	ID    string `param:"id" validate:"required,uuid"`
+	ID    string `param:"id" validate:"required,uuid" swaggerignore:"true"`
 	Page  int    `query:"page" validate:"required,min=1"`
 	Limit int    `query:"limit" validate:"omitempty,min=1,max=100"`
-}
+} // @name model.ListPageEntriesRequest
 
 func (r *ListPageEntriesRequest) Validate(ctx context.Context) error {
 	if r.Limit == 0 {
@@ -84,12 +84,28 @@ func (r *CreateDirectoryRequest) Validate(ctx context.Context) error {
 }
 
 type ShareRequest struct {
-	FullPath string `json:"full_path" validate:"required,filepath|dirpath"`
-}
+	ID     string   `json:"id" validate:"required,uuid"`
+	Emails []string `json:"emails" validate:"required,dive,email"`
+	Role   string   `json:"role" validate:"required,oneof=viewer editor"`
+} // @name model.ShareRequest
 
 func (r *ShareRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
-type ShareResponse struct {
+type AccessRequest struct {
+	ID string `param:"id" validate:"required,uuid"`
+} // @name model.AccessRequest
+
+func (r *AccessRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type UpdateGeneralAccessRequest struct {
+	ID            string `json:"id" validate:"required,uuid"`
+	GeneralAccess string `json:"general_access" validate:"required,oneof=restricted everyone-can-view everyone-can-edit"`
+} // @name model.UpdateGeneralAccessRequest
+
+func (r *UpdateGeneralAccessRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
 }

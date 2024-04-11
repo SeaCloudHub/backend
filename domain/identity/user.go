@@ -17,6 +17,7 @@ type Store interface {
 	GetByID(ctx context.Context, userID uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	List(ctx context.Context, pagination *pagination.Pager) ([]User, error)
+	ListByEmails(ctx context.Context, emails []string) ([]User, error)
 }
 
 type User struct {

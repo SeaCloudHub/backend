@@ -18,22 +18,27 @@ type Store interface {
 	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
+	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
+	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
+	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)
+	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 }
 
 type File struct {
-	ID        uuid.UUID   `json:"id"`
-	Name      string      `json:"name"`
-	Path      string      `json:"path"`
-	FullPath  string      `json:"full_path"`
-	ShownPath string      `json:"shown_path"`
-	Size      uint64      `json:"size"`
-	Mode      os.FileMode `json:"mode"`
-	MimeType  string      `json:"mime_type"`
-	MD5       []byte      `json:"md5"`
-	IsDir     bool        `json:"is_dir"`
-	OwnerID   uuid.UUID   `json:"owner_id"`
-	CreatedAt time.Time   `json:"created_at"`
-	UpdatedAt time.Time   `json:"updated_at"`
+	ID            uuid.UUID   `json:"id"`
+	Name          string      `json:"name"`
+	Path          string      `json:"path"`
+	FullPath      string      `json:"full_path"`
+	ShownPath     string      `json:"shown_path"`
+	Size          uint64      `json:"size"`
+	Mode          os.FileMode `json:"mode"`
+	MimeType      string      `json:"mime_type"`
+	MD5           []byte      `json:"md5"`
+	IsDir         bool        `json:"is_dir"`
+	GeneralAccess string      `json:"general_access"`
+	OwnerID       uuid.UUID   `json:"owner_id"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
 
 	Owner *identity.User `json:"owner,omitempty"`
 } // @name file.File
@@ -65,3 +70,10 @@ func (f *File) Response() *File {
 
 	return f
 }
+
+type Share struct {
+	FileID    uuid.UUID `json:"file_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+} // @name file.Share
