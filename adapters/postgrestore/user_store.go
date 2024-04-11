@@ -54,6 +54,13 @@ func (s *UserStore) UpdateLastSignInAt(ctx context.Context, id uuid.UUID) error 
 		Error
 }
 
+func (s *UserStore) UpdateRootID(ctx context.Context, id, rootID uuid.UUID) error {
+	return s.db.WithContext(ctx).Model(&UserSchema{}).
+		Where("id = ?", id).
+		Update("root_id", rootID).
+		Error
+}
+
 func (s *UserStore) GetByID(ctx context.Context, id uuid.UUID) (*identity.User, error) {
 	var userSchema UserSchema
 	err := s.db.WithContext(ctx).Where("id = ?", id).First(&userSchema).Error
@@ -65,18 +72,7 @@ func (s *UserStore) GetByID(ctx context.Context, id uuid.UUID) (*identity.User, 
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
-	return &identity.User{
-		ID:                userSchema.ID,
-		Email:             userSchema.Email,
-		FirstName:         userSchema.FirstName,
-		LastName:          userSchema.LastName,
-		AvatarURL:         userSchema.AvatarURL,
-		IsActive:          userSchema.IsActive,
-		IsAdmin:           userSchema.IsAdmin,
-		PasswordChangedAt: userSchema.PasswordChangedAt,
-		CreatedAt:         userSchema.CreatedAt,
-		UpdatedAt:         userSchema.UpdatedAt,
-	}, nil
+	return userSchema.ToDomainUser(), nil
 }
 
 func (s *UserStore) GetByEmail(ctx context.Context, email string) (*identity.User, error) {
@@ -123,18 +119,7 @@ func (s *UserStore) List(ctx context.Context, pager *pagination.Pager) ([]identi
 
 	users := make([]identity.User, 0, len(userSchemas))
 	for _, userSchema := range userSchemas {
-		users = append(users, identity.User{
-			ID:                userSchema.ID,
-			Email:             userSchema.Email,
-			FirstName:         userSchema.FirstName,
-			LastName:          userSchema.LastName,
-			AvatarURL:         userSchema.AvatarURL,
-			IsActive:          userSchema.IsActive,
-			IsAdmin:           userSchema.IsAdmin,
-			PasswordChangedAt: userSchema.PasswordChangedAt,
-			CreatedAt:         userSchema.CreatedAt,
-			UpdatedAt:         userSchema.UpdatedAt,
-		})
+		users = append(users, *userSchema.ToDomainUser())
 	}
 
 	return users, nil
