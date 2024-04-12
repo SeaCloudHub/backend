@@ -9,7 +9,7 @@ import (
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/google/uuid"
 
-	"github.com/SeaCloudHub/backend/pkg/mycontext"
+	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -61,7 +61,7 @@ func (a *Authentication) Middleware() echo.MiddlewareFunc {
 }
 
 func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (bool, error) {
-	var ctx = mycontext.NewEchoContextAdapter(c)
+	var ctx = app.NewEchoContextAdapter(c)
 
 	id, err := a.server.IdentityService.WhoAmI(ctx, token)
 	if err != nil {
