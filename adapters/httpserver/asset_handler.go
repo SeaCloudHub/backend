@@ -6,9 +6,8 @@ import (
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/file"
+	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
-	"github.com/SeaCloudHub/backend/pkg/mycontext"
-	"github.com/SeaCloudHub/backend/pkg/util"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 
 	"github.com/labstack/echo/v4"
@@ -25,7 +24,7 @@ import (
 // @Router /assets/images/{name} [get]
 func (s *Server) GetImage(c echo.Context) error {
 	var (
-		ctx = mycontext.NewEchoContextAdapter(c)
+		ctx = app.NewEchoContextAdapter(c)
 		req model.GetImageRequest
 	)
 
@@ -53,9 +52,9 @@ func (s *Server) GetImage(c echo.Context) error {
 // @Failure 500 {object} model.ErrorResponse
 // @Router /assets/images [post]
 func (s *Server) UploadImage(c echo.Context) error {
-	var ctx = mycontext.NewEchoContextAdapter(c)
+	var ctx = app.NewEchoContextAdapter(c)
 
-	reader, contentType, err := util.BindMultipartFile(c, "image")
+	reader, contentType, err := app.BindMultipartFile(c, "image")
 	if err != nil {
 		return s.error(c, apperror.ErrInvalidRequest(err))
 	}

@@ -1,4 +1,4 @@
-package mycontext
+package app
 
 import (
 	"fmt"

@@ -13,9 +13,11 @@ type Store interface {
 	UpdateAdmin(ctx context.Context, userID uuid.UUID) error
 	UpdatePasswordChangedAt(ctx context.Context, userID uuid.UUID) error
 	UpdateLastSignInAt(ctx context.Context, userID uuid.UUID) error
+	UpdateRootID(ctx context.Context, userID, rootID uuid.UUID) error
 	GetByID(ctx context.Context, userID uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	List(ctx context.Context, pagination *pagination.Pager) ([]User, error)
+	ListByEmails(ctx context.Context, emails []string) ([]User, error)
 }
 
 type User struct {
@@ -28,6 +30,7 @@ type User struct {
 	IsAdmin           bool       `json:"is_admin"`
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 	LastSignInAt      *time.Time `json:"last_sign_in_at"`
+	RootID            uuid.UUID  `json:"root_id"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 } // @name identity.User

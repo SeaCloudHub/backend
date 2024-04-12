@@ -1,6 +1,6 @@
 package pagination
 
-import "github.com/SeaCloudHub/backend/pkg/util"
+import "github.com/SeaCloudHub/backend/pkg/app"
 
 type Pager struct {
 	Page  int
@@ -42,12 +42,12 @@ func (p *Pager) PageInfo() PageInfo {
 
 	var nextPage *int
 	if p.Page < totalPages {
-		nextPage = util.Int(p.Page + 1)
+		nextPage = app.Int(p.Page + 1)
 	}
 
 	var previousPage *int
 	if p.Page > 1 {
-		previousPage = util.Int(p.Page - 1)
+		previousPage = app.Int(p.Page - 1)
 	}
 
 	return PageInfo{

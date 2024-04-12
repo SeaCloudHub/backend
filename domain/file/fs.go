@@ -45,7 +45,7 @@ type Entry struct {
 
 func (e *Entry) ToFile() *File {
 	fullPath := e.FullPath
-	if e.IsDir {
+	if e.IsDir && e.FullPath != "/" {
 		fullPath = filepath.Join(e.FullPath) + string(filepath.Separator)
 	}
 

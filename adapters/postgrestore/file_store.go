@@ -3,13 +3,16 @@ package postgrestore
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
-	"os"
+	"time"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type FileStore struct {
@@ -31,9 +34,14 @@ func (s *FileStore) Create(ctx context.Context, f *file.File) error {
 		MimeType: f.MimeType,
 		MD5:      hex.EncodeToString(f.MD5),
 		IsDir:    f.IsDir,
+		OwnerID:  f.OwnerID,
 	}
 
 	if err := s.db.WithContext(ctx).Create(&fileSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return file.ErrDirAlreadyExists
+		}
+
 		return fmt.Errorf("unexpected error: %w", err)
 	}
 
@@ -48,7 +56,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 		total       int64
 	)
 
-	if err := s.db.WithContext(ctx).
+	if err := s.db.WithContext(ctx).Model(&fileSchemas).
 		Where("path = ?", dirpath).
 		Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
@@ -58,6 +66,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 
 	offset, limit := pager.Do()
 	if err := s.db.WithContext(ctx).
+		Preload("Owner").
 		Where("path = ?", dirpath).
 		Offset(offset).Limit(limit).Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
@@ -65,18 +74,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 
 	files := make([]file.File, len(fileSchemas))
 	for i, fileSchema := range fileSchemas {
-		md5, _ := hex.DecodeString(fileSchema.MD5)
-		files[i] = file.File{
-			ID:       fileSchema.ID,
-			Name:     fileSchema.Name,
-			Path:     fileSchema.Path,
-			FullPath: fileSchema.FullPath,
-			Size:     fileSchema.Size,
-			Mode:     os.FileMode(fileSchema.Mode),
-			MimeType: fileSchema.MimeType,
-			MD5:      md5,
-			IsDir:    fileSchema.IsDir,
-		}
+		files[i] = *fileSchema.ToDomainFile()
 	}
 
 	return files, nil
@@ -91,37 +89,43 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	if err := s.db.WithContext(ctx).
-		Where("path = ?", dirpath).
-		Where("id >= ?", cursorObj.ID).
-		Limit(cursor.Limit + 1).Find(&fileSchemas).Error; err != nil {
+	query := s.db.WithContext(ctx).Where("path = ?", dirpath)
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
 	if len(fileSchemas) > cursor.Limit {
-		cursor.SetNextToken(pagination.EncodeToken(fsCursor{ID: fileSchemas[cursor.Limit].ID}))
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
 		fileSchemas = fileSchemas[:cursor.Limit]
 	}
 
 	files := make([]file.File, len(fileSchemas))
 	for i, fileSchema := range fileSchemas {
-		md5, _ := hex.DecodeString(fileSchema.MD5)
-		files[i] = file.File{
-			ID:        fileSchema.ID,
-			Name:      fileSchema.Name,
-			Path:      fileSchema.Path,
-			FullPath:  fileSchema.FullPath,
-			Size:      fileSchema.Size,
-			Mode:      os.FileMode(fileSchema.Mode),
-			MimeType:  fileSchema.MimeType,
-			MD5:       md5,
-			IsDir:     fileSchema.IsDir,
-			CreatedAt: fileSchema.CreatedAt,
-			UpdatedAt: fileSchema.UpdatedAt,
-		}
+		files[i] = *fileSchema.ToDomainFile()
 	}
 
 	return files, nil
+}
+
+func (s *FileStore) GetByID(ctx context.Context, id string) (*file.File, error) {
+	var fileSchema FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Preload("Owner").
+		Where("id = ?", id).
+		First(&fileSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, file.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return fileSchema.ToDomainFile(), nil
 }
 
 func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.File, error) {
@@ -130,29 +134,77 @@ func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.F
 	if err := s.db.WithContext(ctx).
 		Where("full_path = ?", fullPath).
 		First(&fileSchema).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
 		}
 
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
-	md5, _ := hex.DecodeString(fileSchema.MD5)
-	return &file.File{
-		ID:        fileSchema.ID,
-		Name:      fileSchema.Name,
-		Path:      fileSchema.Path,
-		FullPath:  fileSchema.FullPath,
-		Size:      fileSchema.Size,
-		Mode:      os.FileMode(fileSchema.Mode),
-		MimeType:  fileSchema.MimeType,
-		MD5:       md5,
-		IsDir:     fileSchema.IsDir,
-		CreatedAt: fileSchema.CreatedAt,
-		UpdatedAt: fileSchema.UpdatedAt,
+	return fileSchema.ToDomainFile(), nil
+}
+
+func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
+	if err := s.db.WithContext(ctx).
+		Model(&FileSchema{}).
+		Where("id = ?", fileID).
+		Update("general_access", generalAccess).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error {
+	var shareSchemas []ShareSchema
+
+	for _, userID := range userIDs {
+		shareSchemas = append(shareSchemas, ShareSchema{
+			FileID: fileID,
+			UserID: userID,
+			Role:   role,
+		})
+	}
+
+	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "file_id"}, {Name: "user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"role"}),
+	}).Create(&shareSchemas).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) GetShare(ctx context.Context, fileID, userID uuid.UUID) (*file.Share, error) {
+	var shareSchema ShareSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ? AND user_id = ?", fileID, userID).
+		First(&shareSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, file.ErrNotFound
+		}
+	}
+
+	return &file.Share{
+		FileID:    shareSchema.FileID,
+		UserID:    shareSchema.UserID,
+		Role:      shareSchema.Role,
+		CreatedAt: shareSchema.CreatedAt,
 	}, nil
 }
 
+func (s *FileStore) DeleteShare(ctx context.Context, fileID, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ? AND user_id = ?", fileID, userID).
+		Delete(&ShareSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 type fsCursor struct {
-	ID int `json:"id"`
+	CreatedAt *time.Time
 }
