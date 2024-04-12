@@ -1,46 +1,10 @@
-package util
+package app
 
 import (
-	"bufio"
 	"fmt"
-	"net/http"
 	"path/filepath"
 	"strings"
-
-	"github.com/labstack/echo/v4"
 )
-
-func BindMultipartFile(c echo.Context, key string) (*bufio.Reader, string, error) {
-	var (
-		buf         *bufio.Reader
-		contentType string
-	)
-
-	reader, err := c.Request().MultipartReader()
-	if err != nil {
-		return nil, "", fmt.Errorf("parsing multipart form: %w", err)
-	}
-
-	for {
-		part, err := reader.NextPart()
-		if err != nil {
-			return nil, "", fmt.Errorf("reading multipart form: %w", err)
-		}
-
-		if part.FormName() != key {
-			continue
-		}
-
-		buf = bufio.NewReader(part)
-
-		data, _ := buf.Peek(512)
-		contentType = http.DetectContentType(data)
-
-		break
-	}
-
-	return buf, contentType, nil
-}
 
 func GetIdentityDirPath(identityID string) string {
 	return fmt.Sprintf("/%s/", identityID)
@@ -55,6 +19,10 @@ func RemoveRootPath(fp string) string {
 	entryPath := []string{}
 	if fp != "" && fp != "/" {
 		entryPath = strings.Split(fp[1:], "/")
+	}
+
+	if len(entryPath) == 0 {
+		return "/"
 	}
 
 	entryPath[0] = "/"
@@ -92,4 +60,21 @@ func GetPathAndName(fullPath string) (string, string) {
 	}
 
 	return dir, file
+}
+
+func GetParentPath(fullPath string) string {
+	if fullPath == "/" || fullPath == "" {
+		return ""
+	}
+
+	parent := filepath.Join(fullPath, "..")
+	if strings.HasSuffix(parent, "/") {
+		return parent
+	}
+
+	return parent + string(filepath.Separator)
+}
+
+func IsDirPath(path string) bool {
+	return strings.HasSuffix(path, "/")
 }

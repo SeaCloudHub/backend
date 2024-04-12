@@ -11,6 +11,7 @@ const (
 	IncorrectPasswordCode    = "400007"
 	InvalidPasswordCode      = "400009"
 	InvalidImageCode         = "400010"
+	DirAlreadyExistsCode     = "400011"
 	UnauthorizedCode         = "401004"
 	IdentityWasDisableCode   = "401009"
 	ForbiddenCode            = "403005"
@@ -38,6 +39,10 @@ func ErrInvalidPassword(err error) Error {
 
 func ErrInvalidImage(err error) Error {
 	return NewError(err, http.StatusBadRequest, InvalidImageCode, "Invalid image")
+}
+
+func ErrDirAlreadyExists(err error) Error {
+	return NewError(err, http.StatusBadRequest, DirAlreadyExistsCode, "Directory already exists")
 }
 
 // 401 Unauthorized

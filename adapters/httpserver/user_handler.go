@@ -5,8 +5,8 @@ import (
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/identity"
+	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
-	"github.com/SeaCloudHub/backend/pkg/mycontext"
 	"github.com/google/uuid"
 
 	"github.com/labstack/echo/v4"
@@ -26,7 +26,7 @@ import (
 // @Router /users/login [post]
 func (s *Server) Login(c echo.Context) error {
 	var (
-		ctx = mycontext.NewEchoContextAdapter(c)
+		ctx = app.NewEchoContextAdapter(c)
 		req model.LoginRequest
 	)
 
@@ -113,7 +113,7 @@ func (s *Server) Me(c echo.Context) error {
 // @Router /users/change-password [post]
 func (s *Server) ChangePassword(c echo.Context) error {
 	var (
-		ctx = mycontext.NewEchoContextAdapter(c)
+		ctx = app.NewEchoContextAdapter(c)
 		req model.ChangePasswordRequest
 	)
 
@@ -165,7 +165,7 @@ func (s *Server) ChangePassword(c echo.Context) error {
 // @Router /users/email [get]
 func (s *Server) GetByEmail(c echo.Context) error {
 	var (
-		ctx = mycontext.NewEchoContextAdapter(c)
+		ctx = app.NewEchoContextAdapter(c)
 		req model.GetByEmailRequest
 	)
 

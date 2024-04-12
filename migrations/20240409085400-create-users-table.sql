@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS "users"
     "is_admin"              BOOLEAN DEFAULT FALSE,
     "password_changed_at"   TIMESTAMPTZ NULL,
     "last_signin_at"        TIMESTAMPTZ NULL,
+    "root_id"               UUID NULL,
     "created_at"            TIMESTAMPTZ DEFAULT NOW(),
     "updated_at"            TIMESTAMPTZ DEFAULT NOW(),
     "deleted_at"            TIMESTAMPTZ NULL

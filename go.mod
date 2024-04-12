@@ -73,6 +73,7 @@ require (
 	github.com/peterhellberg/link v1.2.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20211224045212-9687c2b0f87c // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/samber/lo v1.39.0 // indirect
 	github.com/segmentio/go-camelcase v0.0.0-20160726192923-7085f1e3c734 // indirect
 	github.com/segmentio/go-snakecase v1.2.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
@@ -80,6 +81,7 @@ require (
 	github.com/sourcegraph/syntaxhighlight v0.0.0-20170531221838-bd320f5d308e // indirect
 	github.com/swaggo/files/v2 v2.0.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
+	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
