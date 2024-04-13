@@ -144,6 +144,23 @@ func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.F
 	return fileSchema.ToDomainFile(), nil
 }
 
+func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
 func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).

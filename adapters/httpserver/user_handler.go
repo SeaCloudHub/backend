@@ -125,10 +125,7 @@ func (s *Server) ChangePassword(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	id, ok := c.Get(ContextKeyIdentity).(*identity.Identity)
-	if !ok {
-		return s.error(c, apperror.ErrInternalServer(errors.New("identity not found")))
-	}
+	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
 
 	if err := s.IdentityService.ChangePassword(ctx, id, req.OldPassword, req.NewPassword); err != nil {
 		if errors.Is(err, identity.ErrIncorrectPassword) {

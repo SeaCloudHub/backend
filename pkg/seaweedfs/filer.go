@@ -34,8 +34,13 @@ func (f *Filer) SetDebug(debug bool) {
 func (f *Filer) GetMetadata(ctx context.Context, in *GetMetadataRequest) (*Entry, error) {
 	var result Entry
 
+	path, err := url.ParseRequestURI(in.FullPath)
+	if err != nil {
+		return nil, fmt.Errorf("parse request uri: %w", err)
+	}
+
 	resp, err := f.client.R().SetContext(ctx).SetQueryParam("metadata", "true").SetResult(&result).
-		Get(in.FullPath)
+		Get(path.String())
 	if err != nil {
 		return nil, fmt.Errorf("get metadata: %w", err)
 	}
@@ -49,6 +54,11 @@ func (f *Filer) GetMetadata(ctx context.Context, in *GetMetadataRequest) (*Entry
 
 func (f *Filer) ListEntries(ctx context.Context, in *ListEntriesRequest) (*ListEntriesResponse, error) {
 	var result ListEntriesResponse
+
+	path, err := url.ParseRequestURI(in.DirPath)
+	if err != nil {
+		return nil, fmt.Errorf("parse request uri: %w", err)
+	}
 
 	req := f.client.R().SetContext(ctx)
 
@@ -69,7 +79,7 @@ func (f *Filer) ListEntries(ctx context.Context, in *ListEntriesRequest) (*ListE
 	}
 
 	resp, err := req.SetHeader("Accept", "application/json").SetResult(&result).
-		Get(in.DirPath)
+		Get(path.String())
 	if err != nil {
 		return nil, fmt.Errorf("list entries: %w", err)
 	}
@@ -82,8 +92,13 @@ func (f *Filer) ListEntries(ctx context.Context, in *ListEntriesRequest) (*ListE
 }
 
 func (f *Filer) DownloadFile(ctx context.Context, in *DownloadFileRequest) (io.ReadCloser, error) {
+	path, err := url.ParseRequestURI(in.FullPath)
+	if err != nil {
+		return nil, fmt.Errorf("parse request uri: %w", err)
+	}
+
 	resp, err := f.client.R().SetContext(ctx).SetDoNotParseResponse(true).
-		Get(in.FullPath)
+		Get(path.String())
 	if err != nil {
 		return nil, fmt.Errorf("download file: %w", err)
 	}
@@ -98,9 +113,14 @@ func (f *Filer) DownloadFile(ctx context.Context, in *DownloadFileRequest) (io.R
 func (f *Filer) UploadFile(ctx context.Context, in *UploadFileRequest) (*UploadFileResponse, error) {
 	var result UploadFileResponse
 
+	path, err := url.ParseRequestURI(in.FullFileName)
+	if err != nil {
+		return nil, fmt.Errorf("parse request uri: %w", err)
+	}
+
 	resp, err := f.client.R().SetContext(ctx).SetFileReader("file", "", in.Content).
 		SetResult(&result).
-		Post(in.FullFileName)
+		Post(path.String())
 	if err != nil {
 		return nil, fmt.Errorf("upload file: %w", err)
 	}
@@ -113,8 +133,13 @@ func (f *Filer) UploadFile(ctx context.Context, in *UploadFileRequest) (*UploadF
 }
 
 func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest) error {
+	path, err := url.ParseRequestURI(in.DirPath)
+	if err != nil {
+		return fmt.Errorf("parse request uri: %w", err)
+	}
+
 	resp, err := f.client.R().SetContext(ctx).
-		Post(in.DirPath)
+		Post(path.String())
 	if err != nil {
 		return fmt.Errorf("create directory: %w", err)
 	}
@@ -131,8 +156,13 @@ func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest)
 }
 
 func (f *Filer) Delete(ctx context.Context, in *DeleteRequest) error {
+	path, err := url.ParseRequestURI(in.FullPath)
+	if err != nil {
+		return fmt.Errorf("parse request uri: %w", err)
+	}
+
 	resp, err := f.client.R().SetContext(ctx).
-		Delete(in.FullPath)
+		Delete(path.String())
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
@@ -142,15 +172,4 @@ func (f *Filer) Delete(ctx context.Context, in *DeleteRequest) error {
 	}
 
 	return nil
-}
-
-func (f *Filer) GetDirectorySize(ctx context.Context, in *GetDirectorySizeRequest) (uint64, error) {
-	listEntry, err := f.ListEntries(ctx, &ListEntriesRequest{
-		DirPath: in.DirPath,
-	})
-	if err != nil {
-		return 0, fmt.Errorf("get directory size: %w", err)
-	}
-
-	return listEntry.GetTotalSize(), nil
 }

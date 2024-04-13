@@ -27,8 +27,8 @@ func (r *ListIdentitiesRequest) Validate() error {
 }
 
 type ListIdentitiesResponse struct {
-	Identities []identity.ExtendedUser `json:"identities"`
-	Pagination pagination.PageInfo     `json:"pagination"`
+	Identities []identity.User     `json:"identities"`
+	Pagination pagination.PageInfo `json:"pagination"`
 } // @name model.ListIdentitiesResponse
 
 type CreateIdentityRequest struct {

@@ -35,37 +35,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  identity.ExtendedUser:
-    properties:
-      avatar_url:
-        type: string
-      created_at:
-        type: string
-      email:
-        type: string
-      first_name:
-        type: string
-      id:
-        type: string
-      is_active:
-        type: boolean
-      is_admin:
-        type: boolean
-      last_name:
-        type: string
-      last_sign_in_at:
-        type: string
-      password_changed_at:
-        type: string
-      root_id:
-        type: string
-      storage_capacity:
-        type: integer
-      storage_used:
-        type: integer
-      updated_at:
-        type: string
-    type: object
   identity.Identity:
     properties:
       email:
@@ -99,6 +68,10 @@ definitions:
         type: string
       root_id:
         type: string
+      storage_capacity:
+        type: integer
+      storage_usage:
+        type: integer
       updated_at:
         type: string
     type: object
@@ -115,6 +88,18 @@ definitions:
     required:
     - new_password
     - old_password
+    type: object
+  model.CopyFilesRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        type: array
+      to:
+        type: string
+    required:
+    - ids
+    - to
     type: object
   model.CreateDirectoryRequest:
     properties:
@@ -181,7 +166,7 @@ definitions:
     properties:
       identities:
         items:
-          $ref: '#/definitions/identity.ExtendedUser'
+          $ref: '#/definitions/identity.User'
         type: array
       pagination:
         $ref: '#/definitions/pagination.PageInfo'
@@ -992,6 +977,61 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: ListPageEntries
+      tags:
+      - file
+  /files/copy:
+    post:
+      consumes:
+      - application/json
+      description: CopyFiles
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Copy files request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.CopyFilesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: CopyFiles
       tags:
       - file
   /files/directories:

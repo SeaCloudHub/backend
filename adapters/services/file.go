@@ -129,20 +129,6 @@ func (s *FileService) Delete(ctx context.Context, fullPath string) error {
 	return nil
 }
 
-func (s *FileService) GetDirectorySize(ctx context.Context, dirpath string) (uint64, error) {
-	size, err := s.filer.GetDirectorySize(ctx,
-		&seaweedfs.GetDirectorySizeRequest{DirPath: dirpath})
-	if err != nil {
-		if errors.Is(err, seaweedfs.ErrNotFound) {
-			return 0, file.ErrNotFound
-		}
-
-		return 0, fmt.Errorf("get directory size: %w", err)
-	}
-
-	return size, nil
-}
-
 func (s *FileService) DirStatus(ctx context.Context) (map[string]interface{}, error) {
 	return s.sw.Master().DirStatus(ctx)
 }

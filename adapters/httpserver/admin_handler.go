@@ -47,10 +47,6 @@ func (s *Server) ListIdentities(c echo.Context) error {
 		req model.ListIdentitiesRequest
 	)
 
-	// TODO: get maxCapacity from config of identity storage size
-	// max capacity is 10GB for now
-	const maxCapacity = 10 << 30
-
 	if err := c.Bind(&req); err != nil {
 		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
@@ -66,22 +62,8 @@ func (s *Server) ListIdentities(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	extendedUsers := make([]identity.ExtendedUser, 0, len(users))
-
-	for i, user := range users {
-		extendedUsers = append(extendedUsers, user.Extend())
-
-		fullPath := app.GetIdentityDirPath(user.ID.String())
-		extendedUsers[i].StorageUsed, err = s.FileService.GetDirectorySize(ctx, fullPath)
-		if err != nil {
-			return s.error(c, apperror.ErrInternalServer(err))
-		}
-
-		extendedUsers[i].StorageCapacity = maxCapacity
-	}
-
 	return s.success(c, model.ListIdentitiesResponse{
-		Identities: extendedUsers,
+		Identities: users,
 		Pagination: pager.PageInfo(),
 	})
 }
