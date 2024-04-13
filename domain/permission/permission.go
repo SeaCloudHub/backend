@@ -1,6 +1,14 @@
 package permission
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var (
+	ErrNotPermittedToView = errors.New("not permitted to view")
+	ErrNotPermittedToEdit = errors.New("not permitted to edit")
+)
 
 type Service interface {
 	IsAdmin(ctx context.Context, userID string) (bool, error)

@@ -14,6 +14,7 @@ type Store interface {
 	UpdatePasswordChangedAt(ctx context.Context, userID uuid.UUID) error
 	UpdateLastSignInAt(ctx context.Context, userID uuid.UUID) error
 	UpdateRootID(ctx context.Context, userID, rootID uuid.UUID) error
+	UpdateStorageUsage(ctx context.Context, userID uuid.UUID, usage uint64) error
 	GetByID(ctx context.Context, userID uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	List(ctx context.Context, pagination *pagination.Pager) ([]User, error)
@@ -31,6 +32,8 @@ type User struct {
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 	LastSignInAt      *time.Time `json:"last_sign_in_at"`
 	RootID            uuid.UUID  `json:"root_id"`
+	StorageUsage      uint64     `json:"storage_usage"`
+	StorageCapacity   uint64     `json:"storage_capacity"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 } // @name identity.User
@@ -47,15 +50,3 @@ func (u *User) WithAvatarURL(avatarURL string) *User {
 
 	return u
 }
-
-func (u *User) Extend() ExtendedUser {
-	return ExtendedUser{
-		User: u,
-	}
-}
-
-type ExtendedUser struct {
-	*User           `json:",inline"`
-	StorageUsed     uint64 `json:"storage_used"`
-	StorageCapacity uint64 `json:"storage_capacity"`
-} // @name identity.ExtendedUser

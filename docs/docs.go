@@ -615,6 +615,93 @@ const docTemplate = `{
                 }
             }
         },
+        "/files/copy": {
+            "post": {
+                "description": "CopyFiles",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "file"
+                ],
+                "summary": "CopyFiles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Copy files request",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CopyFilesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/file.File"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/files/directories": {
             "post": {
                 "description": "CreateDirectory",
@@ -1505,53 +1592,6 @@ const docTemplate = `{
                 }
             }
         },
-        "identity.ExtendedUser": {
-            "type": "object",
-            "properties": {
-                "avatar_url": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "first_name": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "is_admin": {
-                    "type": "boolean"
-                },
-                "last_name": {
-                    "type": "string"
-                },
-                "last_sign_in_at": {
-                    "type": "string"
-                },
-                "password_changed_at": {
-                    "type": "string"
-                },
-                "root_id": {
-                    "type": "string"
-                },
-                "storage_capacity": {
-                    "type": "integer"
-                },
-                "storage_used": {
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "identity.Identity": {
             "type": "object",
             "properties": {
@@ -1602,6 +1642,12 @@ const docTemplate = `{
                 "root_id": {
                     "type": "string"
                 },
+                "storage_capacity": {
+                    "type": "integer"
+                },
+                "storage_usage": {
+                    "type": "integer"
+                },
                 "updated_at": {
                     "type": "string"
                 }
@@ -1623,6 +1669,24 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 32,
                     "minLength": 6
+                }
+            }
+        },
+        "model.CopyFilesRequest": {
+            "type": "object",
+            "required": [
+                "ids",
+                "to"
+            ],
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "to": {
+                    "type": "string"
                 }
             }
         },
@@ -1723,7 +1787,7 @@ const docTemplate = `{
                 "identities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/identity.ExtendedUser"
+                        "$ref": "#/definitions/identity.User"
                     }
                 },
                 "pagination": {

@@ -109,3 +109,12 @@ type UpdateGeneralAccessRequest struct {
 func (r *UpdateGeneralAccessRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type CopyFilesRequest struct {
+	IDs []string `json:"ids" validate:"required,dive,uuid"`
+	To  string   `json:"to" validate:"required,uuid"`
+} // @name model.CopyFilesRequest
+
+func (r *CopyFilesRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}

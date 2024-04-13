@@ -18,6 +18,7 @@ type Store interface {
 	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
+	ListByIDs(ctx context.Context, ids []string) ([]File, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
 	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)

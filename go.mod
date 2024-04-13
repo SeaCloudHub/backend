@@ -15,6 +15,7 @@ require (
 	github.com/ory/kratos-client-go v1.1.0
 	github.com/ory/x v0.0.616
 	github.com/rubenv/sql-migrate v1.5.2
+	github.com/samber/lo v1.39.0
 	github.com/swaggo/echo-swagger v1.4.1
 	github.com/swaggo/swag v1.16.3
 	go.uber.org/zap v1.26.0
@@ -28,6 +29,7 @@ require (
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
+	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
@@ -73,7 +75,6 @@ require (
 	github.com/peterhellberg/link v1.2.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20211224045212-9687c2b0f87c // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
-	github.com/samber/lo v1.39.0 // indirect
 	github.com/segmentio/go-camelcase v0.0.0-20160726192923-7085f1e3c734 // indirect
 	github.com/segmentio/go-snakecase v1.2.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
@@ -90,6 +91,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/gammazero/workerpool v1.1.3
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
 	github.com/go-playground/mold/v4 v4.5.0
 	github.com/go-playground/validator/v10 v10.18.0

@@ -26,7 +26,6 @@ type Service interface {
 	ListEntries(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]Entry, error)
 	CreateDirectory(ctx context.Context, dirpath string) error
 	Delete(ctx context.Context, fullPath string) error
-	GetDirectorySize(ctx context.Context, dirpath string) (uint64, error)
 	DirStatus(ctx context.Context) (map[string]interface{}, error)
 	VolStatus(ctx context.Context) (map[string]interface{}, error)
 }

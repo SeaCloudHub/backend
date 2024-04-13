@@ -22,12 +22,13 @@ func NewUserStore(db *gorm.DB) *UserStore {
 
 func (s *UserStore) Create(ctx context.Context, user *identity.User) error {
 	userSchema := UserSchema{
-		ID:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		AvatarURL: user.AvatarURL,
-		IsActive:  true,
+		ID:              user.ID,
+		Email:           user.Email,
+		FirstName:       user.FirstName,
+		LastName:        user.LastName,
+		AvatarURL:       user.AvatarURL,
+		IsActive:        true,
+		StorageCapacity: 10 << 30,
 	}
 
 	return s.db.WithContext(ctx).Create(&userSchema).Error
@@ -58,6 +59,13 @@ func (s *UserStore) UpdateRootID(ctx context.Context, id, rootID uuid.UUID) erro
 	return s.db.WithContext(ctx).Model(&UserSchema{}).
 		Where("id = ?", id).
 		Update("root_id", rootID).
+		Error
+}
+
+func (s *UserStore) UpdateStorageUsage(ctx context.Context, id uuid.UUID, usage uint64) error {
+	return s.db.WithContext(ctx).Model(&UserSchema{}).
+		Where("id = ?", id).
+		Update("storage_usage", usage).
 		Error
 }
 
