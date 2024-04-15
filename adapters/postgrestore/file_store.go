@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/file"
+
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -25,16 +27,17 @@ func NewFileStore(db *gorm.DB) *FileStore {
 
 func (s *FileStore) Create(ctx context.Context, f *file.File) error {
 	fileSchema := FileSchema{
-		ID:       f.ID,
-		Name:     f.Name,
-		Path:     f.Path,
-		FullPath: f.FullPath,
-		Size:     f.Size,
-		Mode:     uint32(fs.FileMode(f.Mode)),
-		MimeType: f.MimeType,
-		MD5:      hex.EncodeToString(f.MD5),
-		IsDir:    f.IsDir,
-		OwnerID:  f.OwnerID,
+		ID:            f.ID,
+		Name:          f.Name,
+		Path:          f.Path,
+		FullPath:      f.FullPath,
+		Size:          f.Size,
+		Mode:          uint32(fs.FileMode(f.Mode)),
+		MimeType:      f.MimeType,
+		MD5:           hex.EncodeToString(f.MD5),
+		IsDir:         f.IsDir,
+		GeneralAccess: "restricted",
+		OwnerID:       f.OwnerID,
 	}
 
 	if err := s.db.WithContext(ctx).Create(&fileSchema).Error; err != nil {
@@ -161,11 +164,45 @@ func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, e
 	return files, nil
 }
 
+func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File, ids []string) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Where("full_path LIKE ?", fmt.Sprintf("%s%%", parent.FullPath)).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
 func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
 		Where("id = ?", fileID).
 		Update("general_access", generalAccess).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, path, fullPath string) error {
+	if err := s.db.WithContext(ctx).
+		Model(&FileSchema{}).
+		Where("id = ?", fileID).
+		Updates(map[string]interface{}{
+			"id":            fileID,
+			"path":          path,
+			"full_path":     fullPath,
+			"previous_path": gorm.Expr("path"),
+		}).Error; err != nil {
 		return fmt.Errorf("unexpected error: %w", err)
 	}
 

@@ -31,6 +31,7 @@ type DeleteRequest struct {
 	FullPath string
 }
 
-type GetDirectorySizeRequest struct {
-	DirPath string
+type MoveRequest struct {
+	SrcFullPath string
+	DstFullPath string
 }

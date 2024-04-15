@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/seaweedfs"
-	"github.com/pkg/errors"
 )
 
 type FileService struct {
@@ -124,6 +124,15 @@ func (s *FileService) Delete(ctx context.Context, fullPath string) error {
 	err := s.filer.Delete(ctx, &seaweedfs.DeleteRequest{FullPath: fullPath})
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileService) Move(ctx context.Context, srcFullPath, dstFullPath string) error {
+	err := s.filer.Move(ctx, &seaweedfs.MoveRequest{SrcFullPath: srcFullPath, DstFullPath: dstFullPath})
+	if err != nil {
+		return fmt.Errorf("move: %w", err)
 	}
 
 	return nil

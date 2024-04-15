@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/SeaCloudHub/backend/pkg/app"
@@ -20,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
+
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
@@ -594,7 +596,14 @@ func (s *Server) Access(c echo.Context) error {
 	var role string
 
 	switch e.GeneralAccess {
+	case "everyone-can-view":
+		role = "viewer"
+	case "everyone-can-edit":
+		role = "editor"
+
 	case "restricted":
+		fallthrough
+	default:
 		share, err := s.FileStore.GetShare(ctx, e.ID, user.ID)
 		if err != nil {
 			if errors.Is(err, file.ErrNotFound) {
@@ -605,11 +614,6 @@ func (s *Server) Access(c echo.Context) error {
 		}
 
 		role = share.Role
-
-	case "everyone-can-view":
-		role = "viewer"
-	case "everyone-can-edit":
-		role = "editor"
 	}
 
 	// clear permissions
@@ -823,11 +827,142 @@ func (s *Server) CopyFiles(c echo.Context) error {
 
 }
 
+func (s *Server) Move(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.MoveFilesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// check if user has edit permission to the source directory
+	src, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), src.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	// check if user has edit permission to the destination directory
+	dest, err := s.FileStore.GetByID(ctx, req.To)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err = s.PermissionService.CanEditDirectory(ctx, user.ID.String(), dest.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	files, err := s.FileStore.ListSelectedChildren(ctx, src, req.SourceIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	totalSize := lo.Reduce(files, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	if totalSize+dest.Owner.StorageUsage > dest.Owner.StorageCapacity {
+		return s.error(c, apperror.ErrStorageCapacityExceeded())
+	}
+
+	var resp []file.File
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
+
+	for _, e := range files {
+		wp.Submit(func() {
+			dstFullPath := strings.Replace(e.FullPath, src.FullPath, dest.FullPath, 1)
+
+			if e.Path == src.FullPath {
+				// move top level files
+				if err := s.FileService.Move(ctx, e.FullPath, dstFullPath); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+
+				// update parent relationship
+				if e.IsDir {
+					err = s.PermissionService.UpdateDirectoryParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+				} else {
+					err = s.PermissionService.UpdateFileParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+				}
+
+				if err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			f := e.WithPath(dest.FullPath).WithFullPath(dstFullPath)
+			if err := s.FileStore.UpdatePath(ctx, e.ID, dest.FullPath, dstFullPath); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *f.Response())
+		})
+	}
+
+	wp.StopWait()
+
+	if dest.OwnerID == src.OwnerID {
+		return s.success(c, resp)
+	}
+
+	totalSize = lo.Reduce(resp, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	// update user storage usage
+	if err := s.UserStore.UpdateStorageUsage(ctx, dest.OwnerID, dest.Owner.StorageUsage+totalSize); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if err := s.UserStore.UpdateStorageUsage(ctx, src.OwnerID, src.Owner.StorageUsage-totalSize); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, resp)
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.POST("/directories", s.CreateDirectory)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/copy", s.CopyFiles)
+	router.POST("/move", s.Move)
 	router.POST("", s.UploadFiles)
 	router.PATCH("/general-access", s.UpdateGeneralAccess)
 	router.GET("/:id", s.ListEntries)
