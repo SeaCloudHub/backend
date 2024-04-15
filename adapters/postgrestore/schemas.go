@@ -21,6 +21,7 @@ type UserSchema struct {
 	PasswordChangedAt *time.Time `gorm:"column:password_changed_at"`
 	LastSignInAt      *time.Time `gorm:"column:last_signin_at"`
 	RootID            uuid.UUID  `gorm:"column:root_id"`
+	StorageUsage      uint64     `gorm:"column:storage_usage"`
 	StorageCapacity   uint64     `gorm:"column:storage_capacity"`
 	CreatedAt         time.Time  `gorm:"column:created_at"`
 	UpdatedAt         time.Time  `gorm:"column:updated_at"`
@@ -43,6 +44,7 @@ func (s *UserSchema) ToDomainUser() *identity.User {
 		PasswordChangedAt: s.PasswordChangedAt,
 		LastSignInAt:      s.LastSignInAt,
 		RootID:            s.RootID,
+		StorageUsage:      s.StorageUsage,
 		StorageCapacity:   s.StorageCapacity,
 		CreatedAt:         s.CreatedAt,
 		UpdatedAt:         s.UpdatedAt,

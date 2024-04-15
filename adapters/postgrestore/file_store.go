@@ -165,18 +165,38 @@ func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, e
 }
 
 func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File, ids []string) ([]file.File, error) {
-	var fileSchemas []FileSchema
+	var (
+		fileSchemas []FileSchema
+		files       []file.File
+	)
 
-	if err := s.db.WithContext(ctx).
+	db := s.db.WithContext(ctx)
+
+	if err := db.
 		Where("id IN ?", ids).
-		Where("full_path LIKE ?", fmt.Sprintf("%s%%", parent.FullPath)).
+		Where("path = ?", parent.FullPath).
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
-	files := make([]file.File, len(fileSchemas))
-	for i, fileSchema := range fileSchemas {
-		files[i] = *fileSchema.ToDomainFile()
+	for _, fileSchema := range fileSchemas {
+		files = append(files, *fileSchema.ToDomainFile())
+
+		if !fileSchema.IsDir {
+			continue
+		}
+
+		var childFileSchemas []FileSchema
+
+		if err := db.
+			Where("path = ?", fileSchema.FullPath).
+			Find(&childFileSchemas).Error; err != nil {
+			return nil, fmt.Errorf("unexpected error: %w", err)
+		}
+
+		for _, childFileSchema := range childFileSchemas {
+			files = append(files, *childFileSchema.ToDomainFile())
+		}
 	}
 
 	return files, nil
