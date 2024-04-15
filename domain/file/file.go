@@ -19,7 +19,9 @@ type Store interface {
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
 	ListByIDs(ctx context.Context, ids []string) ([]File, error)
+	ListSelectedChildren(ctx context.Context, parent *File, ids []string) ([]File, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
+	UpdatePath(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
 	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)
 	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
@@ -56,6 +58,12 @@ func (f *File) WithPath(path string) *File {
 	}
 
 	f.Path = path
+
+	return f
+}
+
+func (f *File) WithFullPath(fullPath string) *File {
+	f.FullPath = fullPath
 
 	return f
 }

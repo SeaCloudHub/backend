@@ -180,6 +180,39 @@ func (s *PermissionService) ClearDirectoryPermissions(ctx context.Context, fileI
 	return nil
 }
 
+func (s *PermissionService) UpdateDirectoryParent(ctx context.Context, fileID string, parentID string, oldParentID string) error {
+	_, err := s.writeClient.RelationshipApi.PatchRelationships(ctx).
+		RelationshipPatch([]keto.RelationshipPatch{
+			{
+				Action: keto.PtrString("delete"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "Directory",
+					Object:    fileID,
+					SubjectId: keto.PtrString(oldParentID),
+					Relation:  "parents",
+				},
+			},
+			{
+				Action: keto.PtrString("insert"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "Directory",
+					Object:    fileID,
+					SubjectId: keto.PtrString(parentID),
+					Relation:  "parents",
+				},
+			},
+		}).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 func (s *PermissionService) CreateFilePermissions(ctx context.Context, userID string, fileID string, parentID string) error {
 	_, err := s.writeClient.RelationshipApi.PatchRelationships(ctx).RelationshipPatch(
 		[]keto.RelationshipPatch{
@@ -260,6 +293,39 @@ func (s *PermissionService) CanViewFile(ctx context.Context, userID string, file
 func (s *PermissionService) ClearFilePermissions(ctx context.Context, fileID string, userID string) error {
 	_, err := s.writeClient.RelationshipApi.DeleteRelationships(ctx).
 		Namespace("File").Object(fileID).SubjectId(userID).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *PermissionService) UpdateFileParent(ctx context.Context, fileID string, parentID string, oldParentID string) error {
+	_, err := s.writeClient.RelationshipApi.PatchRelationships(ctx).
+		RelationshipPatch([]keto.RelationshipPatch{
+			{
+				Action: keto.PtrString("delete"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "File",
+					Object:    fileID,
+					SubjectId: keto.PtrString(oldParentID),
+					Relation:  "parents",
+				},
+			},
+			{
+				Action: keto.PtrString("insert"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "File",
+					Object:    fileID,
+					SubjectId: keto.PtrString(parentID),
+					Relation:  "parents",
+				},
+			},
+		}).Execute()
 	if err != nil {
 		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
 			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())

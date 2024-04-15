@@ -203,6 +203,21 @@ definitions:
       session_token:
         type: string
     type: object
+  model.MoveFilesRequest:
+    properties:
+      id:
+        type: string
+      source_ids:
+        items:
+          type: string
+        type: array
+      to:
+        type: string
+    required:
+    - id
+    - source_ids
+    - to
+    type: object
   model.ShareRequest:
     properties:
       emails:
@@ -1129,6 +1144,61 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: UpdateGeneralAccess
+      tags:
+      - file
+  /files/move:
+    post:
+      consumes:
+      - application/json
+      description: Move
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Move files request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.MoveFilesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Move
       tags:
       - file
   /files/share:

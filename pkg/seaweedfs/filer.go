@@ -173,3 +173,23 @@ func (f *Filer) Delete(ctx context.Context, in *DeleteRequest) error {
 
 	return nil
 }
+
+func (f *Filer) Move(ctx context.Context, in *MoveRequest) error {
+	path, err := url.ParseRequestURI(in.DstFullPath)
+	if err != nil {
+		return fmt.Errorf("parse request uri: %w", err)
+	}
+
+	resp, err := f.client.R().SetContext(ctx).
+		SetQueryParam("mv.from", in.SrcFullPath).
+		Post(path.String())
+	if err != nil {
+		return fmt.Errorf("move: %w", err)
+	}
+
+	if resp.StatusCode() == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	return nil
+}
