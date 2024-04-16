@@ -79,6 +79,21 @@ func (s *IdentityService) Login(ctx context.Context, email string, password stri
 	}, nil
 }
 
+func (s *IdentityService) Logout(ctx context.Context, token string) error {
+	_, err := s.publicClient.FrontendAPI.PerformNativeLogout(ctx).PerformNativeLogoutBody(
+		kratos.PerformNativeLogoutBody{SessionToken: token},
+	).Execute()
+	if err != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("error logging out: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 func (s *IdentityService) WhoAmI(ctx context.Context, token string) (*identity.Identity, error) {
 	session, _, err := s.publicClient.FrontendAPI.ToSession(ctx).XSessionToken(token).Execute()
 	if err != nil {

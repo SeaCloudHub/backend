@@ -84,6 +84,26 @@ func (s *Server) Login(c echo.Context) error {
 	})
 }
 
+// Logout godoc
+// @Summary Logout
+// @Description Logout
+// @Tags user
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Router /users/logout [post]
+func (s *Server) Logout(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	id := c.Get(ContextKeyIdentity).(*identity.Identity)
+	if err := s.IdentityService.Logout(ctx, *id.Session.Token); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, nil)
+}
+
 // Me godoc
 // @Summary Me
 // @Description Me
@@ -194,7 +214,8 @@ func (s *Server) GetByEmail(c echo.Context) error {
 
 func (s *Server) RegisterUserRoutes(router *echo.Group) {
 	router.POST("/login", s.Login)
-	router.GET("/me", s.Me)
+	router.POST("/logout", s.Logout)
 	router.POST("/change-password", s.ChangePassword)
+	router.GET("/me", s.Me)
 	router.GET("/email", s.GetByEmail)
 }
