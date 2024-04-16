@@ -1364,6 +1364,30 @@ paths:
       summary: Login
       tags:
       - user
+  /users/logout:
+    post:
+      description: Logout
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Logout
+      tags:
+      - user
   /users/me:
     get:
       description: Me

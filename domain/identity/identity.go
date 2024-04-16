@@ -21,6 +21,7 @@ var (
 
 type Service interface {
 	Login(ctx context.Context, email string, password string) (*Session, error)
+	Logout(ctx context.Context, token string) error
 	WhoAmI(ctx context.Context, token string) (*Identity, error)
 	ChangePassword(ctx context.Context, id *Identity, oldPassword string, newPassword string) error
 	GetByEmail(ctx context.Context, email string) (*Identity, error)
