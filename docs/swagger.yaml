@@ -218,6 +218,17 @@ definitions:
     - source_ids
     - to
     type: object
+  model.RenameFileRequest:
+    properties:
+      id:
+        type: string
+      name:
+        maxLength: 255
+        type: string
+    required:
+    - id
+    - name
+    type: object
   model.ShareRequest:
     properties:
       emails:
@@ -1199,6 +1210,59 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Move
+      tags:
+      - file
+  /files/rename:
+    patch:
+      consumes:
+      - application/json
+      description: Rename
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Rename file request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.RenameFileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/file.File'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Rename
       tags:
       - file
   /files/share:

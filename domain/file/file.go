@@ -21,7 +21,7 @@ type Store interface {
 	ListByIDs(ctx context.Context, ids []string) ([]File, error)
 	ListSelectedChildren(ctx context.Context, parent *File, ids []string) ([]File, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
-	UpdatePath(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
+	UpdatePath(ctx context.Context, fileID uuid.UUID, name string, path string, fullPath string) error
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
 	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)
 	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
@@ -48,6 +48,12 @@ type File struct {
 
 func (f *File) WithID(id uuid.UUID) *File {
 	f.ID = id
+
+	return f
+}
+
+func (f *File) WithName(name string) *File {
+	f.Name = name
 
 	return f
 }

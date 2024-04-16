@@ -27,6 +27,7 @@ type Service interface {
 	CreateDirectory(ctx context.Context, dirpath string) error
 	Delete(ctx context.Context, fullPath string) error
 	Move(ctx context.Context, srcFullPath, dstFullPath string) error
+	Rename(ctx context.Context, fullPath, newName string) error
 	DirStatus(ctx context.Context) (map[string]interface{}, error)
 	VolStatus(ctx context.Context) (map[string]interface{}, error)
 }

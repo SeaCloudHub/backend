@@ -213,12 +213,13 @@ func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, g
 	return nil
 }
 
-func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, path, fullPath string) error {
+func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, name, path, fullPath string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
 		Where("id = ?", fileID).
 		Updates(map[string]interface{}{
 			"id":            fileID,
+			"name":          name,
 			"path":          path,
 			"full_path":     fullPath,
 			"previous_path": gorm.Expr("path"),
