@@ -1035,7 +1035,7 @@ func (s *Server) Rename(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	if err := s.FileStore.UpdatePath(ctx, e.ID, req.Name, newPath, newFullPath); err != nil {
+	if err := s.FileStore.UpdateName(ctx, e.ID, req.Name); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 

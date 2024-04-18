@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -225,6 +224,74 @@ func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, name, path
 			"previous_path": gorm.Expr("path"),
 		}).Error; err != nil {
 		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name string) error {
+	// Start a transaction
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("could not begin transaction: %w", tx.Error)
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Retrieve file information
+	fileSchema := FileSchema{}
+	if err := tx.WithContext(ctx).
+		Where("id = ?", fileID).
+		First(&fileSchema).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to retrieve file: %w", err)
+	}
+
+	oldPath := ""
+	newPath := ""
+
+	// Check if the file is a folder or a regular file
+	if fileSchema.IsDir { // If it's a folder
+		oldPath = fmt.Sprintf("/%s/", fileSchema.Name)
+		newPath = fmt.Sprintf("/%s/", name)
+	} else { // If it's a regular file
+		oldPath = fmt.Sprintf("/%s", fileSchema.Name)
+		newPath = fmt.Sprintf("/%s", name)
+	}
+
+	// Update name and paths
+	if err := tx.WithContext(ctx).
+		Model(&FileSchema{}).
+		Where("id = ?", fileID).
+		Updates(map[string]interface{}{
+			"name":      name,
+			"full_path": gorm.Expr("REPLACE(full_path, ?, ?)", oldPath, newPath),
+		}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update name: %w", err)
+	}
+
+	// Update child folders and file paths only if it's a folder
+	if fileSchema.IsDir {
+		if err := tx.WithContext(ctx).
+			Model(&FileSchema{}).
+			Where("path LIKE ?", fmt.Sprintf("%s%%", fileSchema.FullPath)).
+			Updates(map[string]interface{}{
+				"path":          gorm.Expr("REPLACE(path, ?, ?)", oldPath, newPath),
+				"full_path":     gorm.Expr("REPLACE(full_path, ?, ?)", oldPath, newPath),
+				"previous_path": gorm.Expr("REPLACE(previous_path, ?, ?)", oldPath, newPath),
+			}).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to update child folders and files: %w", err)
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("transaction commit failed: %w", err)
 	}
 
 	return nil
