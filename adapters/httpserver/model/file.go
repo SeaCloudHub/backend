@@ -154,3 +154,11 @@ type RenameFileRequest struct {
 func (r *RenameFileRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type DeleteRequest struct {
+	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
+} // @name model.DeleteRequest
+
+func (r *DeleteRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
