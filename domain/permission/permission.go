@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	ErrNotPermittedToView = errors.New("not permitted to view")
-	ErrNotPermittedToEdit = errors.New("not permitted to edit")
+	ErrNotPermittedToView   = errors.New("not permitted to view")
+	ErrNotPermittedToEdit   = errors.New("not permitted to edit")
+	ErrNotPermittedToDelete = errors.New("not permitted to delete")
 )
 
 type Service interface {
@@ -17,13 +18,17 @@ type Service interface {
 	CreateDirectoryPermissions(ctx context.Context, userID string, fileID string, parentID string) error
 	CanEditDirectory(ctx context.Context, userID string, fileID string) (bool, error)
 	CanViewDirectory(ctx context.Context, userID string, fileID string) (bool, error)
+	CanDeleteDirectory(ctx context.Context, userID string, fileID string) (bool, error)
 	ClearDirectoryPermissions(ctx context.Context, fileID string, userID string) error
 	UpdateDirectoryParent(ctx context.Context, fileID string, parentID string, oldParentID string) error
+	DeleteDirectoryPermissions(ctx context.Context, fileID string) error
 	CreateFilePermissions(ctx context.Context, userID string, fileID string, parentID string) error
 	CanEditFile(ctx context.Context, userID string, fileID string) (bool, error)
 	CanViewFile(ctx context.Context, userID string, fileID string) (bool, error)
+	CanDeleteFile(ctx context.Context, userID string, fileID string) (bool, error)
 	ClearFilePermissions(ctx context.Context, fileID string, userID string) error
 	UpdateFileParent(ctx context.Context, fileID string, parentID string, oldParentID string) error
+	DeleteFilePermissions(ctx context.Context, fileID string) error
 }
 
 type CreatePermission struct {

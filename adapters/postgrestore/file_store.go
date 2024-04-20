@@ -169,6 +169,7 @@ func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, e
 	var fileSchemas []FileSchema
 
 	if err := s.db.WithContext(ctx).
+		Preload("Owner").
 		Where("id IN ?", ids).
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
@@ -422,6 +423,34 @@ func (s *FileStore) RestoreChildrenFromTrash(ctx context.Context, parentPath, ne
 	var files []file.File
 	for _, fileSchema := range fileSchemas {
 		files = append(files, *fileSchema.ToDomainFile())
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) Delete(ctx context.Context, e file.File) ([]file.File, error) {
+	var (
+		fileSchemas []FileSchema
+		files       []file.File
+	)
+
+	if err := s.db.WithContext(ctx).Unscoped().
+		Where("id = ?", e.ID).
+		Delete(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if e.IsDir {
+		if err := s.db.WithContext(ctx).Unscoped().
+			Clauses(clause.Returning{}).
+			Where("path LIKE ?", e.FullPath+"%").
+			Delete(&fileSchemas).Error; err != nil {
+			return nil, fmt.Errorf("unexpected error: %w", err)
+		}
+
+		for _, fileSchema := range fileSchemas {
+			files = append(files, *fileSchema.ToDomainFile())
+		}
 	}
 
 	return files, nil

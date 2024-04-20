@@ -1346,6 +1346,136 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// Delete godoc
+// @Summary Delete
+// @Description Delete
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.DeleteRequest true "Delete files request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/delete [post]
+func (s *Server) Delete(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.DeleteRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	files, err := s.FileStore.ListByIDs(ctx, req.SourceIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	var (
+		resp      []file.File
+		totalSize uint64
+	)
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
+
+	for _, e := range files {
+		wp.Submit(func() {
+			// check if user can delete the file
+			var (
+				canDelete bool
+				err       error
+			)
+
+			if e.IsDir {
+				canDelete, err = s.PermissionService.CanDeleteDirectory(ctx, user.ID.String(), e.ID.String())
+			} else {
+				canDelete, err = s.PermissionService.CanDeleteFile(ctx, user.ID.String(), e.ID.String())
+			}
+
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			if !canDelete {
+				s.Logger.Errorw(permission.ErrNotPermittedToDelete.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			if err := s.FileService.Delete(ctx, e.FullPath); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			files, err := s.FileStore.Delete(ctx, e)
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			// delete file permissions
+			if e.IsDir {
+				if err := s.PermissionService.DeleteDirectoryPermissions(ctx, e.ID.String()); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+
+				for _, f := range files {
+					totalSize += uint64(f.Size)
+
+					if f.IsDir {
+						if err := s.PermissionService.DeleteDirectoryPermissions(ctx, f.ID.String()); err != nil {
+							s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+							return
+						}
+
+						return
+					}
+
+					if err := s.PermissionService.DeleteFilePermissions(ctx, f.ID.String()); err != nil {
+						s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+						return
+					}
+				}
+			} else {
+				totalSize = uint64(e.Size)
+
+				if err := s.PermissionService.DeleteFilePermissions(ctx, e.ID.String()); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *e.Response())
+		})
+	}
+
+	// update user storage usage
+	if totalSize > 0 {
+		if err := s.UserStore.UpdateStorageUsage(ctx, files[0].Owner.ID, files[0].Owner.StorageUsage-totalSize); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	wp.StopWait()
+
+	return s.success(c, resp)
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.POST("/directories", s.CreateDirectory)
@@ -1355,6 +1485,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.PATCH("/rename", s.Rename)
 	router.POST("/move/trash", s.MoveToTrash)
 	router.POST("/restore", s.RestoreFromTrash)
+	router.POST("/delete", s.Delete)
 	router.POST("", s.UploadFiles)
 	router.PATCH("/general-access", s.UpdateGeneralAccess)
 	router.GET("/:id", s.ListEntries)

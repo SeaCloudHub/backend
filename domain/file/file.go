@@ -29,6 +29,7 @@ type Store interface {
 	MoveToTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
 	RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
 	RestoreChildrenFromTrash(ctx context.Context, parentPath, newPath string) ([]File, error)
+	Delete(ctx context.Context, file File) ([]File, error)
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
 	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)
 	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
