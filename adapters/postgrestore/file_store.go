@@ -134,7 +134,26 @@ func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.F
 	var fileSchema FileSchema
 
 	if err := s.db.WithContext(ctx).
+		Preload("Owner").
 		Where("full_path = ?", fullPath).
+		First(&fileSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, file.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return fileSchema.ToDomainFile(), nil
+}
+
+func (s *FileStore) GetTrashByUserID(ctx context.Context, userID uuid.UUID) (*file.File, error) {
+	var fileSchema FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Preload("Owner").
+		Where("name = ?", ".trash").
+		Where("owner_id = ?", userID).
 		First(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
@@ -158,6 +177,26 @@ func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, e
 	files := make([]file.File, len(fileSchemas))
 	for i, fileSchema := range fileSchemas {
 		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) ListSelected(ctx context.Context, parent *file.File, ids []string) ([]file.File, error) {
+	var (
+		fileSchemas []FileSchema
+		files       []file.File
+	)
+
+	if err := s.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Where("path = ?", parent.FullPath).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	for _, fileSchema := range fileSchemas {
+		files = append(files, *fileSchema.ToDomainFile())
 	}
 
 	return files, nil
@@ -201,6 +240,45 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File,
 	return files, nil
 }
 
+func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.UUID, parent *file.File, ids []string) ([]file.File, error) {
+	var (
+		fileSchemas []FileSchema
+		files       []file.File
+	)
+
+	db := s.db.WithContext(ctx)
+
+	if err := db.
+		Where("id IN ?", ids).
+		Where("path = ?", parent.FullPath).
+		Where("owner_id = ?", userID).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	for _, fileSchema := range fileSchemas {
+		files = append(files, *fileSchema.ToDomainFile())
+
+		if !fileSchema.IsDir {
+			continue
+		}
+
+		var childFileSchemas []FileSchema
+
+		if err := db.
+			Where("path = ?", fileSchema.FullPath).
+			Find(&childFileSchemas).Error; err != nil {
+			return nil, fmt.Errorf("unexpected error: %w", err)
+		}
+
+		for _, childFileSchema := range childFileSchemas {
+			files = append(files, *childFileSchema.ToDomainFile())
+		}
+	}
+
+	return files, nil
+}
+
 func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
@@ -217,11 +295,10 @@ func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, name, path
 		Model(&FileSchema{}).
 		Where("id = ?", fileID).
 		Updates(map[string]interface{}{
-			"id":            fileID,
-			"name":          name,
-			"path":          path,
-			"full_path":     fullPath,
-			"previous_path": gorm.Expr("path"),
+			"id":        fileID,
+			"name":      name,
+			"path":      path,
+			"full_path": fullPath,
 		}).Error; err != nil {
 		return fmt.Errorf("unexpected error: %w", err)
 	}
@@ -295,6 +372,45 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 	}
 
 	return nil
+}
+
+func (s *FileStore) RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path, fullPath string) error {
+	if err := s.db.WithContext(ctx).
+		Model(&FileSchema{}).
+		Where("id = ?", fileID).
+		Updates(map[string]interface{}{
+			"id":            fileID,
+			"path":          path,
+			"full_path":     fullPath,
+			"previous_path": nil,
+		}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) RestoreChildrenFromTrash(ctx context.Context, parentPath, newPath string) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Model(&fileSchemas).
+		Clauses(clause.Returning{}).
+		Where("path LIKE ?", parentPath+"%").
+		Updates(map[string]interface{}{
+			"path":          gorm.Expr("replace(path, ?, ?)", parentPath, newPath),
+			"full_path":     gorm.Expr("replace(full_path, ?, ?)", parentPath, newPath),
+			"previous_path": nil,
+		}).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	var files []file.File
+	for _, fileSchema := range fileSchemas {
+		files = append(files, *fileSchema.ToDomainFile())
+	}
+
+	return files, nil
 }
 
 func (s *FileStore) UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error {

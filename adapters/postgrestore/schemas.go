@@ -56,7 +56,7 @@ type FileSchema struct {
 	Name          string     `gorm:"column:name"`
 	Path          string     `gorm:"column:path"`
 	FullPath      string     `gorm:"column:full_path"`
-	PreviousPath  *string    `gorm:"column:previous_path"`
+	PreviousPath  *string    `gorm:"column:previous_path"` // user for move to trash
 	Size          uint64     `gorm:"column:size"`
 	Mode          uint32     `gorm:"column:mode"`
 	MimeType      string     `gorm:"column:mime_type"`
@@ -88,6 +88,7 @@ func (s *FileSchema) ToDomainFile() *file.File {
 		Name:          s.Name,
 		Path:          s.Path,
 		FullPath:      s.FullPath,
+		PreviousPath:  s.PreviousPath,
 		Size:          s.Size,
 		Mode:          os.FileMode(s.Mode),
 		MimeType:      s.MimeType,
