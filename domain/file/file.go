@@ -18,11 +18,17 @@ type Store interface {
 	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
+	GetTrashByUserID(ctx context.Context, userID uuid.UUID) (*File, error)
 	ListByIDs(ctx context.Context, ids []string) ([]File, error)
+	ListSelected(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedChildren(ctx context.Context, parent *File, ids []string) ([]File, error)
+	ListSelectedOwnedChildren(ctx context.Context, userID uuid.UUID, parent *File, ids []string) ([]File, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
-	UpdatePath(ctx context.Context, fileID uuid.UUID, name string, path string, fullPath string) error
+	UpdatePath(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
 	UpdateName(ctx context.Context, fileID uuid.UUID, name string) error
+	MoveToTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
+	RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
+	RestoreChildrenFromTrash(ctx context.Context, parentPath, newPath string) ([]File, error)
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
 	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)
 	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
@@ -34,6 +40,7 @@ type File struct {
 	Path          string      `json:"path"`
 	FullPath      string      `json:"full_path"`
 	ShownPath     string      `json:"shown_path"`
+	PreviousPath  *string     `json:"-"`
 	Size          uint64      `json:"size"`
 	Mode          os.FileMode `json:"mode"`
 	MimeType      string      `json:"mime_type"`

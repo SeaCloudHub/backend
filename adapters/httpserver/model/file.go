@@ -119,13 +119,30 @@ func (r *CopyFilesRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
-type MoveFilesRequest struct {
+type MoveRequest struct {
 	ID        string   `json:"id" validate:"required,uuid"`
 	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
 	To        string   `json:"to" validate:"required,uuid"`
-} // @name model.MoveFilesRequest
+} // @name model.MoveRequest
 
-func (r *MoveFilesRequest) Validate(ctx context.Context) error {
+func (r *MoveRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type MoveToTrashRequest struct {
+	ID        string   `json:"id" validate:"required,uuid"`
+	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
+} // @name model.MoveToTrashRequest
+
+func (r *MoveToTrashRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type RestoreFromTrashRequest struct {
+	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
+} // @name model.RestoreFromTrashRequest
+
+func (r *RestoreFromTrashRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
