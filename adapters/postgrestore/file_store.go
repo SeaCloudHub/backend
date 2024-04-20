@@ -356,9 +356,8 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 			Model(&FileSchema{}).
 			Where("path LIKE ?", fmt.Sprintf("%s%%", fileSchema.FullPath)).
 			Updates(map[string]interface{}{
-				"path":          gorm.Expr("REPLACE(path, ?, ?)", oldPath, newPath),
-				"full_path":     gorm.Expr("REPLACE(full_path, ?, ?)", oldPath, newPath),
-				"previous_path": gorm.Expr("REPLACE(previous_path, ?, ?)", oldPath, newPath),
+				"path":      gorm.Expr("REPLACE(path, ?, ?)", oldPath, newPath),
+				"full_path": gorm.Expr("REPLACE(full_path, ?, ?)", oldPath, newPath),
 			}).Error; err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to update child folders and files: %w", err)
