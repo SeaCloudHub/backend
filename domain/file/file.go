@@ -24,7 +24,7 @@ type Store interface {
 	ListSelectedChildren(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedOwnedChildren(ctx context.Context, userID uuid.UUID, parent *File, ids []string) ([]File, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
-	UpdatePath(ctx context.Context, fileID uuid.UUID, name string, path string, fullPath string) error
+	UpdatePath(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
 	UpdateName(ctx context.Context, fileID uuid.UUID, name string) error
 	MoveToTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
 	RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error

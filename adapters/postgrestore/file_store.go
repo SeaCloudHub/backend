@@ -290,13 +290,12 @@ func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, g
 	return nil
 }
 
-func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, name, path, fullPath string) error {
+func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, path, fullPath string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
 		Where("id = ?", fileID).
 		Updates(map[string]interface{}{
 			"id":        fileID,
-			"name":      name,
 			"path":      path,
 			"full_path": fullPath,
 		}).Error; err != nil {
@@ -369,6 +368,22 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		return fmt.Errorf("transaction commit failed: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) MoveToTrash(ctx context.Context, fileID uuid.UUID, path, fullPath string) error {
+	if err := s.db.WithContext(ctx).
+		Model(&FileSchema{}).
+		Where("id = ?", fileID).
+		Updates(map[string]interface{}{
+			"id":            fileID,
+			"path":          path,
+			"full_path":     fullPath,
+			"previous_path": gorm.Expr("path"),
+		}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
 	}
 
 	return nil

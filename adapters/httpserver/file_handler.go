@@ -940,7 +940,7 @@ func (s *Server) Move(c echo.Context) error {
 			}
 
 			f := e.WithPath(dstPath).WithFullPath(dstFullPath)
-			if err := s.FileStore.UpdatePath(ctx, e.ID, e.Name, dstPath, dstFullPath); err != nil {
+			if err := s.FileStore.UpdatePath(ctx, e.ID, dstPath, dstFullPath); err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
@@ -1045,6 +1045,21 @@ func (s *Server) Rename(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// MoveToTrash godoc
+// @Summary MoveToTrash
+// @Description MoveToTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.MoveToTrashRequest true "Move to trash request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/move/trash [post]
 func (s *Server) MoveToTrash(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
@@ -1176,6 +1191,21 @@ func (s *Server) MoveToTrash(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// RestoreFromTrash godoc
+// @Summary RestoreFromTrash
+// @Description RestoreFromTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.RestoreFromTrashRequest true "Restore from trash request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/restore [post]
 func (s *Server) RestoreFromTrash(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
