@@ -138,6 +138,16 @@ func (s *FileService) Move(ctx context.Context, srcFullPath, dstFullPath string)
 	return nil
 }
 
+func (s *FileService) Rename(ctx context.Context, fullPath, newName string) error {
+	err := s.filer.Move(ctx, &seaweedfs.MoveRequest{SrcFullPath: fullPath,
+		DstFullPath: newName})
+	if err != nil {
+		return fmt.Errorf("rename: %w", err)
+	}
+
+	return nil
+}
+
 func (s *FileService) DirStatus(ctx context.Context) (map[string]interface{}, error) {
 	return s.sw.Master().DirStatus(ctx)
 }

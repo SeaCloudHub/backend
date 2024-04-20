@@ -940,7 +940,7 @@ func (s *Server) Move(c echo.Context) error {
 			}
 
 			f := e.WithPath(dstPath).WithFullPath(dstFullPath)
-			if err := s.FileStore.UpdatePath(ctx, e.ID, dstPath, dstFullPath); err != nil {
+			if err := s.FileStore.UpdatePath(ctx, e.ID, e.Name, dstPath, dstFullPath); err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
@@ -973,12 +973,85 @@ func (s *Server) Move(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// Rename godoc
+// @Summary Rename
+// @Description Rename
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.RenameFileRequest true "Rename file request"
+// @Success 200 {object} model.SuccessResponse{data=file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/rename [patch]
+func (s *Server) Rename(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.RenameFileRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	e, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err := func() (bool, error) {
+		if e.IsDir {
+			return s.PermissionService.CanEditDirectory(ctx, user.ID.String(), e.ID.String())
+		}
+		return s.PermissionService.CanEditFile(ctx, user.ID.String(), e.ID.String())
+	}()
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	newFullPath := strings.Replace(e.FullPath, e.Name, req.Name, 1)
+	newPath := strings.Replace(e.Path, e.Name, req.Name, 1)
+
+	if err := s.FileService.Rename(ctx, strings.TrimRight(e.FullPath, string(filepath.Separator)), strings.TrimRight(newFullPath,
+		string(filepath.Separator))); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if err := s.FileStore.UpdateName(ctx, e.ID, req.Name); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	resp := *e.WithName(req.Name).WithPath(newPath).WithFullPath(
+		newFullPath).Response()
+
+	return s.success(c, resp)
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.POST("/directories", s.CreateDirectory)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/copy", s.CopyFiles)
 	router.POST("/move", s.Move)
+	router.PATCH("/rename", s.Rename)
 	router.POST("", s.UploadFiles)
 	router.PATCH("/general-access", s.UpdateGeneralAccess)
 	router.GET("/:id", s.ListEntries)

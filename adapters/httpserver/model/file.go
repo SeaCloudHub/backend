@@ -128,3 +128,12 @@ type MoveFilesRequest struct {
 func (r *MoveFilesRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type RenameFileRequest struct {
+	ID   string `json:"id" validate:"required,uuid"`
+	Name string `json:"name" validate:"required,max=255"`
+} // @name model.RenameFileRequest
+
+func (r *RenameFileRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
