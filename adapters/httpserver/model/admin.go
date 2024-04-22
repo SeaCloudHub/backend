@@ -10,8 +10,9 @@ import (
 )
 
 type ListIdentitiesRequest struct {
-	Limit int `query:"limit" validate:"required,min=1,max=100"`
-	Page  int `query:"page" validate:"required,min=1"`
+	Keyword string `query:"keyword" validate:"omitempty,max=50"`
+	Limit   int    `query:"limit" validate:"required,min=1,max=100"`
+	Page    int    `query:"page" validate:"required,min=1"`
 }
 
 func (r *ListIdentitiesRequest) Validate() error {

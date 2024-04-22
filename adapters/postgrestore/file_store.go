@@ -209,9 +209,9 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File,
 		files       []file.File
 	)
 
-	db := s.db.WithContext(ctx)
+	db := s.db
 
-	if err := db.
+	if err := db.WithContext(ctx).
 		Where("id IN ?", ids).
 		Where("path = ?", parent.FullPath).
 		Find(&fileSchemas).Error; err != nil {
@@ -227,7 +227,7 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File,
 
 		var childFileSchemas []FileSchema
 
-		if err := db.
+		if err := db.WithContext(ctx).
 			Where("path = ?", fileSchema.FullPath).
 			Find(&childFileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)
@@ -247,9 +247,9 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 		files       []file.File
 	)
 
-	db := s.db.WithContext(ctx)
+	db := s.db
 
-	if err := db.
+	if err := db.WithContext(ctx).
 		Where("id IN ?", ids).
 		Where("path = ?", parent.FullPath).
 		Where("owner_id = ?", userID).
@@ -266,7 +266,7 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 
 		var childFileSchemas []FileSchema
 
-		if err := db.
+		if err := db.WithContext(ctx).
 			Where("path = ?", fileSchema.FullPath).
 			Find(&childFileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)

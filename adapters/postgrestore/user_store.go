@@ -108,20 +108,29 @@ func (s *UserStore) GetByEmail(ctx context.Context, email string) (*identity.Use
 	}, nil
 }
 
-func (s *UserStore) List(ctx context.Context, pager *pagination.Pager) ([]identity.User, error) {
+func (s *UserStore) List(ctx context.Context, pager *pagination.Pager, filter identity.Filter) ([]identity.User, error) {
 	var (
 		userSchemas []UserSchema
 		total       int64
 	)
 
-	if err := s.db.WithContext(ctx).Model(&userSchemas).Count(&total).Error; err != nil {
+	query := s.db.Model(&userSchemas)
+	if filter.Keyword != "" {
+		query = query.Where("search_vector @@ PLAINTO_TSQUERY('english_nostop', REPLACE(REPLACE(?, '@', ' '), '.', ' '))", filter.Keyword)
+
+		if id, err := uuid.Parse(filter.Keyword); err == nil {
+			query = query.Or("id = ?", id)
+		}
+	}
+
+	if err := query.WithContext(ctx).Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
 	pager.SetTotal(total)
 
 	offset, limit := pager.Do()
-	if err := s.db.WithContext(ctx).Limit(limit).Offset(offset).Find(&userSchemas).Error; err != nil {
+	if err := query.WithContext(ctx).Order("created_at DESC").Limit(limit).Offset(offset).Find(&userSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
