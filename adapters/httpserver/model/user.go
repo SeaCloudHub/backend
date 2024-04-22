@@ -47,3 +47,11 @@ type GetByEmailResponse struct {
 	AvatarURL         string     `json:"avatar_url"`
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 } // @name model.GetByEmailResponse
+
+type ChangeUserStorageCapacityRequest struct {
+	StorageCapacity uint64 `json:"storage_capacity" validate:"required,min=0"`
+} // @name model.ChangeUserStorageCapacityRequest
+
+func (r *ChangeUserStorageCapacityRequest) Validate() error {
+	return validation.Validate().Struct(r)
+}

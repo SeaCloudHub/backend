@@ -212,10 +212,60 @@ func (s *Server) GetByEmail(c echo.Context) error {
 	})
 }
 
+// ChangeUserStorageCapacity godoc
+// @Summary Change user's storage capacity
+// @Description Change user's storage capacity
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.ChangeUserStorageCapacityRequest true "Change user's storage capacity request"
+// @Param id path string true "User ID"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /users/{id}/storage [patch]
+func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ChangeUserStorageCapacityRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param("id")))
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if req.StorageCapacity < user.StorageUsage {
+		return s.error(c, apperror.ErrInvalidParam(errors.New("storage capacity must be greater than storage usage")))
+	}
+
+	if err := s.UserStore.UpdateStorageCapacity(ctx, uuid.MustParse(c.Param("id")), req.StorageCapacity); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, nil)
+}
+
 func (s *Server) RegisterUserRoutes(router *echo.Group) {
 	router.POST("/login", s.Login)
 	router.POST("/logout", s.Logout)
 	router.POST("/change-password", s.ChangePassword)
 	router.GET("/me", s.Me)
 	router.GET("/email", s.GetByEmail)
+	router.PATCH("/:id/storage", s.ChangeUserStorageCapacity, s.adminMiddleware)
 }
