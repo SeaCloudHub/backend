@@ -452,6 +452,10 @@ paths:
         required: true
         type: string
       - in: query
+        maxLength: 50
+        name: keyword
+        type: string
+      - in: query
         maximum: 100
         minimum: 1
         name: limit

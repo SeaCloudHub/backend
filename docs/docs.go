@@ -90,6 +90,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "maxLength": 50,
+                        "type": "string",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
                         "maximum": 100,
                         "minimum": 1,
                         "type": "integer",

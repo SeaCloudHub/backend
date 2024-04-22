@@ -56,8 +56,9 @@ func (s *Server) ListIdentities(c echo.Context) error {
 	}
 
 	pager := pagination.NewPager(req.Page, req.Limit)
+	filter := identity.Filter{Keyword: req.Keyword}
 
-	users, err := s.UserStore.List(ctx, pager)
+	users, err := s.UserStore.List(ctx, pager, filter)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
