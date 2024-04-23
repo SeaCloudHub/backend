@@ -102,6 +102,16 @@ func (s *FileSchema) ToDomainFile() *file.File {
 	}
 }
 
+func (s *FileSchema) ToDomainSimpleFile() *file.SimpleFile {
+	return &file.SimpleFile{
+		ID:       s.ID,
+		Name:     s.Name,
+		Path:     s.Path,
+		FullPath: s.FullPath,
+	}
+
+}
+
 type ShareSchema struct {
 	FileID    uuid.UUID `gorm:"column:file_id"`
 	UserID    uuid.UUID `gorm:"column:user_id"`

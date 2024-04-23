@@ -85,6 +85,35 @@ func (s *PermissionService) CreatePermission(ctx context.Context, in *permission
 	return nil
 }
 
+func (s *PermissionService) GetSharedPermissions(ctx context.Context, userID string, namespace string, relation string) ([]string, error) {
+	var (
+		sharedIDs []string
+		first     = true
+		cursor    string
+	)
+
+	for first || len(cursor) > 0 {
+		result, _, err := s.readClient.RelationshipApi.GetRelationships(ctx).PageSize(100).PageToken(cursor).
+			Namespace(namespace).SubjectId(userID).Relation(relation).Execute()
+		if err != nil {
+			if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+				return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+			}
+
+			return nil, fmt.Errorf("unexpected error: %w", err)
+		}
+
+		for _, relationship := range result.RelationTuples {
+			sharedIDs = append(sharedIDs, relationship.Object)
+		}
+
+		cursor = *result.NextPageToken
+		first = false
+	}
+
+	return sharedIDs, nil
+}
+
 func (s *PermissionService) CreateDirectoryPermissions(ctx context.Context, userID string, fileID string, parentID string) error {
 	relationshipPatch := []keto.RelationshipPatch{
 		{

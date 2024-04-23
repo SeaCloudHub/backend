@@ -3,6 +3,7 @@ package file
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ type Store interface {
 	ListSelected(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedChildren(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedOwnedChildren(ctx context.Context, userID uuid.UUID, parent *File, ids []string) ([]File, error)
+	ListByFullPaths(ctx context.Context, paths []string) ([]SimpleFile, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
 	UpdatePath(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
 	UpdateName(ctx context.Context, fileID uuid.UUID, name string) error
@@ -94,6 +96,36 @@ func (f *File) Response() *File {
 
 	return f
 }
+
+func (f *File) Parents() []string {
+	if f.Path == "" || f.Path == "/" {
+		return nil
+	}
+
+	root := app.GetRootPath(f.Path)
+	shownPath := app.RemoveRootPath(f.Path)
+
+	parts := strings.Split(shownPath+"/", "/")
+	if shownPath == "/" {
+		parts = strings.Split(shownPath, "/")
+	}
+
+	parts = parts[:len(parts)-1]
+
+	var parents []string
+	for i := len(parts); i > 0; i-- {
+		parents = append(parents, filepath.Join(root, strings.Join(parts[:i], "/"))+"/")
+	}
+
+	return parents
+}
+
+type SimpleFile struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Path     string    `json:"path"`
+	FullPath string    `json:"full_path"`
+} // @name file.SimpleFile
 
 type Share struct {
 	FileID    uuid.UUID `json:"file_id"`

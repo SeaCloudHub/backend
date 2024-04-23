@@ -16,6 +16,11 @@ func (r *GetMetadataRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
+type GetMetadataResponse struct {
+	File    file.File         `json:"file"`
+	Parents []file.SimpleFile `json:"parents"`
+} // @name model.GetMetadataResponse
+
 type DownloadFileRequest struct {
 	ID string `param:"id" validate:"required,uuid"`
 }

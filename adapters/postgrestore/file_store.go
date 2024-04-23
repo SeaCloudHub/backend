@@ -280,6 +280,24 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 	return files, nil
 }
 
+func (s *FileStore) ListByFullPaths(ctx context.Context, paths []string) ([]file.SimpleFile, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("full_path IN ?", paths).
+		Order("created_at DESC").
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.SimpleFile, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainSimpleFile()
+	}
+
+	return files, nil
+}
+
 func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
