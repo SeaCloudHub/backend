@@ -19,6 +19,7 @@ require (
 	github.com/swaggo/echo-swagger v1.4.1
 	github.com/swaggo/swag v1.16.3
 	go.uber.org/zap v1.26.0
+	golang.org/x/sync v0.6.0
 	gorm.io/gorm v1.25.7-0.20240204074919-46816ad31dde
 )
 
@@ -84,7 +85,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

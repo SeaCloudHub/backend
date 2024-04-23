@@ -19,6 +19,7 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 
@@ -47,6 +48,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 	var (
 		ctx     = app.NewEchoContextAdapter(c)
 		req     model.GetMetadataRequest
+		parents []file.SimpleFile
 		canView bool
 		err     error
 	)
@@ -84,7 +86,17 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
 	}
 
-	return s.success(c, f.Response())
+	if parentPaths := f.Parents(); len(parentPaths) > 0 {
+		parents, err = s.FileStore.ListByFullPaths(ctx, parentPaths)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	return s.success(c, model.GetMetadataResponse{
+		File:    *f.Response(),
+		Parents: parents,
+	})
 }
 
 // Download godoc
@@ -1476,10 +1488,100 @@ func (s *Server) Delete(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// GetShared godoc
+// @Summary GetShared
+// @Description GetShared
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/share [get]
+func (s *Server) GetShared(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	g, _ := errgroup.WithContext(ctx)
+	var (
+		m       sync.Mutex
+		fileIDs []string
+	)
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "Directory", "editors")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (d-e): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "Directory", "viewers")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (d-v): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "File", "editors")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (f-e): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "File", "viewers")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (f-v): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	files, err := s.FileStore.ListByIDs(ctx, fileIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, files)
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
-	router.POST("/directories", s.CreateDirectory)
+	router.GET("/share", s.GetShared)
 	router.POST("/share", s.Share) // share file or directory with some users
+	router.POST("/directories", s.CreateDirectory)
 	router.POST("/copy", s.CopyFiles)
 	router.POST("/move", s.Move)
 	router.PATCH("/rename", s.Rename)
