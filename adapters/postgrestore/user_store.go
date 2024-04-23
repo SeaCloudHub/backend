@@ -155,3 +155,10 @@ func (s *UserStore) ListByEmails(ctx context.Context, emails []string) ([]identi
 
 	return users, nil
 }
+
+func (s *UserStore) UpdateStorageCapacity(ctx context.Context, id uuid.UUID, storageCapacity uint64) error {
+	return s.db.WithContext(ctx).Model(&UserSchema{}).
+		Where("id = ?", id).
+		Update("storage_capacity", storageCapacity).
+		Error
+}

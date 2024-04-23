@@ -89,6 +89,14 @@ definitions:
     - new_password
     - old_password
     type: object
+  model.ChangeUserStorageCapacityRequest:
+    properties:
+      storage_capacity:
+        minimum: 0
+        type: integer
+    required:
+    - storage_capacity
+    type: object
   model.CopyFilesRequest:
     properties:
       ids:
@@ -1512,6 +1520,55 @@ paths:
       summary: Share
       tags:
       - file
+  /users/{id}/storage:
+    patch:
+      consumes:
+      - application/json
+      description: Change user's storage capacity
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Change user's storage capacity request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.ChangeUserStorageCapacityRequest'
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Change user's storage capacity
+      tags:
+      - user
   /users/change-password:
     post:
       consumes:

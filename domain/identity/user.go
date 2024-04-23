@@ -19,6 +19,7 @@ type Store interface {
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	List(ctx context.Context, pagination *pagination.Pager, filter Filter) ([]User, error)
 	ListByEmails(ctx context.Context, emails []string) ([]User, error)
+	UpdateStorageCapacity(ctx context.Context, userID uuid.UUID, storageCapacity uint64) error
 }
 
 type User struct {
