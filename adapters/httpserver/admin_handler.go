@@ -282,10 +282,47 @@ func (s *Server) Dashboard(c echo.Context) error {
 	return s.success(c, dirStatus)
 }
 
+// Statistics godoc
+// @Summary Statistics
+// @Description Statistics
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=model.StatisticsUserResponse}
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/statistics [get]
+func (s *Server) Statistics(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	users, err := s.UserStore.GetAll(ctx)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	totalUsers := len(users)
+	activeUsers := 0
+	for _, user := range users {
+		if user.IsActive {
+			activeUsers++
+		}
+	}
+	blockedUsers := totalUsers - activeUsers
+
+	resp := model.StatisticsUserResponse{
+		TotalUsers:   totalUsers,
+		ActiveUsers:  activeUsers,
+		BlockedUsers: blockedUsers,
+	}
+
+	return s.success(c, resp)
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
 	router.GET("/dashboard", s.Dashboard)
+	router.GET("/statistics", s.Statistics)
 
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)

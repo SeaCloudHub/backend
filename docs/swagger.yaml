@@ -299,6 +299,15 @@ definitions:
     - id
     - role
     type: object
+  model.StatisticsUserResponse:
+    properties:
+      active_users:
+        type: integer
+      blocked_users:
+        type: integer
+      total_users:
+        type: integer
+    type: object
   model.SuccessResponse:
     properties:
       data: {}
@@ -697,6 +706,39 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: AdminMe
+      tags:
+      - admin
+  /admin/statistics:
+    get:
+      description: Statistics
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.StatisticsUserResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Statistics
       tags:
       - admin
   /assets/images:

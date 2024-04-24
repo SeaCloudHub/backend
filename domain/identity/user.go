@@ -17,6 +17,7 @@ type Store interface {
 	UpdateStorageUsage(ctx context.Context, userID uuid.UUID, usage uint64) error
 	GetByID(ctx context.Context, userID uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
+	GetAll(ctx context.Context) ([]User, error)
 	List(ctx context.Context, pagination *pagination.Pager, filter Filter) ([]User, error)
 	ListByEmails(ctx context.Context, emails []string) ([]User, error)
 	UpdateStorageCapacity(ctx context.Context, userID uuid.UUID, storageCapacity uint64) error

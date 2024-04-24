@@ -108,6 +108,20 @@ func (s *UserStore) GetByEmail(ctx context.Context, email string) (*identity.Use
 	}, nil
 }
 
+func (s *UserStore) GetAll(ctx context.Context) ([]identity.User, error) {
+	var userSchemas []UserSchema
+	if err := s.db.WithContext(ctx).Find(&userSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	users := make([]identity.User, 0, len(userSchemas))
+	for _, userSchema := range userSchemas {
+		users = append(users, *userSchema.ToDomainUser())
+	}
+
+	return users, nil
+}
+
 func (s *UserStore) List(ctx context.Context, pager *pagination.Pager, filter identity.Filter) ([]identity.User, error) {
 	var (
 		userSchemas []UserSchema

@@ -56,3 +56,9 @@ type UpdateIdentityStateRequest struct {
 func (r *UpdateIdentityStateRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type StatisticsUserResponse struct {
+	TotalUsers   int `json:"total_users"`
+	ActiveUsers  int `json:"active_users"`
+	BlockedUsers int `json:"blocked_users"`
+} // @name model.StatisticsUserResponse
