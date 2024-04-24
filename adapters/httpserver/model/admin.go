@@ -51,7 +51,7 @@ func (r *CreateIdentityRequest) Validate() error {
 type UpdateIdentityStateRequest struct {
 	ID    string `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
 	State string `json:"state" validate:"required,oneof=active inactive"`
-} // @name model.UpdateIdentityStateRequest
+}
 
 func (r *UpdateIdentityStateRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)

@@ -331,16 +331,6 @@ definitions:
     - general_access
     - id
     type: object
-  model.UpdateIdentityStateRequest:
-    properties:
-      state:
-        enum:
-        - active
-        - inactive
-        type: string
-    required:
-    - state
-    type: object
   model.UploadImageResponse:
     properties:
       file_name:
@@ -588,12 +578,6 @@ paths:
         name: identity_id
         required: true
         type: string
-      - description: Update identity state request
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/model.UpdateIdentityStateRequest'
       produces:
       - application/json
       responses:

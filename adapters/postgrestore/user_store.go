@@ -162,3 +162,10 @@ func (s *UserStore) UpdateStorageCapacity(ctx context.Context, id uuid.UUID, sto
 		Update("storage_capacity", storageCapacity).
 		Error
 }
+
+func (s *UserStore) ToggleActive(ctx context.Context, id uuid.UUID) error {
+	return s.db.WithContext(ctx).Model(&UserSchema{}).
+		Where("id = ?", id).
+		Update("is_active", gorm.Expr("NOT is_active")).
+		Error
+}

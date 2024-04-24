@@ -358,15 +358,6 @@ const docTemplate = `{
                         "name": "identity_id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Update identity state request",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.UpdateIdentityStateRequest"
-                        }
                     }
                 ],
                 "responses": {
@@ -2724,21 +2715,6 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
-                }
-            }
-        },
-        "model.UpdateIdentityStateRequest": {
-            "type": "object",
-            "required": [
-                "state"
-            ],
-            "properties": {
-                "state": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "inactive"
-                    ]
                 }
             }
         },

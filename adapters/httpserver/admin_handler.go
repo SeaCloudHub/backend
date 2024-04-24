@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -185,7 +186,6 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param identity_id path string true "Identity ID"
-// @Param payload body model.UpdateIdentityStateRequest true "Update identity state request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -194,13 +194,33 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 func (s *Server) UpdateIdentityState(c echo.Context) error {
 	ctx := app.NewEchoContextAdapter(c)
 
+	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param(
+		"identity_id")))
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if user.IsAdmin {
+		return s.error(c, apperror.ErrForbidden(errors.New("cannot update admin user")))
+	}
+
 	var req model.UpdateIdentityStateRequest
-	if err := c.Bind(&req); err != nil {
-		return s.error(c, apperror.ErrInvalidRequest(err))
+	req.ID = user.ID.String()
+	if user.IsActive {
+		req.State = "inactive"
+	} else {
+		req.State = "active"
 	}
 
 	if err := req.Validate(ctx); err != nil {
 		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	if err := s.UserStore.ToggleActive(ctx, user.ID); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	if err := s.IdentityService.UpdateIdentityState(ctx, req.ID, req.State); err != nil {
