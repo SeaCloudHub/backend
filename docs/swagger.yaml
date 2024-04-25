@@ -211,6 +211,15 @@ definitions:
       pagination:
         $ref: '#/definitions/pagination.PageInfo'
     type: object
+  model.ListTrashResponse:
+    properties:
+      cursor:
+        type: string
+      entries:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
+    type: object
   model.LoginRequest:
     properties:
       email:
@@ -1668,6 +1677,55 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Share
+      tags:
+      - file
+  /files/trash:
+    get:
+      description: ListTrash
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListTrashResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListTrash
       tags:
       - file
   /users/{id}/storage:

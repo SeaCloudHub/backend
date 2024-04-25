@@ -425,6 +425,19 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 	})
 }
 
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListTrashRequest true "List trash request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListTrashResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/trash [get]
 func (s *Server) ListTrash(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
