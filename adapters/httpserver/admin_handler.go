@@ -288,7 +288,7 @@ func (s *Server) Dashboard(c echo.Context) error {
 // @Tags admin
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Success 200 {object} model.SuccessResponse{data=model.StatisticsUserResponse}
+// @Success 200 {object} model.SuccessResponse{data=model.StatisticsResponse}
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /admin/statistics [get]
@@ -302,17 +302,21 @@ func (s *Server) Statistics(c echo.Context) error {
 
 	totalUsers := len(users)
 	activeUsers := 0
+	var totalStorageUsage uint64
 	for _, user := range users {
 		if user.IsActive {
 			activeUsers++
 		}
+
+		totalStorageUsage += user.StorageUsage
 	}
 	blockedUsers := totalUsers - activeUsers
 
-	resp := model.StatisticsUserResponse{
-		TotalUsers:   totalUsers,
-		ActiveUsers:  activeUsers,
-		BlockedUsers: blockedUsers,
+	resp := model.StatisticsResponse{
+		TotalUsers:        totalUsers,
+		ActiveUsers:       activeUsers,
+		BlockedUsers:      blockedUsers,
+		TotalStorageUsage: totalStorageUsage,
 	}
 
 	return s.success(c, resp)

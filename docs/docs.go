@@ -468,7 +468,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/model.StatisticsUserResponse"
+                                            "$ref": "#/definitions/model.StatisticsResponse"
                                         }
                                     }
                                 }
@@ -2725,13 +2725,16 @@ const docTemplate = `{
                 }
             }
         },
-        "model.StatisticsUserResponse": {
+        "model.StatisticsResponse": {
             "type": "object",
             "properties": {
                 "active_users": {
                     "type": "integer"
                 },
                 "blocked_users": {
+                    "type": "integer"
+                },
+                "total_storage_usage": {
                     "type": "integer"
                 },
                 "total_users": {

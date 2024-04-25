@@ -299,11 +299,13 @@ definitions:
     - id
     - role
     type: object
-  model.StatisticsUserResponse:
+  model.StatisticsResponse:
     properties:
       active_users:
         type: integer
       blocked_users:
+        type: integer
+      total_storage_usage:
         type: integer
       total_users:
         type: integer
@@ -728,7 +730,7 @@ paths:
             - $ref: '#/definitions/model.SuccessResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/model.StatisticsUserResponse'
+                  $ref: '#/definitions/model.StatisticsResponse'
               type: object
         "401":
           description: Unauthorized
