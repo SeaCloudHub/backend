@@ -358,15 +358,6 @@ const docTemplate = `{
                         "name": "identity_id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Update identity state request",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.UpdateIdentityStateRequest"
-                        }
                     }
                 ],
                 "responses": {
@@ -438,6 +429,60 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/statistics": {
+            "get": {
+                "description": "Statistics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.StatisticsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/model.ErrorResponse"
                         }
@@ -2680,6 +2725,23 @@ const docTemplate = `{
                 }
             }
         },
+        "model.StatisticsResponse": {
+            "type": "object",
+            "properties": {
+                "active_users": {
+                    "type": "integer"
+                },
+                "blocked_users": {
+                    "type": "integer"
+                },
+                "total_storage_usage": {
+                    "type": "integer"
+                },
+                "total_users": {
+                    "type": "integer"
+                }
+            }
+        },
         "model.SuccessResponse": {
             "type": "object",
             "properties": {
@@ -2724,21 +2786,6 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
-                }
-            }
-        },
-        "model.UpdateIdentityStateRequest": {
-            "type": "object",
-            "required": [
-                "state"
-            ],
-            "properties": {
-                "state": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "inactive"
-                    ]
                 }
             }
         },
