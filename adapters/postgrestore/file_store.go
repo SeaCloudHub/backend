@@ -96,7 +96,8 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Find(&fileSchemas).Error; err != nil {
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").
+		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
