@@ -425,6 +425,61 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 	})
 }
 
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListTrashRequest true "List trash request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListTrashResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/trash [get]
+func (s *Server) ListTrash(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListTrashRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// get trash directory
+	trash, err := s.FileStore.GetTrashByUserID(ctx, user.ID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	files, err := s.FileStore.ListCursor(ctx, trash.FullPath, cursor)
+	if err != nil {
+		if errors.Is(err, file.ErrInvalidCursor) {
+			return s.error(c, apperror.ErrInvalidParam(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	for i := range files {
+		files[i] = *files[i].Response()
+	}
+
+	return s.success(c, model.ListTrashResponse{
+		Entries: files,
+		Cursor:  cursor.NextToken(),
+	})
+}
+
 // CreateDirectory godoc
 // @Summary CreateDirectory
 // @Description CreateDirectory
@@ -1687,6 +1742,7 @@ func (s *Server) GetShared(c echo.Context) error {
 
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
+	router.GET("/trash", s.ListTrash)
 	router.GET("/share", s.GetShared)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/directories", s.CreateDirectory)

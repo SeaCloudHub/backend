@@ -58,6 +58,24 @@ type ListEntriesResponse struct {
 	Cursor  string      `json:"cursor"`
 } // @name model.ListEntriesResponse
 
+type ListTrashRequest struct {
+	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string `query:"cursor" validate:"omitempty,base64url"`
+}
+
+func (r *ListTrashRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 10
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type ListTrashResponse struct {
+	Entries []file.File `json:"entries"`
+	Cursor  string      `json:"cursor"`
+} // @name model.ListTrashResponse
+
 type ListPageEntriesRequest struct {
 	ID    string `param:"id" validate:"required,uuid" swaggerignore:"true"`
 	Page  int    `query:"page" validate:"required,min=1"`
