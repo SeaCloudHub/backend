@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/SeaCloudHub/backend/domain/file"
+	"github.com/SeaCloudHub/backend/domain/permission"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/validation"
 )
@@ -17,8 +18,9 @@ func (r *GetMetadataRequest) Validate(ctx context.Context) error {
 }
 
 type GetMetadataResponse struct {
-	File    file.File         `json:"file"`
-	Parents []file.SimpleFile `json:"parents"`
+	File    file.File             `json:"file"`
+	Parents []file.SimpleFile     `json:"parents"`
+	Users   []permission.FileUser `json:"users"`
 } // @name model.GetMetadataResponse
 
 type DownloadFileRequest struct {
@@ -115,6 +117,20 @@ func (r *UpdateGeneralAccessRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
+type Access struct {
+	UserID string `json:"user_id" validate:"required,uuid"`
+	Role   string `json:"role" validate:"required,oneof=viewer editor revoked"`
+} // @name model.AccessRequest
+
+type UpdateAccessRequest struct {
+	ID     string   `json:"id" validate:"required,uuid"`
+	Access []Access `json:"access" validate:"required,dive"`
+} // @name model.UpdateAccessRequest
+
+func (r *UpdateAccessRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
 type CopyFilesRequest struct {
 	IDs []string `json:"ids" validate:"required,dive,uuid"`
 	To  string   `json:"to" validate:"required,uuid"`
@@ -166,4 +182,8 @@ type DeleteRequest struct {
 
 func (r *DeleteRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
+}
+
+type GetPermissionsRequest struct {
+	ID string `param:"id" validate:"required,uuid"`
 }

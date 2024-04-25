@@ -49,6 +49,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		ctx     = app.NewEchoContextAdapter(c)
 		req     model.GetMetadataRequest
 		parents []file.SimpleFile
+		users   []permission.FileUser
 		canView bool
 		err     error
 	)
@@ -93,9 +94,21 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		}
 	}
 
+	// get who has access to the file
+	if f.IsDir {
+		users, err = s.PermissionService.GetDirectoryUsers(ctx, f.ID.String())
+	} else {
+		users, err = s.PermissionService.GetFileUsers(ctx, f.ID.String())
+	}
+
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
 	return s.success(c, model.GetMetadataResponse{
 		File:    *f.Response(),
 		Parents: parents,
+		Users:   users,
 	})
 }
 
@@ -712,6 +725,101 @@ func (s *Server) UpdateGeneralAccess(c echo.Context) error {
 	if err := s.FileStore.UpdateGeneralAccess(ctx, e.ID, req.GeneralAccess); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
+
+	return s.success(c, nil)
+}
+
+// UpdateAccess godoc
+// @Summary UpdateAccess
+// @Description UpdateAccess
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.UpdateAccessRequest true "Update access request"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/access [patch]
+func (s *Server) UpdateAccess(c echo.Context) error {
+	var (
+		ctx     = app.NewEchoContextAdapter(c)
+		req     model.UpdateAccessRequest
+		isOwner bool
+		err     error
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	e, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if e.IsDir {
+		isOwner, err = s.PermissionService.IsDirectoryOwner(ctx, user.ID.String(), e.ID.String())
+	} else {
+		isOwner, err = s.PermissionService.IsFileOwner(ctx, user.ID.String(), e.ID.String())
+	}
+
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !isOwner {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	wp := workerpool.New(10)
+
+	for _, a := range req.Access {
+		wp.Submit(func() {
+			if a.UserID == user.ID.String() {
+				return
+			}
+
+			// clear permissions
+			if e.IsDir {
+				if err := s.PermissionService.ClearDirectoryPermissions(ctx, e.ID.String(), a.UserID); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			} else {
+				if err := s.PermissionService.ClearFilePermissions(ctx, e.ID.String(), a.UserID); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			// add permissions
+			if a.Role == "revoked" {
+				return
+			}
+
+			if err := s.PermissionService.CreatePermission(ctx, permission.NewCreatePermission(
+				a.UserID, e.ID.String(), e.IsDir, a.Role)); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+		})
+	}
+
+	wp.StopWait()
 
 	return s.success(c, nil)
 }
@@ -1590,6 +1698,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.POST("/delete", s.Delete)
 	router.POST("", s.UploadFiles)
 	router.PATCH("/general-access", s.UpdateGeneralAccess)
+	router.PATCH("/access", s.UpdateAccess)
 	router.GET("/:id", s.ListEntries)
 	router.GET("/:id/page", s.ListPageEntries)
 	router.GET("/:id/metadata", s.GetMetadata)

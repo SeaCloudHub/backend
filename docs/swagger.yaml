@@ -75,6 +75,20 @@ definitions:
       updated_at:
         type: string
     type: object
+  model.AccessRequest:
+    properties:
+      role:
+        enum:
+        - viewer
+        - editor
+        - revoked
+        type: string
+      user_id:
+        type: string
+    required:
+    - role
+    - user_id
+    type: object
   model.ChangePasswordRequest:
     properties:
       new_password:
@@ -290,6 +304,18 @@ definitions:
       data: {}
       message:
         type: string
+    type: object
+  model.UpdateAccessRequest:
+    properties:
+      access:
+        items:
+          $ref: '#/definitions/model.AccessRequest'
+        type: array
+      id:
+        type: string
+    required:
+    - access
+    - id
     type: object
   model.UpdateGeneralAccessRequest:
     properties:
@@ -1045,6 +1071,54 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: ListPageEntries
+      tags:
+      - file
+  /files/access:
+    patch:
+      consumes:
+      - application/json
+      description: UpdateAccess
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Update access request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateAccessRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: UpdateAccess
       tags:
       - file
   /files/copy:
