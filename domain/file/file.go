@@ -35,6 +35,9 @@ type Store interface {
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
 	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)
 	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
+	Star(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
+	Unstar(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
+	ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error)
 }
 
 type File struct {
@@ -133,3 +136,9 @@ type Share struct {
 	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 } // @name file.Share
+
+type Stars struct {
+	FileID    uuid.UUID `json:"file_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+} // @name file.Stars

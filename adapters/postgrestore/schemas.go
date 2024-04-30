@@ -125,3 +125,11 @@ type ShareSchema struct {
 func (ShareSchema) TableName() string {
 	return "shares"
 }
+
+type StarSchema struct {
+	FileID    uuid.UUID `gorm:"column:file_id"`
+	UserID    uuid.UUID `gorm:"column:user_id"`
+	CreatedAt time.Time `gorm:"column:created_at"`
+}
+
+func (StarSchema) TableName() string { return "stars" }

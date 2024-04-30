@@ -1108,6 +1108,100 @@ paths:
       summary: ListPageEntries
       tags:
       - file
+  /files/{id}/star:
+    patch:
+      consumes:
+      - application/json
+      description: Star
+      parameters:
+      - default: Bearer <session_token>
+        description: ' Bearer token'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Star
+      tags:
+      - file
+  /files/{id}/unstar:
+    patch:
+      consumes:
+      - application/json
+      description: Unstar
+      parameters:
+      - default: Bearer <session_token>
+        description: ' Bearer token'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Unstar
+      tags:
+      - file
   /files/access:
     patch:
       consumes:
@@ -1675,6 +1769,55 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Share
+      tags:
+      - file
+  /files/starred:
+    get:
+      consumes:
+      - application/json
+      description: ListStarred
+      parameters:
+      - default: Bearer <session_token>
+        description: ' Bearer token'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListStarred
       tags:
       - file
   /files/trash:

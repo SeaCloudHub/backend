@@ -512,6 +512,56 @@ func (s *FileStore) DeleteShare(ctx context.Context, fileID, userID uuid.UUID) e
 	return nil
 }
 
+func (s *FileStore) Star(ctx context.Context, fileID, userID uuid.UUID) error {
+	var starSchema StarSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ? AND user_id = ?", fileID, userID).
+		First(&starSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			starSchema = StarSchema{
+				FileID: fileID,
+				UserID: userID,
+			}
+
+			if err := s.db.WithContext(ctx).Create(&starSchema).Error; err != nil {
+				return fmt.Errorf("unexpected error: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *FileStore) Unstar(ctx context.Context, fileID, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ? AND user_id = ?", fileID, userID).
+		Delete(&StarSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Joins("JOIN stars ON files.id = stars.file_id").
+		Where("stars.user_id = ?", userID).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+
+}
+
 type fsCursor struct {
 	CreatedAt *time.Time
 }
