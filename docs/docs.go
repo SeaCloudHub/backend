@@ -2620,6 +2620,9 @@ const docTemplate = `{
                 "size": {
                     "type": "integer"
                 },
+                "type": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 }
