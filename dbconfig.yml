@@ -1,6 +1,6 @@
 development:
-  dialect: postgresql
-  datasource: root:root@tcp(127.0.0.1:33062)/seacloudapp?parseTime=true
+  dialect: postgres
+  datasource: postgres://root:123456@localhost:33062/seacloudapp?sslmode=disable
   dir: migrations
   table: gorp_migrations
 
