@@ -46,6 +46,7 @@ type File struct {
 	Size          uint64      `json:"size"`
 	Mode          os.FileMode `json:"mode"`
 	MimeType      string      `json:"mime_type"`
+	Type          string      `json:"type"`
 	MD5           []byte      `json:"md5"`
 	IsDir         bool        `json:"is_dir"`
 	GeneralAccess string      `json:"general_access"`
