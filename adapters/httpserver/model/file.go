@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/SeaCloudHub/backend/domain/file"
+	"github.com/SeaCloudHub/backend/domain/permission"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/validation"
 )
@@ -15,6 +16,12 @@ type GetMetadataRequest struct {
 func (r *GetMetadataRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type GetMetadataResponse struct {
+	File    file.File             `json:"file"`
+	Parents []file.SimpleFile     `json:"parents"`
+	Users   []permission.FileUser `json:"users"`
+} // @name model.GetMetadataResponse
 
 type DownloadFileRequest struct {
 	ID string `param:"id" validate:"required,uuid"`
@@ -50,6 +57,24 @@ type ListEntriesResponse struct {
 	Entries []file.File `json:"entries"`
 	Cursor  string      `json:"cursor"`
 } // @name model.ListEntriesResponse
+
+type ListTrashRequest struct {
+	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string `query:"cursor" validate:"omitempty,base64url"`
+}
+
+func (r *ListTrashRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 10
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type ListTrashResponse struct {
+	Entries []file.File `json:"entries"`
+	Cursor  string      `json:"cursor"`
+} // @name model.ListTrashResponse
 
 type ListPageEntriesRequest struct {
 	ID    string `param:"id" validate:"required,uuid" swaggerignore:"true"`
@@ -108,4 +133,75 @@ type UpdateGeneralAccessRequest struct {
 
 func (r *UpdateGeneralAccessRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
+}
+
+type Access struct {
+	UserID string `json:"user_id" validate:"required,uuid"`
+	Role   string `json:"role" validate:"required,oneof=viewer editor revoked"`
+} // @name model.AccessRequest
+
+type UpdateAccessRequest struct {
+	ID     string   `json:"id" validate:"required,uuid"`
+	Access []Access `json:"access" validate:"required,dive"`
+} // @name model.UpdateAccessRequest
+
+func (r *UpdateAccessRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type CopyFilesRequest struct {
+	IDs []string `json:"ids" validate:"required,dive,uuid"`
+	To  string   `json:"to" validate:"required,uuid"`
+} // @name model.CopyFilesRequest
+
+func (r *CopyFilesRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type MoveRequest struct {
+	ID        string   `json:"id" validate:"required,uuid"`
+	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
+	To        string   `json:"to" validate:"required,uuid"`
+} // @name model.MoveRequest
+
+func (r *MoveRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type MoveToTrashRequest struct {
+	ID        string   `json:"id" validate:"required,uuid"`
+	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
+} // @name model.MoveToTrashRequest
+
+func (r *MoveToTrashRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type RestoreFromTrashRequest struct {
+	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
+} // @name model.RestoreFromTrashRequest
+
+func (r *RestoreFromTrashRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type RenameFileRequest struct {
+	ID   string `json:"id" validate:"required,uuid"`
+	Name string `json:"name" validate:"required,max=255"`
+} // @name model.RenameFileRequest
+
+func (r *RenameFileRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type DeleteRequest struct {
+	SourceIDs []string `json:"source_ids" validate:"required,dive,uuid"`
+} // @name model.DeleteRequest
+
+func (r *DeleteRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type GetPermissionsRequest struct {
+	ID string `param:"id" validate:"required,uuid"`
 }

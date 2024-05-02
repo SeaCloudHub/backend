@@ -3,6 +3,7 @@ package postgrestore
 import (
 	"encoding/hex"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -21,6 +22,8 @@ type UserSchema struct {
 	PasswordChangedAt *time.Time `gorm:"column:password_changed_at"`
 	LastSignInAt      *time.Time `gorm:"column:last_signin_at"`
 	RootID            uuid.UUID  `gorm:"column:root_id"`
+	StorageUsage      uint64     `gorm:"column:storage_usage"`
+	StorageCapacity   uint64     `gorm:"column:storage_capacity"`
 	CreatedAt         time.Time  `gorm:"column:created_at"`
 	UpdatedAt         time.Time  `gorm:"column:updated_at"`
 	DeletedAt         *time.Time `gorm:"column:deleted_at"`
@@ -42,6 +45,8 @@ func (s *UserSchema) ToDomainUser() *identity.User {
 		PasswordChangedAt: s.PasswordChangedAt,
 		LastSignInAt:      s.LastSignInAt,
 		RootID:            s.RootID,
+		StorageUsage:      s.StorageUsage,
+		StorageCapacity:   s.StorageCapacity,
 		CreatedAt:         s.CreatedAt,
 		UpdatedAt:         s.UpdatedAt,
 	}
@@ -51,11 +56,11 @@ type FileSchema struct {
 	ID            uuid.UUID  `gorm:"column:id"`
 	Name          string     `gorm:"column:name"`
 	Path          string     `gorm:"column:path"`
-	FullPath      string     `gorm:"column:full_path"`
-	PreviousPath  *string    `gorm:"column:previous_path"`
+	PreviousPath  *string    `gorm:"column:previous_path"` // user for move to trash
 	Size          uint64     `gorm:"column:size"`
 	Mode          uint32     `gorm:"column:mode"`
 	MimeType      string     `gorm:"column:mime_type"`
+	Type          string     `gorm:"column:type;->"`
 	MD5           string     `gorm:"column:md5"`
 	IsDir         bool       `gorm:"column:is_dir"`
 	GeneralAccess string     `gorm:"column:general_access"`
@@ -71,6 +76,10 @@ func (FileSchema) TableName() string {
 	return "files"
 }
 
+func (f *FileSchema) FullPath() string {
+	return filepath.Join(f.Path, f.Name)
+}
+
 func (s *FileSchema) ToDomainFile() *file.File {
 	md5, _ := hex.DecodeString(s.MD5)
 
@@ -83,10 +92,11 @@ func (s *FileSchema) ToDomainFile() *file.File {
 		ID:            s.ID,
 		Name:          s.Name,
 		Path:          s.Path,
-		FullPath:      s.FullPath,
+		PreviousPath:  s.PreviousPath,
 		Size:          s.Size,
 		Mode:          os.FileMode(s.Mode),
 		MimeType:      s.MimeType,
+		Type:          s.Type,
 		MD5:           md5,
 		IsDir:         s.IsDir,
 		GeneralAccess: s.GeneralAccess,
@@ -94,6 +104,14 @@ func (s *FileSchema) ToDomainFile() *file.File {
 		CreatedAt:     s.CreatedAt,
 		UpdatedAt:     s.UpdatedAt,
 		Owner:         owner,
+	}
+}
+
+func (s *FileSchema) ToDomainSimpleFile() *file.SimpleFile {
+	return &file.SimpleFile{
+		ID:   s.ID,
+		Name: s.Name,
+		Path: s.Path,
 	}
 }
 

@@ -2,12 +2,13 @@ package httpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
-	"path/filepath"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
+	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
@@ -47,10 +48,6 @@ func (s *Server) ListIdentities(c echo.Context) error {
 		req model.ListIdentitiesRequest
 	)
 
-	// TODO: get maxCapacity from config of identity storage size
-	// max capacity is 10GB for now
-	const maxCapacity = 10 << 30
-
 	if err := c.Bind(&req); err != nil {
 		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
@@ -60,28 +57,15 @@ func (s *Server) ListIdentities(c echo.Context) error {
 	}
 
 	pager := pagination.NewPager(req.Page, req.Limit)
+	filter := identity.Filter{Keyword: req.Keyword}
 
-	users, err := s.UserStore.List(ctx, pager)
+	users, err := s.UserStore.List(ctx, pager, filter)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	extendedUsers := make([]identity.ExtendedUser, 0, len(users))
-
-	for i, user := range users {
-		extendedUsers = append(extendedUsers, user.Extend())
-
-		fullPath := app.GetIdentityDirPath(user.ID.String())
-		extendedUsers[i].StorageUsed, err = s.FileService.GetDirectorySize(ctx, fullPath)
-		if err != nil {
-			return s.error(c, apperror.ErrInternalServer(err))
-		}
-
-		extendedUsers[i].StorageCapacity = maxCapacity
-	}
-
 	return s.success(c, model.ListIdentitiesResponse{
-		Identities: extendedUsers,
+		Identities: users,
 		Pagination: pager.PageInfo(),
 	})
 }
@@ -123,7 +107,7 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 	user := id.ToUser().WithName(req.FirstName, req.LastName).WithAvatarURL(req.AvatarURL)
 
 	// get root directory
-	rootDir, err := s.FileStore.GetByFullPath(ctx, "/")
+	rootDir, err := s.FileStore.GetRootDirectory(ctx)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -175,7 +159,7 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 	}
 
 	// get root directory
-	rootDir, err := s.FileStore.GetByFullPath(ctx, "/")
+	rootDir, err := s.FileStore.GetRootDirectory(ctx)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -202,7 +186,6 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param identity_id path string true "Identity ID"
-// @Param payload body model.UpdateIdentityStateRequest true "Update identity state request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -211,13 +194,33 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 func (s *Server) UpdateIdentityState(c echo.Context) error {
 	ctx := app.NewEchoContextAdapter(c)
 
+	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param(
+		"identity_id")))
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if user.IsAdmin {
+		return s.error(c, apperror.ErrForbidden(errors.New("cannot update admin user")))
+	}
+
 	var req model.UpdateIdentityStateRequest
-	if err := c.Bind(&req); err != nil {
-		return s.error(c, apperror.ErrInvalidRequest(err))
+	req.ID = user.ID.String()
+	if user.IsActive {
+		req.State = "inactive"
+	} else {
+		req.State = "active"
 	}
 
 	if err := req.Validate(ctx); err != nil {
 		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	if err := s.UserStore.ToggleActive(ctx, user.ID); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	if err := s.IdentityService.UpdateIdentityState(ctx, req.ID, req.State); err != nil {
@@ -279,10 +282,51 @@ func (s *Server) Dashboard(c echo.Context) error {
 	return s.success(c, dirStatus)
 }
 
+// Statistics godoc
+// @Summary Statistics
+// @Description Statistics
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=model.StatisticsResponse}
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/statistics [get]
+func (s *Server) Statistics(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	users, err := s.UserStore.GetAll(ctx)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	totalUsers := len(users)
+	activeUsers := 0
+	var totalStorageUsage uint64
+	for _, user := range users {
+		if user.IsActive {
+			activeUsers++
+		}
+
+		totalStorageUsage += user.StorageUsage
+	}
+	blockedUsers := totalUsers - activeUsers
+
+	resp := model.StatisticsResponse{
+		TotalUsers:        totalUsers,
+		ActiveUsers:       activeUsers,
+		BlockedUsers:      blockedUsers,
+		TotalStorageUsage: totalStorageUsage,
+	}
+
+	return s.success(c, resp)
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
 	router.GET("/dashboard", s.Dashboard)
+	router.GET("/statistics", s.Statistics)
 
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)
@@ -302,18 +346,9 @@ func (s *Server) createUser(ctx context.Context, user *identity.User, rootID str
 
 	// create user root directory
 	fullPath := app.GetIdentityDirPath(userID)
-	if err := s.FileService.CreateDirectory(ctx, fullPath); err != nil {
-		return fmt.Errorf("create user root directory: %w", err)
-	}
-
-	// get metadata
-	entry, err := s.FileService.GetMetadata(ctx, fullPath)
-	if err != nil {
-		return fmt.Errorf("get metadata: %w", err)
-	}
 
 	// create files row
-	f := entry.ToFile().WithID(uuid.New()).WithPath("/").WithOwnerID(user.ID)
+	f := file.NewDirectory(userID).WithID(uuid.New()).WithPath("/").WithOwnerID(user.ID)
 	if err := s.FileStore.Create(ctx, f); err != nil {
 		return fmt.Errorf("create files row: %w", err)
 	}
@@ -328,20 +363,8 @@ func (s *Server) createUser(ctx context.Context, user *identity.User, rootID str
 		return fmt.Errorf("update user root id: %w", err)
 	}
 
-	// create trash directory
-	trashPath := filepath.Join(fullPath, ".trash") + string(filepath.Separator)
-	if err := s.FileService.CreateDirectory(ctx, trashPath); err != nil {
-		return fmt.Errorf("create user trash directory: %w", err)
-	}
-
-	// get metadata
-	trashEntry, err := s.FileService.GetMetadata(ctx, trashPath)
-	if err != nil {
-		return fmt.Errorf("get metadata: %w", err)
-	}
-
 	// create files row
-	trash := trashEntry.ToFile().WithID(uuid.New()).WithPath(fullPath).WithOwnerID(user.ID)
+	trash := file.NewDirectory(".trash").WithID(uuid.New()).WithPath(fullPath).WithOwnerID(user.ID)
 	if err := s.FileStore.Create(ctx, trash); err != nil {
 		return fmt.Errorf("create files row: %w", err)
 	}

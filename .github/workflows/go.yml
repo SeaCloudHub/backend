@@ -97,6 +97,13 @@ jobs:
             scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker pull ghcr.io/$repository_lowercase/seed-admin
+            
+            # Check if the container exists
+            if docker ps -a --format '{{.Names}}' | grep -Eq "^seed-admin$"; then
+              docker stop seed-admin
+              docker rm seed-admin
+            fi
+            
             docker run -d --name seed-admin --env-file ~/.env ghcr.io/$repository_lowercase/seed-admin
             rm ~/.env
 
@@ -136,6 +143,13 @@ jobs:
             scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker pull ghcr.io/$repository_lowercase/migrate
+            
+            # Check if the container exists
+            if docker ps -a --format '{{.Names}}' | grep -Eq "^migrate$"; then
+              docker stop migrate
+              docker rm migrate
+            fi
+            
             docker run -d --name migrate --env-file ~/.env ghcr.io/$repository_lowercase/migrate
             rm ~/.env
 

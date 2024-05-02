@@ -5,19 +5,22 @@ import (
 )
 
 const (
-	BindingCode              = "400001"
-	ValidationCode           = "400002"
-	InvalidCredentialsCode   = "400003"
-	IncorrectPasswordCode    = "400007"
-	InvalidPasswordCode      = "400009"
-	InvalidImageCode         = "400010"
-	DirAlreadyExistsCode     = "400011"
-	UnauthorizedCode         = "401004"
-	IdentityWasDisableCode   = "401009"
-	ForbiddenCode            = "403005"
-	RefreshTokenRequiredCode = "403008"
-	EntityNotFoundCode       = "404006"
-	IdentityNotFoundCode     = "404007"
+	BindingCode                 = "400001"
+	ValidationCode              = "400002"
+	InvalidCredentialsCode      = "400003"
+	IncorrectPasswordCode       = "400007"
+	InvalidPasswordCode         = "400009"
+	InvalidImageCode            = "400010"
+	DirAlreadyExistsCode        = "400011"
+	StorageCapacityExceededCode = "400012"
+	FileOnlyOperationCode       = "400013"
+	DirectoryOnlyOperationCode  = "400014"
+	UnauthorizedCode            = "401004"
+	IdentityWasDisableCode      = "401009"
+	ForbiddenCode               = "403005"
+	RefreshTokenRequiredCode    = "403008"
+	EntityNotFoundCode          = "404006"
+	IdentityNotFoundCode        = "404007"
 )
 
 // 400 Bad Request
@@ -56,6 +59,18 @@ func ErrUnauthorized(err error) Error {
 
 func ErrIdentityWasDisabled(err error) Error {
 	return NewError(err, http.StatusUnauthorized, IdentityWasDisableCode, "Identity was disabled")
+}
+
+func ErrStorageCapacityExceeded() Error {
+	return NewError(nil, http.StatusBadRequest, StorageCapacityExceededCode, "Storage capacity exceeded")
+}
+
+func ErrFileOnlyOperation() Error {
+	return NewError(nil, http.StatusBadRequest, FileOnlyOperationCode, "This operation is only allowed for files")
+}
+
+func ErrDirectoryOnlyOperation() Error {
+	return NewError(nil, http.StatusBadRequest, DirectoryOnlyOperationCode, "This operation is only allowed for directories")
 }
 
 // 403 Forbidden
