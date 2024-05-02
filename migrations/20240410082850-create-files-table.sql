@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS "files"
     "id"                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "name"              VARCHAR(255) NOT NULL,
     "path"              TEXT NOT NULL,
-    "full_path"         TEXT UNIQUE NOT NULL,
     "previous_path"     TEXT NULL,
     "size"              BIGINT NOT NULL,
     "mode"              BIGINT NOT NULL,

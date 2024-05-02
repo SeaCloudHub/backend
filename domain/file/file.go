@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
@@ -19,17 +18,18 @@ type Store interface {
 	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
+	GetRootDirectory(ctx context.Context) (*File, error)
 	GetTrashByUserID(ctx context.Context, userID uuid.UUID) (*File, error)
 	ListByIDs(ctx context.Context, ids []string) ([]File, error)
+	ListByFullPaths(ctx context.Context, fullPaths []string) ([]SimpleFile, error)
 	ListSelected(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedChildren(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedOwnedChildren(ctx context.Context, userID uuid.UUID, parent *File, ids []string) ([]File, error)
-	ListByFullPaths(ctx context.Context, paths []string) ([]SimpleFile, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
-	UpdatePath(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
+	UpdatePath(ctx context.Context, fileID uuid.UUID, path string) error
 	UpdateName(ctx context.Context, fileID uuid.UUID, name string) error
-	MoveToTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
-	RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path string, fullPath string) error
+	MoveToTrash(ctx context.Context, fileID uuid.UUID, path string) error
+	RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path string) error
 	RestoreChildrenFromTrash(ctx context.Context, parentPath, newPath string) ([]File, error)
 	Delete(ctx context.Context, file File) ([]File, error)
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
@@ -41,7 +41,6 @@ type File struct {
 	ID            uuid.UUID   `json:"id"`
 	Name          string      `json:"name"`
 	Path          string      `json:"path"`
-	FullPath      string      `json:"full_path"`
 	ShownPath     string      `json:"shown_path"`
 	PreviousPath  *string     `json:"-"`
 	Size          uint64      `json:"size"`
@@ -57,6 +56,17 @@ type File struct {
 	Owner *identity.User `json:"owner,omitempty"`
 } // @name file.File
 
+func NewDirectory(name string) *File {
+	return &File{
+		Name:     name,
+		Size:     0,
+		Mode:     os.ModeDir,
+		MD5:      []byte{},
+		MimeType: "",
+		IsDir:    true,
+	}
+}
+
 func (f *File) WithID(id uuid.UUID) *File {
 	f.ID = id
 
@@ -70,17 +80,7 @@ func (f *File) WithName(name string) *File {
 }
 
 func (f *File) WithPath(path string) *File {
-	if !strings.HasSuffix(path, "/") && len(path) > 0 {
-		path = path + "/"
-	}
-
-	f.Path = path
-
-	return f
-}
-
-func (f *File) WithFullPath(fullPath string) *File {
-	f.FullPath = fullPath
+	f.Path = filepath.Clean(path)
 
 	return f
 }
@@ -89,6 +89,10 @@ func (f *File) WithOwnerID(ownerID uuid.UUID) *File {
 	f.OwnerID = ownerID
 
 	return f
+}
+
+func (f *File) FullPath() string {
+	return filepath.Join(f.Path, f.Name)
 }
 
 func (f *File) Response() *File {
@@ -102,29 +106,24 @@ func (f *File) Parents() []string {
 		return nil
 	}
 
-	root := app.GetRootPath(f.Path)
-	shownPath := app.RemoveRootPath(f.Path)
+	// Initialize an empty slice to store parent paths
+	var result []string
 
-	parts := strings.Split(shownPath+"/", "/")
-	if shownPath == "/" {
-		parts = strings.Split(shownPath, "/")
+	currentPath := f.Path
+
+	for currentPath != "" && currentPath != "/" {
+		result = append(result, currentPath)
+
+		currentPath = filepath.Dir(currentPath)
 	}
 
-	parts = parts[:len(parts)-1]
-
-	var parents []string
-	for i := len(parts); i > 0; i-- {
-		parents = append(parents, filepath.Join(root, strings.Join(parts[:i], "/"))+"/")
-	}
-
-	return parents
+	return result
 }
 
 type SimpleFile struct {
-	ID       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	Path     string    `json:"path"`
-	FullPath string    `json:"full_path"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Path string    `json:"path"`
 } // @name file.SimpleFile
 
 type Share struct {

@@ -3,6 +3,7 @@ package postgrestore
 import (
 	"encoding/hex"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -55,7 +56,6 @@ type FileSchema struct {
 	ID            uuid.UUID  `gorm:"column:id"`
 	Name          string     `gorm:"column:name"`
 	Path          string     `gorm:"column:path"`
-	FullPath      string     `gorm:"column:full_path"`
 	PreviousPath  *string    `gorm:"column:previous_path"` // user for move to trash
 	Size          uint64     `gorm:"column:size"`
 	Mode          uint32     `gorm:"column:mode"`
@@ -75,6 +75,10 @@ func (FileSchema) TableName() string {
 	return "files"
 }
 
+func (f *FileSchema) FullPath() string {
+	return filepath.Join(f.Path, f.Name)
+}
+
 func (s *FileSchema) ToDomainFile() *file.File {
 	md5, _ := hex.DecodeString(s.MD5)
 
@@ -87,7 +91,6 @@ func (s *FileSchema) ToDomainFile() *file.File {
 		ID:            s.ID,
 		Name:          s.Name,
 		Path:          s.Path,
-		FullPath:      s.FullPath,
 		PreviousPath:  s.PreviousPath,
 		Size:          s.Size,
 		Mode:          os.FileMode(s.Mode),
@@ -104,12 +107,10 @@ func (s *FileSchema) ToDomainFile() *file.File {
 
 func (s *FileSchema) ToDomainSimpleFile() *file.SimpleFile {
 	return &file.SimpleFile{
-		ID:       s.ID,
-		Name:     s.Name,
-		Path:     s.Path,
-		FullPath: s.FullPath,
+		ID:   s.ID,
+		Name: s.Name,
+		Path: s.Path,
 	}
-
 }
 
 type ShareSchema struct {

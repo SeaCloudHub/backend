@@ -2363,9 +2363,6 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "full_path": {
-                    "type": "string"
-                },
                 "general_access": {
                     "type": "string"
                 },

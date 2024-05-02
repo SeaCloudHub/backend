@@ -71,7 +71,7 @@ func (s *Server) UploadImage(c echo.Context) error {
 	fileName := gonanoid.Must(11) + exts[0]
 	fullPath := filepath.Join("/assets", "images", fileName)
 
-	size, err := s.FileService.CreateFile(ctx, reader, fullPath)
+	size, err := s.FileService.CreateFile(ctx, reader, fullPath, contentType)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}

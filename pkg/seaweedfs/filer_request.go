@@ -21,6 +21,7 @@ type DownloadFileRequest struct {
 type UploadFileRequest struct {
 	Content      io.Reader
 	FullFileName string
+	ContentType  string
 }
 
 type CreateDirectoryRequest struct {

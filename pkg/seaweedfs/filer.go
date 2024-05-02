@@ -118,7 +118,7 @@ func (f *Filer) UploadFile(ctx context.Context, in *UploadFileRequest) (*UploadF
 		return nil, fmt.Errorf("parse request uri: %w", err)
 	}
 
-	resp, err := f.client.R().SetContext(ctx).SetFileReader("file", "", in.Content).
+	resp, err := f.client.R().SetContext(ctx).SetMultipartField("file", in.FullFileName, in.ContentType, in.Content).
 		SetResult(&result).
 		Post(path.String())
 	if err != nil {
