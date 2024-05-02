@@ -3,6 +3,7 @@ module github.com/SeaCloudHub/backend
 go 1.22.0
 
 require (
+	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-resty/resty/v2 v2.12.0
 	github.com/gocarina/gocsv v0.0.0-20231116093920-b87c2d0e983a
@@ -29,7 +30,6 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect

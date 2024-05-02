@@ -13,7 +13,6 @@ import (
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
-	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/logger"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -101,13 +100,7 @@ func main() {
 		applog.Fatalf("cannot create root directory: %v", err)
 	}
 
-	// create user root directory
-	fullPath := app.GetIdentityDirPath(identity.ID)
-	if err := s.fileService.CreateDirectory(ctx, fullPath); err != nil {
-		applog.Fatalf("cannot create user root directory: %v", err)
-	}
-
-	userRootID, err := s.createDirectory(ctx, user.ID, fullPath, "/", rootID)
+	userRootID, err := s.createDirectory(ctx, user.ID, identity.ID, "/", rootID)
 	if err != nil {
 		applog.Fatalf("cannot create user root directory: %v", err)
 	}
@@ -118,12 +111,8 @@ func main() {
 	}
 
 	// create user trash directory
-	trashPath := filepath.Join(fullPath, ".trash") + string(filepath.Separator)
-	if err := s.fileService.CreateDirectory(ctx, trashPath); err != nil {
-		applog.Fatalf("cannot create user trash directory: %v", err)
-	}
-
-	if _, err := s.createDirectory(ctx, user.ID, trashPath, fullPath, userRootID); err != nil {
+	path := filepath.Join("/", identity.ID)
+	if _, err := s.createDirectory(ctx, user.ID, ".trash", path, userRootID); err != nil {
 		applog.Fatalf("cannot create user trash directory: %v", err)
 	}
 
@@ -131,15 +120,9 @@ func main() {
 	applog.Infof("email: %s - password: %s", email, password)
 }
 
-func (s *service) createDirectory(ctx context.Context, ownerID uuid.UUID, fullPath string, path string, parentID string) (string, error) {
-	// get metadata
-	entry, err := s.fileService.GetMetadata(ctx, fullPath)
-	if err != nil {
-		return "", fmt.Errorf("get metadata: %w", err)
-	}
-
+func (s *service) createDirectory(ctx context.Context, ownerID uuid.UUID, name string, path string, parentID string) (string, error) {
 	// create files row
-	f := entry.ToFile().WithID(uuid.New()).WithPath(path).WithOwnerID(ownerID)
+	f := file.NewDirectory(name).WithID(uuid.New()).WithPath(path).WithOwnerID(ownerID)
 	if err := s.fileStore.Create(ctx, f); err != nil {
 		return "", fmt.Errorf("create files row: %w", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/gammazero/workerpool"
 	"github.com/google/uuid"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -163,7 +161,7 @@ func (s *Server) Download(c echo.Context) error {
 		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
 	}
 
-	f, mime, err := s.FileService.DownloadFile(ctx, e.FullPath)
+	f, mime, err := s.FileService.DownloadFile(ctx, e.ID.String())
 	if err != nil {
 		if errors.Is(err, file.ErrNotFound) {
 			return s.error(c, apperror.ErrEntityNotFound(err))
@@ -253,13 +251,9 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		}
 		defer src.Close()
 
-		fullPath := filepath.Join(e.FullPath, file.Filename)
-
-		// TODO: handle file already exists
-
 		wp.Submit(func() {
 			// save files
-			f, err := s.createFile(ctx, e, src, fullPath, user.ID)
+			f, err := s.createFile(ctx, e, src, file.Filename, user.ID)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -338,7 +332,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, e.FullPath, cursor)
+	files, err := s.FileStore.ListCursor(ctx, e.FullPath(), cursor)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -410,7 +404,7 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 	}
 
 	pager := pagination.NewPager(req.Page, req.Limit)
-	files, err := s.FileStore.ListPager(ctx, e.FullPath, pager)
+	files, err := s.FileStore.ListPager(ctx, e.FullPath(), pager)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -461,7 +455,7 @@ func (s *Server) ListTrash(c echo.Context) error {
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, trash.FullPath, cursor)
+	files, err := s.FileStore.ListCursor(ctx, trash.FullPath(), cursor)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -528,21 +522,7 @@ func (s *Server) CreateDirectory(c echo.Context) error {
 		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
-	dirpath := filepath.Join(parent.FullPath, req.Name) + string(filepath.Separator)
-	if err := s.FileService.CreateDirectory(ctx, dirpath); err != nil {
-		if errors.Is(err, file.ErrDirAlreadyExists) {
-			return s.error(c, apperror.ErrDirAlreadyExists(err))
-		}
-
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	entry, err := s.FileService.GetMetadata(ctx, dirpath)
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	f := entry.ToFile().WithID(uuid.New()).WithPath(parent.FullPath).WithOwnerID(user.ID)
+	f := file.NewDirectory(req.Name).WithID(uuid.New()).WithPath(parent.FullPath()).WithOwnerID(user.ID)
 	if err := s.FileStore.Create(ctx, f); err != nil {
 		if errors.Is(err, file.ErrDirAlreadyExists) {
 			return s.error(c, apperror.ErrDirAlreadyExists(err))
@@ -965,17 +945,16 @@ func (s *Server) CopyFiles(c echo.Context) error {
 
 		// copy file
 		wp.Submit(func() {
-			src, _, err := s.FileService.DownloadFile(ctx, e.FullPath)
+			src, _, err := s.FileService.DownloadFile(ctx, e.ID.String())
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
 			defer src.Close()
 
-			newName := fmt.Sprintf("Copy #%s of %s", gonanoid.MustGenerate("0123456789ABCDEF", 3), e.Name)
-			fullPath := filepath.Join(dest.FullPath, newName)
+			newName := fmt.Sprintf("Copy of %s", e.Name)
 
-			f, err := s.createFile(ctx, dest, src, fullPath, user.ID)
+			f, err := s.createFile(ctx, dest, src, newName, user.ID)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -1091,16 +1070,9 @@ func (s *Server) Move(c echo.Context) error {
 
 	for _, e := range files {
 		wp.Submit(func() {
-			dstFullPath := strings.Replace(e.FullPath, src.FullPath, dest.FullPath, 1)
-			dstPath := strings.Replace(e.Path, src.FullPath, dest.FullPath, 1)
+			dstPath := strings.Replace(e.Path, src.FullPath(), dest.FullPath(), 1)
 
-			if e.Path == src.FullPath {
-				// move top level files
-				if err := s.FileService.Move(ctx, e.FullPath, dstPath); err != nil {
-					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
-					return
-				}
-
+			if e.Path == src.FullPath() {
 				// update parent relationship
 				if e.IsDir {
 					err = s.PermissionService.UpdateDirectoryParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
@@ -1114,8 +1086,8 @@ func (s *Server) Move(c echo.Context) error {
 				}
 			}
 
-			f := e.WithPath(dstPath).WithFullPath(dstFullPath)
-			if err := s.FileStore.UpdatePath(ctx, e.ID, dstPath, dstFullPath); err != nil {
+			f := e.WithPath(dstPath)
+			if err := s.FileStore.UpdatePath(ctx, e.ID, dstPath); err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
@@ -1202,20 +1174,13 @@ func (s *Server) Rename(c echo.Context) error {
 		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
-	newFullPath := strings.Replace(e.FullPath, e.Name, req.Name, 1)
 	newPath := strings.Replace(e.Path, e.Name, req.Name, 1)
-
-	if err := s.FileService.Rename(ctx, strings.TrimRight(e.FullPath, string(filepath.Separator)), strings.TrimRight(newFullPath,
-		string(filepath.Separator))); err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
 
 	if err := s.FileStore.UpdateName(ctx, e.ID, req.Name); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	resp := *e.WithName(req.Name).WithPath(newPath).WithFullPath(
-		newFullPath).Response()
+	resp := *e.WithName(req.Name).WithPath(newPath).Response()
 
 	return s.success(c, resp)
 }
@@ -1309,16 +1274,9 @@ func (s *Server) MoveToTrash(c echo.Context) error {
 
 	for _, e := range files {
 		wp.Submit(func() {
-			dstFullPath := strings.Replace(e.FullPath, src.FullPath, dest.FullPath, 1)
-			dstPath := strings.Replace(e.Path, src.FullPath, dest.FullPath, 1)
+			dstPath := strings.Replace(e.Path, src.FullPath(), dest.FullPath(), 1)
 
-			if e.Path == src.FullPath {
-				// move top level files
-				if err := s.FileService.Move(ctx, e.FullPath, dstPath); err != nil {
-					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
-					return
-				}
-
+			if e.Path == src.FullPath() {
 				// update parent relationship
 				if e.IsDir {
 					err = s.PermissionService.UpdateDirectoryParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
@@ -1332,8 +1290,8 @@ func (s *Server) MoveToTrash(c echo.Context) error {
 				}
 			}
 
-			f := e.WithPath(dstPath).WithFullPath(dstFullPath)
-			if err := s.FileStore.MoveToTrash(ctx, e.ID, dstPath, dstFullPath); err != nil {
+			f := e.WithPath(dstPath)
+			if err := s.FileStore.MoveToTrash(ctx, e.ID, dstPath); err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
@@ -1454,14 +1412,8 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 				}
 			}
 
-			dstFullPath := strings.Replace(e.FullPath, src.FullPath, dest.FullPath, 1)
-			dstPath := strings.Replace(e.Path, src.FullPath, dest.FullPath, 1)
+			dstPath := strings.Replace(e.Path, src.FullPath(), dest.FullPath(), 1)
 			path := e.Path
-
-			if err := s.FileService.Move(ctx, e.FullPath, dstPath); err != nil {
-				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
-				return
-			}
 
 			// update parent relationship
 			if e.IsDir {
@@ -1475,8 +1427,8 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 				return
 			}
 
-			f := e.WithPath(dstPath).WithFullPath(dstFullPath)
-			if err := s.FileStore.RestoreFromTrash(ctx, e.ID, dstPath, dstFullPath); err != nil {
+			f := e.WithPath(dstPath)
+			if err := s.FileStore.RestoreFromTrash(ctx, e.ID, dstPath); err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
@@ -1589,7 +1541,7 @@ func (s *Server) Delete(c echo.Context) error {
 				return
 			}
 
-			if err := s.FileService.Delete(ctx, e.FullPath); err != nil {
+			if err := s.FileService.Delete(ctx, e.ID.String()); err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
@@ -1762,18 +1714,25 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/:id/access", s.Access) // get access to the shared file or directory
 }
 
-func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, fullPath string, ownerID uuid.UUID) (*file.File, error) {
-	_, err := s.FileService.CreateFile(ctx, reader, fullPath)
+func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID) (*file.File, error) {
+	id := uuid.New()
+
+	contentType, src, err := app.DetectContentType(reader)
+	if err != nil {
+		return nil, fmt.Errorf("detect content type: %w", err)
+	}
+
+	_, err = s.FileService.CreateFile(ctx, src, id.String(), contentType)
 	if err != nil {
 		return nil, fmt.Errorf("upload file: %w", err)
 	}
 
-	entry, err := s.FileService.GetMetadata(ctx, fullPath)
+	entry, err := s.FileService.GetMetadata(ctx, id.String())
 	if err != nil {
 		return nil, fmt.Errorf("get metadata: %w", err)
 	}
 
-	f := entry.ToFile().WithID(uuid.New()).WithPath(parent.FullPath).WithOwnerID(ownerID)
+	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID)
 	if err := s.FileStore.Create(ctx, f); err != nil {
 		return nil, fmt.Errorf("create file: %w", err)
 	}

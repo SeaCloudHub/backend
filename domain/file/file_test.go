@@ -11,10 +11,10 @@ func TestParents(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"/r/a/b/c/", []string{"/r/a/b/c/", "/r/a/b/", "/r/a/", "/r/"}},
-		{"/r/a/b/", []string{"/r/a/b/", "/r/a/", "/r/"}},
-		{"/r/a/", []string{"/r/a/", "/r/"}},
-		{"/r/", []string{"/r/"}},
+		{"/r/a/b/c", []string{"/r/a/b/c", "/r/a/b", "/r/a", "/r"}},
+		{"/r/a/b", []string{"/r/a/b", "/r/a", "/r"}},
+		{"/r/a", []string{"/r/a", "/r"}},
+		{"/r", []string{"/r"}},
 		{"/", nil},
 		{"", nil},
 	}

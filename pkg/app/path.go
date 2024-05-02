@@ -7,7 +7,7 @@ import (
 )
 
 func GetIdentityDirPath(identityID string) string {
-	return fmt.Sprintf("/%s/", identityID)
+	return fmt.Sprintf("/%s", identityID)
 }
 
 func GetFullRoot(path string, id string) string {
