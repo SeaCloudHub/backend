@@ -10,8 +10,9 @@ import (
 )
 
 type ListIdentitiesRequest struct {
-	Limit int `query:"limit" validate:"required,min=1,max=100"`
-	Page  int `query:"page" validate:"required,min=1"`
+	Keyword string `query:"keyword" validate:"omitempty,max=50"`
+	Limit   int    `query:"limit" validate:"required,min=1,max=100"`
+	Page    int    `query:"page" validate:"required,min=1"`
 }
 
 func (r *ListIdentitiesRequest) Validate() error {
@@ -27,8 +28,8 @@ func (r *ListIdentitiesRequest) Validate() error {
 }
 
 type ListIdentitiesResponse struct {
-	Identities []identity.ExtendedUser `json:"identities"`
-	Pagination pagination.PageInfo     `json:"pagination"`
+	Identities []identity.User     `json:"identities"`
+	Pagination pagination.PageInfo `json:"pagination"`
 } // @name model.ListIdentitiesResponse
 
 type CreateIdentityRequest struct {
@@ -50,8 +51,15 @@ func (r *CreateIdentityRequest) Validate() error {
 type UpdateIdentityStateRequest struct {
 	ID    string `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
 	State string `json:"state" validate:"required,oneof=active inactive"`
-} // @name model.UpdateIdentityStateRequest
+}
 
 func (r *UpdateIdentityStateRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type StatisticsResponse struct {
+	TotalUsers        int    `json:"total_users"`
+	ActiveUsers       int    `json:"active_users"`
+	BlockedUsers      int    `json:"blocked_users"`
+	TotalStorageUsage uint64 `json:"total_storage_usage"`
+} // @name model.StatisticsResponse

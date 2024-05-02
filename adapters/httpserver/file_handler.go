@@ -1,17 +1,26 @@
 package httpserver
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
-	"path/filepath"
+	"strings"
+	"sync"
 
 	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
+	"github.com/gammazero/workerpool"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
+
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
@@ -37,6 +46,8 @@ func (s *Server) GetMetadata(c echo.Context) error {
 	var (
 		ctx     = app.NewEchoContextAdapter(c)
 		req     model.GetMetadataRequest
+		parents []file.SimpleFile
+		users   []permission.FileUser
 		canView bool
 		err     error
 	)
@@ -71,10 +82,32 @@ func (s *Server) GetMetadata(c echo.Context) error {
 	}
 
 	if !canView {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
 	}
 
-	return s.success(c, f.Response())
+	if parentPaths := f.Parents(); len(parentPaths) > 0 {
+		parents, err = s.FileStore.ListByFullPaths(ctx, parentPaths)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	// get who has access to the file
+	if f.IsDir {
+		users, err = s.PermissionService.GetDirectoryUsers(ctx, f.ID.String())
+	} else {
+		users, err = s.PermissionService.GetFileUsers(ctx, f.ID.String())
+	}
+
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.GetMetadataResponse{
+		File:    *f.Response(),
+		Parents: parents,
+		Users:   users,
+	})
 }
 
 // Download godoc
@@ -116,7 +149,7 @@ func (s *Server) Download(c echo.Context) error {
 	}
 
 	if e.IsDir {
-		return s.error(c, apperror.ErrInvalidParam(errors.New("cannot download directory")))
+		return s.error(c, apperror.ErrFileOnlyOperation())
 	}
 
 	canView, err := s.PermissionService.CanViewFile(ctx, id.ID, e.ID.String())
@@ -125,10 +158,10 @@ func (s *Server) Download(c echo.Context) error {
 	}
 
 	if !canView {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
 	}
 
-	f, mime, err := s.FileService.DownloadFile(ctx, e.FullPath)
+	f, mime, err := s.FileService.DownloadFile(ctx, e.ID.String())
 	if err != nil {
 		if errors.Is(err, file.ErrNotFound) {
 			return s.error(c, apperror.ErrEntityNotFound(err))
@@ -187,7 +220,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 	}
 
 	if !canEdit {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to edit")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
 	// Files
@@ -196,10 +229,20 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidRequest(err))
 	}
 
+	files := form.File["files"]
+
+	totalSize := lo.Reduce(files, func(agg uint64, file *multipart.FileHeader, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	if totalSize+e.Owner.StorageUsage > e.Owner.StorageCapacity {
+		return s.error(c, apperror.ErrStorageCapacityExceeded())
+	}
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
 	var resp []file.File
 
-	// TODO: add workerpool to handle multiple file uploads concurrently
-	files := form.File["files"]
 	for _, file := range files {
 		// open file
 		src, err := file.Open()
@@ -208,32 +251,29 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		}
 		defer src.Close()
 
-		fullPath := filepath.Join(e.FullPath, file.Filename)
+		wp.Submit(func() {
+			// save files
+			f, err := s.createFile(ctx, e, src, file.Filename, user.ID)
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
 
-		// TODO: handle file already exists
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *f.Response())
+		})
+	}
 
-		// save files
-		_, err = s.FileService.CreateFile(ctx, src, fullPath)
-		if err != nil {
-			return s.error(c, apperror.ErrInternalServer(err))
-		}
+	wp.StopWait()
 
-		entry, err := s.FileService.GetMetadata(ctx, fullPath)
-		if err != nil {
-			return s.error(c, apperror.ErrInternalServer(err))
-		}
+	newStorageUsage := lo.Reduce(resp, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, e.Owner.StorageUsage)
 
-		f := entry.ToFile().WithID(uuid.New()).WithPath(e.FullPath).WithOwnerID(user.ID)
-		if err := s.FileStore.Create(ctx, f); err != nil {
-			return s.error(c, apperror.ErrInternalServer(err))
-		}
-
-		// create file permissions
-		if err := s.PermissionService.CreateFilePermissions(ctx, user.ID.String(), f.ID.String(), e.ID.String()); err != nil {
-			return s.error(c, apperror.ErrInternalServer(err))
-		}
-
-		resp = append(resp, *f.Response())
+	// update user storage usage
+	if err := s.UserStore.UpdateStorageUsage(ctx, e.OwnerID, newStorageUsage); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	return s.success(c, resp)
@@ -277,7 +317,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 	}
 
 	if !e.IsDir {
-		return s.error(c, apperror.ErrEntityNotFound(errors.New("not a directory")))
+		return s.error(c, apperror.ErrDirectoryOnlyOperation())
 	}
 
 	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
@@ -288,11 +328,11 @@ func (s *Server) ListEntries(c echo.Context) error {
 	}
 
 	if !canView {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, e.FullPath, cursor)
+	files, err := s.FileStore.ListCursor(ctx, e.FullPath(), cursor)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -351,7 +391,7 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 	}
 
 	if !e.IsDir {
-		return s.error(c, apperror.ErrEntityNotFound(errors.New("not a directory")))
+		return s.error(c, apperror.ErrDirectoryOnlyOperation())
 	}
 
 	canView, err := s.PermissionService.CanViewDirectory(ctx, identity.ID, e.ID.String())
@@ -360,11 +400,11 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 	}
 
 	if !canView {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to view")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
 	}
 
 	pager := pagination.NewPager(req.Page, req.Limit)
-	files, err := s.FileStore.ListPager(ctx, e.FullPath, pager)
+	files, err := s.FileStore.ListPager(ctx, e.FullPath(), pager)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -376,6 +416,61 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 	return s.success(c, model.ListPageEntriesResponse{
 		Entries:    files,
 		Pagination: pager.PageInfo(),
+	})
+}
+
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListTrashRequest true "List trash request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListTrashResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/trash [get]
+func (s *Server) ListTrash(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListTrashRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// get trash directory
+	trash, err := s.FileStore.GetTrashByUserID(ctx, user.ID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	files, err := s.FileStore.ListCursor(ctx, trash.FullPath(), cursor)
+	if err != nil {
+		if errors.Is(err, file.ErrInvalidCursor) {
+			return s.error(c, apperror.ErrInvalidParam(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	for i := range files {
+		files[i] = *files[i].Response()
+	}
+
+	return s.success(c, model.ListTrashResponse{
+		Entries: files,
+		Cursor:  cursor.NextToken(),
 	})
 }
 
@@ -424,24 +519,10 @@ func (s *Server) CreateDirectory(c echo.Context) error {
 	}
 
 	if !canEdit {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to edit")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
-	dirpath := filepath.Join(parent.FullPath, req.Name) + string(filepath.Separator)
-	if err := s.FileService.CreateDirectory(ctx, dirpath); err != nil {
-		if errors.Is(err, file.ErrDirAlreadyExists) {
-			return s.error(c, apperror.ErrDirAlreadyExists(err))
-		}
-
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	entry, err := s.FileService.GetMetadata(ctx, dirpath)
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	f := entry.ToFile().WithID(uuid.New()).WithPath(parent.FullPath).WithOwnerID(user.ID)
+	f := file.NewDirectory(req.Name).WithID(uuid.New()).WithPath(parent.FullPath()).WithOwnerID(user.ID)
 	if err := s.FileStore.Create(ctx, f); err != nil {
 		if errors.Is(err, file.ErrDirAlreadyExists) {
 			return s.error(c, apperror.ErrDirAlreadyExists(err))
@@ -510,7 +591,7 @@ func (s *Server) Share(c echo.Context) error {
 	}
 
 	if !canEdit {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to edit")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
 	users, err := s.UserStore.ListByEmails(ctx, req.Emails)
@@ -575,7 +656,14 @@ func (s *Server) Access(c echo.Context) error {
 	var role string
 
 	switch e.GeneralAccess {
+	case "everyone-can-view":
+		role = "viewer"
+	case "everyone-can-edit":
+		role = "editor"
+
 	case "restricted":
+		fallthrough
+	default:
 		share, err := s.FileStore.GetShare(ctx, e.ID, user.ID)
 		if err != nil {
 			if errors.Is(err, file.ErrNotFound) {
@@ -586,11 +674,6 @@ func (s *Server) Access(c echo.Context) error {
 		}
 
 		role = share.Role
-
-	case "everyone-can-view":
-		role = "viewer"
-	case "everyone-can-edit":
-		role = "editor"
 	}
 
 	// clear permissions
@@ -671,7 +754,7 @@ func (s *Server) UpdateGeneralAccess(c echo.Context) error {
 	}
 
 	if !canEdit {
-		return s.error(c, apperror.ErrForbidden(errors.New("not permitted to edit")))
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
 	if err := s.FileStore.UpdateGeneralAccess(ctx, e.ID, req.GeneralAccess); err != nil {
@@ -681,15 +764,983 @@ func (s *Server) UpdateGeneralAccess(c echo.Context) error {
 	return s.success(c, nil)
 }
 
+// UpdateAccess godoc
+// @Summary UpdateAccess
+// @Description UpdateAccess
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.UpdateAccessRequest true "Update access request"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/access [patch]
+func (s *Server) UpdateAccess(c echo.Context) error {
+	var (
+		ctx     = app.NewEchoContextAdapter(c)
+		req     model.UpdateAccessRequest
+		isOwner bool
+		err     error
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	e, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if e.IsDir {
+		isOwner, err = s.PermissionService.IsDirectoryOwner(ctx, user.ID.String(), e.ID.String())
+	} else {
+		isOwner, err = s.PermissionService.IsFileOwner(ctx, user.ID.String(), e.ID.String())
+	}
+
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !isOwner {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	wp := workerpool.New(10)
+
+	for _, a := range req.Access {
+		wp.Submit(func() {
+			if a.UserID == user.ID.String() {
+				return
+			}
+
+			// clear permissions
+			if e.IsDir {
+				if err := s.PermissionService.ClearDirectoryPermissions(ctx, e.ID.String(), a.UserID); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			} else {
+				if err := s.PermissionService.ClearFilePermissions(ctx, e.ID.String(), a.UserID); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			// add permissions
+			if a.Role == "revoked" {
+				return
+			}
+
+			if err := s.PermissionService.CreatePermission(ctx, permission.NewCreatePermission(
+				a.UserID, e.ID.String(), e.IsDir, a.Role)); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+		})
+	}
+
+	wp.StopWait()
+
+	return s.success(c, nil)
+}
+
+// CopyFiles godoc
+// @Summary CopyFiles
+// @Description CopyFiles
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.CopyFilesRequest true "Copy files request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/copy [post]
+func (s *Server) CopyFiles(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.CopyFilesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// check if user has edit permission to the destination directory
+	dest, err := s.FileStore.GetByID(ctx, req.To)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), dest.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	files, err := s.FileStore.ListByIDs(ctx, req.IDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	totalSize := lo.Reduce(files, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	if totalSize+dest.Owner.StorageUsage > dest.Owner.StorageCapacity {
+		return s.error(c, apperror.ErrStorageCapacityExceeded())
+	}
+
+	var resp []file.File
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
+
+	for _, e := range files {
+		// copy directory is not allowed
+		if e.IsDir {
+			return s.error(c, apperror.ErrFileOnlyOperation())
+		}
+
+		// check if user has view permission to the file
+		canView, err := s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		if !canView {
+			return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+		}
+
+		// copy file
+		wp.Submit(func() {
+			src, _, err := s.FileService.DownloadFile(ctx, e.ID.String())
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+			defer src.Close()
+
+			newName := fmt.Sprintf("Copy of %s", e.Name)
+
+			f, err := s.createFile(ctx, dest, src, newName, user.ID)
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *f.Response())
+		})
+	}
+
+	wp.StopWait()
+
+	newStorageUsage := lo.Reduce(resp, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, dest.Owner.StorageUsage)
+
+	// update user storage usage
+	if err := s.UserStore.UpdateStorageUsage(ctx, dest.OwnerID, newStorageUsage); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, resp)
+
+}
+
+// Move godoc
+// @Summary Move
+// @Description Move
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.MoveRequest true "Move files request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/move [post]
+func (s *Server) Move(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.MoveRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// check if user has edit permission to the source directory
+	src, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), src.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	// check if user has edit permission to the destination directory
+	dest, err := s.FileStore.GetByID(ctx, req.To)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err = s.PermissionService.CanEditDirectory(ctx, user.ID.String(), dest.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	files, err := s.FileStore.ListSelectedChildren(ctx, src, req.SourceIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	totalSize := lo.Reduce(files, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	if totalSize+dest.Owner.StorageUsage > dest.Owner.StorageCapacity {
+		return s.error(c, apperror.ErrStorageCapacityExceeded())
+	}
+
+	var resp []file.File
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
+
+	for _, e := range files {
+		wp.Submit(func() {
+			dstPath := strings.Replace(e.Path, src.FullPath(), dest.FullPath(), 1)
+
+			if e.Path == src.FullPath() {
+				// update parent relationship
+				if e.IsDir {
+					err = s.PermissionService.UpdateDirectoryParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+				} else {
+					err = s.PermissionService.UpdateFileParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+				}
+
+				if err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			f := e.WithPath(dstPath)
+			if err := s.FileStore.UpdatePath(ctx, e.ID, dstPath); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *f.Response())
+		})
+	}
+
+	wp.StopWait()
+
+	if dest.OwnerID == src.OwnerID {
+		return s.success(c, resp)
+	}
+
+	totalSize = lo.Reduce(resp, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	// update user storage usage
+	if err := s.UserStore.UpdateStorageUsage(ctx, dest.OwnerID, dest.Owner.StorageUsage+totalSize); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if err := s.UserStore.UpdateStorageUsage(ctx, src.OwnerID, src.Owner.StorageUsage-totalSize); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, resp)
+}
+
+// Rename godoc
+// @Summary Rename
+// @Description Rename
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.RenameFileRequest true "Rename file request"
+// @Success 200 {object} model.SuccessResponse{data=file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/rename [patch]
+func (s *Server) Rename(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.RenameFileRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	e, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err := func() (bool, error) {
+		if e.IsDir {
+			return s.PermissionService.CanEditDirectory(ctx, user.ID.String(), e.ID.String())
+		}
+		return s.PermissionService.CanEditFile(ctx, user.ID.String(), e.ID.String())
+	}()
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	newPath := strings.Replace(e.Path, e.Name, req.Name, 1)
+
+	if err := s.FileStore.UpdateName(ctx, e.ID, req.Name); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	resp := *e.WithName(req.Name).WithPath(newPath).Response()
+
+	return s.success(c, resp)
+}
+
+// MoveToTrash godoc
+// @Summary MoveToTrash
+// @Description MoveToTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.MoveToTrashRequest true "Move to trash request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/move/trash [post]
+func (s *Server) MoveToTrash(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.MoveToTrashRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// check if user has edit permission to the source directory
+	src, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), src.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	// get trash directory
+	dest, err := s.FileStore.GetTrashByUserID(ctx, user.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err = s.PermissionService.CanEditDirectory(ctx, user.ID.String(), dest.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	files, err := s.FileStore.ListSelectedOwnedChildren(ctx, user.ID, src, req.SourceIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	totalSize := lo.Reduce(files, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	if totalSize+dest.Owner.StorageUsage > dest.Owner.StorageCapacity {
+		return s.error(c, apperror.ErrStorageCapacityExceeded())
+	}
+
+	var resp []file.File
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
+
+	for _, e := range files {
+		wp.Submit(func() {
+			dstPath := strings.Replace(e.Path, src.FullPath(), dest.FullPath(), 1)
+
+			if e.Path == src.FullPath() {
+				// update parent relationship
+				if e.IsDir {
+					err = s.PermissionService.UpdateDirectoryParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+				} else {
+					err = s.PermissionService.UpdateFileParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+				}
+
+				if err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			f := e.WithPath(dstPath)
+			if err := s.FileStore.MoveToTrash(ctx, e.ID, dstPath); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *f.Response())
+		})
+	}
+
+	wp.StopWait()
+
+	if dest.OwnerID == src.OwnerID {
+		return s.success(c, resp)
+	}
+
+	totalSize = lo.Reduce(resp, func(agg uint64, file file.File, index int) uint64 {
+		return agg + uint64(file.Size)
+	}, 0)
+
+	// update user storage usage
+	if err := s.UserStore.UpdateStorageUsage(ctx, dest.OwnerID, dest.Owner.StorageUsage+totalSize); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if err := s.UserStore.UpdateStorageUsage(ctx, src.OwnerID, src.Owner.StorageUsage-totalSize); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, resp)
+}
+
+// RestoreFromTrash godoc
+// @Summary RestoreFromTrash
+// @Description RestoreFromTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.RestoreFromTrashRequest true "Restore from trash request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/restore [post]
+func (s *Server) RestoreFromTrash(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.RestoreFromTrashRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// check if user has edit permission to the trash directory
+	src, err := s.FileStore.GetTrashByUserID(ctx, user.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), src.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	files, err := s.FileStore.ListSelected(ctx, src, req.SourceIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	var resp []file.File
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
+
+	for _, e := range files {
+		if e.PreviousPath == nil || *e.PreviousPath == "" {
+			continue
+		}
+
+		wp.Submit(func() {
+			dest, err := s.FileStore.GetByFullPath(ctx, *e.PreviousPath)
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			// check if user has edit permission to the destination directory
+			canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), dest.ID.String())
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			if !canEdit {
+				// if user has no edit permission to the destination directory, restore to root directory
+				dest, err = s.FileStore.GetByID(ctx, e.Owner.RootID.String())
+				if err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			dstPath := strings.Replace(e.Path, src.FullPath(), dest.FullPath(), 1)
+			path := e.Path
+
+			// update parent relationship
+			if e.IsDir {
+				err = s.PermissionService.UpdateDirectoryParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+			} else {
+				err = s.PermissionService.UpdateFileParent(ctx, e.ID.String(), dest.ID.String(), src.ID.String())
+			}
+
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			f := e.WithPath(dstPath)
+			if err := s.FileStore.RestoreFromTrash(ctx, e.ID, dstPath); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			totalSize := e.Size
+
+			if e.IsDir {
+				children, err := s.FileStore.RestoreChildrenFromTrash(ctx, path, dstPath)
+				if err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+
+				totalSize = lo.Reduce(children, func(agg uint64, file file.File, index int) uint64 {
+					return agg + uint64(file.Size)
+				}, totalSize)
+			}
+
+			if dest.OwnerID == src.OwnerID {
+				return
+			}
+
+			// update user storage usage
+			if err := s.UserStore.UpdateStorageUsage(ctx, dest.OwnerID, dest.Owner.StorageUsage+totalSize); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			if err := s.UserStore.UpdateStorageUsage(ctx, src.OwnerID, src.Owner.StorageUsage-totalSize); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *f.Response())
+		})
+	}
+
+	wp.StopWait()
+
+	return s.success(c, resp)
+}
+
+// Delete godoc
+// @Summary Delete
+// @Description Delete
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.DeleteRequest true "Delete files request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/delete [post]
+func (s *Server) Delete(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.DeleteRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	files, err := s.FileStore.ListByIDs(ctx, req.SourceIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	var (
+		resp      []file.File
+		totalSize uint64
+	)
+
+	wp := workerpool.New(10)
+	var m sync.Mutex
+
+	for _, e := range files {
+		wp.Submit(func() {
+			// check if user can delete the file
+			var (
+				canDelete bool
+				err       error
+			)
+
+			if e.IsDir {
+				canDelete, err = s.PermissionService.CanDeleteDirectory(ctx, user.ID.String(), e.ID.String())
+			} else {
+				canDelete, err = s.PermissionService.CanDeleteFile(ctx, user.ID.String(), e.ID.String())
+			}
+
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			if !canDelete {
+				s.Logger.Errorw(permission.ErrNotPermittedToDelete.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			if err := s.FileService.Delete(ctx, e.ID.String()); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			files, err := s.FileStore.Delete(ctx, e)
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
+			// delete file permissions
+			if e.IsDir {
+				if err := s.PermissionService.DeleteDirectoryPermissions(ctx, e.ID.String()); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+
+				for _, f := range files {
+					totalSize += uint64(f.Size)
+
+					if f.IsDir {
+						if err := s.PermissionService.DeleteDirectoryPermissions(ctx, f.ID.String()); err != nil {
+							s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+							return
+						}
+
+						return
+					}
+
+					if err := s.PermissionService.DeleteFilePermissions(ctx, f.ID.String()); err != nil {
+						s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+						return
+					}
+				}
+			} else {
+				totalSize = uint64(e.Size)
+
+				if err := s.PermissionService.DeleteFilePermissions(ctx, e.ID.String()); err != nil {
+					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+			}
+
+			m.Lock()
+			defer m.Unlock()
+			resp = append(resp, *e.Response())
+		})
+	}
+
+	// update user storage usage
+	if totalSize > 0 {
+		if err := s.UserStore.UpdateStorageUsage(ctx, files[0].Owner.ID, files[0].Owner.StorageUsage-totalSize); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	wp.StopWait()
+
+	return s.success(c, resp)
+}
+
+// GetShared godoc
+// @Summary GetShared
+// @Description GetShared
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/share [get]
+func (s *Server) GetShared(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	g, _ := errgroup.WithContext(ctx)
+	var (
+		m       sync.Mutex
+		fileIDs []string
+	)
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "Directory", "editors")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (d-e): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "Directory", "viewers")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (d-v): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "File", "editors")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (f-e): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "File", "viewers")
+		if err != nil {
+			return fmt.Errorf("get shared permissions (f-v): %w", err)
+		}
+
+		m.Lock()
+		defer m.Unlock()
+		fileIDs = append(fileIDs, ids...)
+
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	files, err := s.FileStore.ListByIDs(ctx, fileIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, files)
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
-	router.POST("/directories", s.CreateDirectory)
+	router.GET("/trash", s.ListTrash)
+	router.GET("/share", s.GetShared)
 	router.POST("/share", s.Share) // share file or directory with some users
+	router.POST("/directories", s.CreateDirectory)
+	router.POST("/copy", s.CopyFiles)
+	router.POST("/move", s.Move)
+	router.PATCH("/rename", s.Rename)
+	router.POST("/move/trash", s.MoveToTrash)
+	router.POST("/restore", s.RestoreFromTrash)
+	router.POST("/delete", s.Delete)
 	router.POST("", s.UploadFiles)
+	router.PATCH("/general-access", s.UpdateGeneralAccess)
+	router.PATCH("/access", s.UpdateAccess)
 	router.GET("/:id", s.ListEntries)
 	router.GET("/:id/page", s.ListPageEntries)
 	router.GET("/:id/metadata", s.GetMetadata)
 	router.GET("/:id/download", s.Download)
 	router.GET("/:id/access", s.Access) // get access to the shared file or directory
-	router.PATCH("/general-access", s.UpdateGeneralAccess)
+}
+
+func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID) (*file.File, error) {
+	id := uuid.New()
+
+	contentType, src, err := app.DetectContentType(reader)
+	if err != nil {
+		return nil, fmt.Errorf("detect content type: %w", err)
+	}
+
+	_, err = s.FileService.CreateFile(ctx, src, id.String(), contentType)
+	if err != nil {
+		return nil, fmt.Errorf("upload file: %w", err)
+	}
+
+	entry, err := s.FileService.GetMetadata(ctx, id.String())
+	if err != nil {
+		return nil, fmt.Errorf("get metadata: %w", err)
+	}
+
+	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID)
+	if err := s.FileStore.Create(ctx, f); err != nil {
+		return nil, fmt.Errorf("create file: %w", err)
+	}
+
+	// create file permissions
+	if err := s.PermissionService.CreateFilePermissions(ctx, ownerID.String(), f.ID.String(), parent.ID.String()); err != nil {
+		return nil, fmt.Errorf("create file permissions: %w", err)
+	}
+
+	return f, nil
 }

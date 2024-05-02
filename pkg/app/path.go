@@ -7,11 +7,20 @@ import (
 )
 
 func GetIdentityDirPath(identityID string) string {
-	return fmt.Sprintf("/%s/", identityID)
+	return fmt.Sprintf("/%s", identityID)
 }
 
 func GetFullRoot(path string, id string) string {
 	return filepath.Join(string(filepath.Separator), id, path) + string(filepath.Separator)
+}
+
+func GetRootPath(path string) string {
+	entryPath := strings.Split(path, "/")
+	if len(entryPath) < 3 {
+		return "/"
+	}
+
+	return "/" + entryPath[1] + "/"
 }
 
 // remove the root path from the full path

@@ -2,14 +2,14 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/pkg/config"
-	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/seaweedfs"
-	"github.com/pkg/errors"
 )
 
 type FileService struct {
@@ -35,8 +35,8 @@ func NewFileService(cfg *config.Config) *FileService {
 	}
 }
 
-func (s *FileService) GetMetadata(ctx context.Context, fullPath string) (*file.Entry, error) {
-	resp, err := s.filer.GetMetadata(ctx, &seaweedfs.GetMetadataRequest{FullPath: fullPath})
+func (s *FileService) GetMetadata(ctx context.Context, id string) (*file.Entry, error) {
+	resp, err := s.filer.GetMetadata(ctx, &seaweedfs.GetMetadataRequest{FullPath: filepath.Join("/", id)})
 	if err != nil {
 		if errors.Is(err, seaweedfs.ErrNotFound) {
 			return nil, file.ErrNotFound
@@ -50,8 +50,8 @@ func (s *FileService) GetMetadata(ctx context.Context, fullPath string) (*file.E
 	return &entry, nil
 }
 
-func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.ReadCloser, string, error) {
-	entry, err := s.GetMetadata(ctx, filePath)
+func (s *FileService) DownloadFile(ctx context.Context, id string) (io.ReadCloser, string, error) {
+	entry, err := s.GetMetadata(ctx, id)
 	if err != nil {
 		return nil, "", fmt.Errorf("get metadata: %w", err)
 	}
@@ -60,7 +60,7 @@ func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.Rea
 		return nil, "", file.ErrNotFound
 	}
 
-	rc, err := s.filer.DownloadFile(ctx, &seaweedfs.DownloadFileRequest{FullPath: filePath})
+	rc, err := s.filer.DownloadFile(ctx, &seaweedfs.DownloadFileRequest{FullPath: filepath.Join("/", id)})
 	if err != nil {
 		return nil, "", fmt.Errorf("download file: %w", err)
 	}
@@ -68,10 +68,11 @@ func (s *FileService) DownloadFile(ctx context.Context, filePath string) (io.Rea
 	return rc, entry.MimeType, nil
 }
 
-func (s *FileService) CreateFile(ctx context.Context, content io.Reader, fullName string) (int64, error) {
+func (s *FileService) CreateFile(ctx context.Context, content io.Reader, id string, contentType string) (int64, error) {
 	result, err := s.filer.UploadFile(ctx, &seaweedfs.UploadFileRequest{
 		Content:      content,
-		FullFileName: fullName,
+		FullFileName: filepath.Join("/", id),
+		ContentType:  contentType,
 	})
 	if err != nil {
 		return 0, err
@@ -80,67 +81,13 @@ func (s *FileService) CreateFile(ctx context.Context, content io.Reader, fullNam
 	return result.Size, nil
 }
 
-func (s *FileService) ListEntries(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]file.Entry, error) {
-	// parse cursor
-	cursorObj, err := pagination.DecodeToken[swCursor](cursor.Token)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
-	}
-
-	resp, err := s.filer.ListEntries(ctx, &seaweedfs.ListEntriesRequest{
-		DirPath:      dirpath,
-		Limit:        cursor.Limit,
-		LastFileName: cursorObj.LastFileName,
-	})
-	if err != nil {
-		if errors.Is(err, seaweedfs.ErrNotFound) {
-			return nil, file.ErrNotFound
-		}
-
-		return nil, fmt.Errorf("list entries: %w", err)
-	}
-
-	if resp.ShouldDisplayLoadMore {
-		cursor.SetNextToken(pagination.EncodeToken(swCursor{LastFileName: resp.LastFileName}))
-	}
-
-	return mapEntries(resp), nil
-}
-
-func (s *FileService) CreateDirectory(ctx context.Context, dirpath string) error {
-	err := s.filer.CreateDirectory(ctx, &seaweedfs.CreateDirectoryRequest{DirPath: dirpath})
-	if err != nil {
-		if errors.Is(err, seaweedfs.ErrDirAlreadyExists) {
-			return file.ErrDirAlreadyExists
-		}
-
-		return fmt.Errorf("create directory: %w", err)
-	}
-
-	return nil
-}
-
-func (s *FileService) Delete(ctx context.Context, fullPath string) error {
-	err := s.filer.Delete(ctx, &seaweedfs.DeleteRequest{FullPath: fullPath})
+func (s *FileService) Delete(ctx context.Context, id string) error {
+	err := s.filer.Delete(ctx, &seaweedfs.DeleteRequest{FullPath: filepath.Join("/", id)})
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
 
 	return nil
-}
-
-func (s *FileService) GetDirectorySize(ctx context.Context, dirpath string) (uint64, error) {
-	size, err := s.filer.GetDirectorySize(ctx,
-		&seaweedfs.GetDirectorySizeRequest{DirPath: dirpath})
-	if err != nil {
-		if errors.Is(err, seaweedfs.ErrNotFound) {
-			return 0, file.ErrNotFound
-		}
-
-		return 0, fmt.Errorf("get directory size: %w", err)
-	}
-
-	return size, nil
 }
 
 func (s *FileService) DirStatus(ctx context.Context) (map[string]interface{}, error) {
@@ -149,19 +96,6 @@ func (s *FileService) DirStatus(ctx context.Context) (map[string]interface{}, er
 
 func (s *FileService) VolStatus(ctx context.Context) (map[string]interface{}, error) {
 	return s.sw.Master().VolStatus(ctx)
-}
-
-func mapEntries(resp *seaweedfs.ListEntriesResponse) []file.Entry {
-	entries := make([]file.Entry, 0, len(resp.Entries))
-	for _, entry := range resp.Entries {
-		entries = append(entries, mapToEntry(&entry))
-	}
-
-	return entries
-}
-
-type swCursor struct {
-	LastFileName string `json:"lastFileName"`
 }
 
 func mapToEntry(entry *seaweedfs.Entry) file.Entry {

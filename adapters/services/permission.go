@@ -85,6 +85,69 @@ func (s *PermissionService) CreatePermission(ctx context.Context, in *permission
 	return nil
 }
 
+func (s *PermissionService) GetDirectoryUsers(ctx context.Context, fileID string) ([]permission.FileUser, error) {
+	var (
+		fileUsers []permission.FileUser
+		first     = true
+		cursor    string
+	)
+
+	for first || len(cursor) > 0 {
+		result, _, err := s.readClient.RelationshipApi.GetRelationships(ctx).PageSize(100).PageToken(cursor).
+			Namespace("Directory").Object(fileID).Execute()
+		if err != nil {
+			if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+				return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+			}
+
+			return nil, fmt.Errorf("unexpected error: %w", err)
+		}
+
+		for _, relationship := range result.RelationTuples {
+			if role, ok := permission.RelationshipRoleMap[relationship.Relation]; ok {
+				fileUsers = append(fileUsers, permission.FileUser{
+					UserID: *relationship.SubjectId,
+					Role:   role,
+				})
+			}
+		}
+
+		cursor = *result.NextPageToken
+		first = false
+	}
+
+	return fileUsers, nil
+}
+
+func (s *PermissionService) GetSharedPermissions(ctx context.Context, userID string, namespace string, relation string) ([]string, error) {
+	var (
+		sharedIDs []string
+		first     = true
+		cursor    string
+	)
+
+	for first || len(cursor) > 0 {
+		result, _, err := s.readClient.RelationshipApi.GetRelationships(ctx).PageSize(100).PageToken(cursor).
+			Namespace(namespace).SubjectId(userID).Relation(relation).Execute()
+		if err != nil {
+			if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+				return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+			}
+
+			return nil, fmt.Errorf("unexpected error: %w", err)
+		}
+
+		for _, relationship := range result.RelationTuples {
+			sharedIDs = append(sharedIDs, relationship.Object)
+		}
+
+		cursor = *result.NextPageToken
+		first = false
+	}
+
+	return sharedIDs, nil
+}
+
 func (s *PermissionService) CreateDirectoryPermissions(ctx context.Context, userID string, fileID string, parentID string) error {
 	relationshipPatch := []keto.RelationshipPatch{
 		{
@@ -166,9 +229,85 @@ func (s *PermissionService) CanViewDirectory(ctx context.Context, userID string,
 	return result.Allowed, nil
 }
 
+func (s *PermissionService) CanDeleteDirectory(ctx context.Context, userID string, fileID string) (bool, error) {
+	result, _, err := s.readClient.PermissionApi.CheckPermission(ctx).
+		Namespace("Directory").Object(fileID).SubjectId(userID).Relation("delete").
+		Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return false, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return false, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return result.Allowed, nil
+}
+
+func (s *PermissionService) IsDirectoryOwner(ctx context.Context, userID string, fileID string) (bool, error) {
+	result, _, err := s.readClient.PermissionApi.CheckPermission(ctx).
+		Namespace("Directory").Object(fileID).SubjectId(userID).Relation("owners").
+		Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return false, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return false, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return result.Allowed, nil
+}
+
 func (s *PermissionService) ClearDirectoryPermissions(ctx context.Context, fileID string, userID string) error {
 	_, err := s.writeClient.RelationshipApi.DeleteRelationships(ctx).
 		Namespace("Directory").Object(fileID).SubjectId(userID).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *PermissionService) UpdateDirectoryParent(ctx context.Context, fileID string, parentID string, oldParentID string) error {
+	_, err := s.writeClient.RelationshipApi.PatchRelationships(ctx).
+		RelationshipPatch([]keto.RelationshipPatch{
+			{
+				Action: keto.PtrString("delete"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "Directory",
+					Object:    fileID,
+					SubjectId: keto.PtrString(oldParentID),
+					Relation:  "parents",
+				},
+			},
+			{
+				Action: keto.PtrString("insert"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "Directory",
+					Object:    fileID,
+					SubjectId: keto.PtrString(parentID),
+					Relation:  "parents",
+				},
+			},
+		}).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *PermissionService) DeleteDirectoryPermissions(ctx context.Context, fileID string) error {
+	_, err := s.writeClient.RelationshipApi.DeleteRelationships(ctx).Namespace("Directory").Object(fileID).Execute()
 	if err != nil {
 		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
 			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
@@ -257,6 +396,36 @@ func (s *PermissionService) CanViewFile(ctx context.Context, userID string, file
 	return result.Allowed, nil
 }
 
+func (s *PermissionService) CanDeleteFile(ctx context.Context, userID string, fileID string) (bool, error) {
+	result, _, err := s.readClient.PermissionApi.CheckPermission(ctx).
+		Namespace("File").Object(fileID).SubjectId(userID).Relation("delete").
+		Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return false, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return false, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return result.Allowed, nil
+}
+
+func (s *PermissionService) IsFileOwner(ctx context.Context, userID string, fileID string) (bool, error) {
+	result, _, err := s.readClient.PermissionApi.CheckPermission(ctx).
+		Namespace("File").Object(fileID).SubjectId(userID).Relation("owners").
+		Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return false, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return false, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return result.Allowed, nil
+}
+
 func (s *PermissionService) ClearFilePermissions(ctx context.Context, fileID string, userID string) error {
 	_, err := s.writeClient.RelationshipApi.DeleteRelationships(ctx).
 		Namespace("File").Object(fileID).SubjectId(userID).Execute()
@@ -269,6 +438,86 @@ func (s *PermissionService) ClearFilePermissions(ctx context.Context, fileID str
 	}
 
 	return nil
+}
+
+func (s *PermissionService) UpdateFileParent(ctx context.Context, fileID string, parentID string, oldParentID string) error {
+	_, err := s.writeClient.RelationshipApi.PatchRelationships(ctx).
+		RelationshipPatch([]keto.RelationshipPatch{
+			{
+				Action: keto.PtrString("delete"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "File",
+					Object:    fileID,
+					SubjectId: keto.PtrString(oldParentID),
+					Relation:  "parents",
+				},
+			},
+			{
+				Action: keto.PtrString("insert"),
+				RelationTuple: &keto.Relationship{
+					Namespace: "File",
+					Object:    fileID,
+					SubjectId: keto.PtrString(parentID),
+					Relation:  "parents",
+				},
+			},
+		}).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *PermissionService) DeleteFilePermissions(ctx context.Context, fileID string) error {
+	_, err := s.writeClient.RelationshipApi.DeleteRelationships(ctx).Namespace("File").Object(fileID).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *PermissionService) GetFileUsers(ctx context.Context, fileID string) ([]permission.FileUser, error) {
+	var (
+		fileUsers []permission.FileUser
+		first     = true
+		cursor    string
+	)
+
+	for first || len(cursor) > 0 {
+		result, _, err := s.readClient.RelationshipApi.GetRelationships(ctx).PageSize(100).PageToken(cursor).
+			Namespace("File").Object(fileID).Execute()
+		if err != nil {
+			if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+				return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+			}
+
+			return nil, fmt.Errorf("unexpected error: %w", err)
+		}
+
+		for _, relationship := range result.RelationTuples {
+			if role, ok := permission.RelationshipRoleMap[relationship.Relation]; ok {
+				fileUsers = append(fileUsers, permission.FileUser{
+					UserID: *relationship.SubjectId,
+					Role:   role,
+				})
+			}
+		}
+
+		cursor = *result.NextPageToken
+		first = false
+	}
+
+	return fileUsers, nil
 }
 
 func assertKetoError[T any](err error) (*keto.GenericOpenAPIError, *T) {
