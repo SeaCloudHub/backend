@@ -8,6 +8,7 @@ on:
       - database
       - seed-admin
       - migrate
+      - thumbnail
 
 env:
   IMAGE_NAME: seacloudserver/app
