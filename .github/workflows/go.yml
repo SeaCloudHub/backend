@@ -193,8 +193,8 @@ jobs:
             
             # Check if the container exists
             if docker ps -a --format '{{.Names}}' | grep -Eq "^thumbnail"; then
-              docker stop migrate
-              docker rm migrate
+              docker stop thumbnail
+              docker rm thumbnail
             fi
             
             docker run -d --name thumbnail --env-file ~/.env ghcr.io/$repository_lowercase/thumbnail
