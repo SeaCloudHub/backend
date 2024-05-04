@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -273,6 +274,19 @@ func (s *Server) UploadFiles(c echo.Context) error {
 
 	// update user storage usage
 	if err := s.UserStore.UpdateStorageUsage(ctx, e.OwnerID, newStorageUsage); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	payload := lo.Map(resp, func(f file.File, index int) map[string]string {
+		return map[string]string{"id": f.ID.String(), "mime": f.MimeType}
+	})
+
+	message, err := json.Marshal(payload)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if err := s.PubSubService.Publish(ctx, "thumbnails", string(message)); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 

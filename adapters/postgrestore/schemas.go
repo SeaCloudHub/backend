@@ -61,6 +61,7 @@ type FileSchema struct {
 	Mode          uint32     `gorm:"column:mode"`
 	MimeType      string     `gorm:"column:mime_type"`
 	Type          string     `gorm:"column:type;->"`
+	Thumbnail     *string    `gorm:"column:thumbnail"`
 	MD5           string     `gorm:"column:md5"`
 	IsDir         bool       `gorm:"column:is_dir"`
 	GeneralAccess string     `gorm:"column:general_access"`
@@ -97,6 +98,7 @@ func (s *FileSchema) ToDomainFile() *file.File {
 		Mode:          os.FileMode(s.Mode),
 		MimeType:      s.MimeType,
 		Type:          s.Type,
+		Thumbnail:     s.Thumbnail,
 		MD5:           md5,
 		IsDir:         s.IsDir,
 		GeneralAccess: s.GeneralAccess,

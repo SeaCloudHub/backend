@@ -153,6 +153,52 @@ jobs:
             docker run -d --name migrate --env-file ~/.env ghcr.io/$repository_lowercase/migrate
             rm ~/.env
 
+  thumbnail:
+    if: github.ref == 'refs/heads/thumbnail'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker build and push
+        run: |
+          repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$repository_lowercase/thumbnail -f cmd/thumbnail/Dockerfile .
+          docker push ghcr.io/$repository_lowercase/thumbnail
+
+      - name: Thumbnail Deployment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            repository_lowercase=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            echo "${{ secrets.ENV_FILE }}" >> .env
+            scp .env ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker pull ghcr.io/$repository_lowercase/thumbnail
+            
+            # Check if the container exists
+            if docker ps -a --format '{{.Names}}' | grep -Eq "^thumbnail"; then
+              docker stop migrate
+              docker rm migrate
+            fi
+            
+            docker run -d --name thumbnail --env-file ~/.env ghcr.io/$repository_lowercase/thumbnail
+            rm ~/.env
+
   make_app:
     if: github.ref == 'refs/heads/github-workflow' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
