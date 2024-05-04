@@ -125,6 +125,13 @@ services:
     networks:
       - seacloudserver
 
+  redis:
+    image: redis:7.2-alpine3.19
+    ports:
+      - 6379:6379
+    networks:
+      - seacloudserver
+
   appdb:
     image: postgres:15-alpine3.18
     environment:
