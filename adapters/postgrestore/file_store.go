@@ -82,7 +82,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 	return files, nil
 }
 
-func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]file.File, error) {
+func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
 	// parse cursor
@@ -94,6 +94,14 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 	query := s.db.WithContext(ctx).Where("path = ?", dirpath).Where("name != ?", ".trash")
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
 	}
 
 	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").

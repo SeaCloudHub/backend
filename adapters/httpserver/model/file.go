@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"time"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/permission"
@@ -40,9 +41,11 @@ func (r *UploadFilesRequest) Validate(ctx context.Context) error {
 }
 
 type ListEntriesRequest struct {
-	ID     string `param:"id" validate:"required,uuid" swaggerignore:"true"`
-	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
-	Cursor string `query:"cursor" validate:"omitempty,base64url"`
+	ID     string     `param:"id" validate:"required,uuid" swaggerignore:"true"`
+	Limit  int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string     `query:"cursor" validate:"omitempty,base64url"`
+	Type   string     `query:"type" validate:"omitempty,oneof=folder text document pdf json image video audio archive other"`
+	After  *time.Time `query:"after" validate:"omitempty"`
 }
 
 func (r *ListEntriesRequest) Validate(ctx context.Context) error {
@@ -101,7 +104,7 @@ type ListPageEntriesResponse struct {
 
 type CreateDirectoryRequest struct {
 	ID   string `json:"id" validate:"required,uuid"`
-	Name string `json:"name" validate:"required,max=255"`
+	Name string `json:"name" validate:"required,max=255,ne=.trash"`
 } // @name model.CreateDirectoryRequest
 
 func (r *CreateDirectoryRequest) Validate(ctx context.Context) error {

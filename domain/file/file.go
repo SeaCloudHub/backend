@@ -15,7 +15,7 @@ import (
 type Store interface {
 	Create(ctx context.Context, file *File) error
 	ListPager(ctx context.Context, dirpath string, pager *pagination.Pager) ([]File, error)
-	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]File, error)
+	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
 	GetRootDirectory(ctx context.Context) (*File, error)
@@ -145,3 +145,15 @@ type Stars struct {
 	UserID    uuid.UUID `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 } // @name file.Stars
+
+type Filter struct {
+	Type  string
+	After *time.Time
+}
+
+func NewFilter(_type string, after *time.Time) Filter {
+	return Filter{
+		Type:  _type,
+		After: after,
+	}
+}
