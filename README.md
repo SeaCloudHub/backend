@@ -32,7 +32,13 @@
    make run
    ```
 
-7. Unit test
+7. Run the thumbnail service
+
+   ```shell
+   make thumbnail
+   ```
+
+8. Unit test
    ```shell
    make test
    ```

@@ -26,5 +26,8 @@ migrate:
 seed:
 	go run ./cmd/seed/main.go
 
+thumbnail:
+	go run ./cmd/thumbnail/main.go
+
 swagger:
 	swag init -g cmd/httpserver/main.go --parseDependency --parseInternal --parseDepth 2

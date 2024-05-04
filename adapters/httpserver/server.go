@@ -15,6 +15,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/permission"
+	"github.com/SeaCloudHub/backend/domain/pubsub"
 	"github.com/SeaCloudHub/backend/internal"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/SeaCloudHub/backend/pkg/sentry"
@@ -38,6 +39,9 @@ type Server struct {
 	// storage adapters
 	UserStore identity.Store
 	FileStore file.Store
+
+	// cache and stream adapters
+	PubSubService pubsub.Service
 
 	// services
 	FileService       file.Service

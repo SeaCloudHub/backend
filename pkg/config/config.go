@@ -39,6 +39,12 @@ type Config struct {
 		ReadURL  string `envconfig:"KETO_READ_URL"`
 		WriteURL string `envconfig:"KETO_WRITE_URL"`
 	}
+
+	Redis struct {
+		Addr     string `envconfig:"REDIS_ADDR"`
+		Password string `envconfig:"REDIS_PASSWORD"`
+		DB       int    `envconfig:"REDIS_DB"`
+	}
 }
 
 func LoadConfig() (*Config, error) {

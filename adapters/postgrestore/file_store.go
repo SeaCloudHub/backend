@@ -382,6 +382,17 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 	})
 }
 
+func (s *FileStore) UpdateThumbnail(ctx context.Context, fileID uuid.UUID, thumbnail string) error {
+	if err := s.db.WithContext(ctx).
+		Model(&FileSchema{}).
+		Where("id = ?", fileID).
+		Update("thumbnail", thumbnail).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 func (s *FileStore) MoveToTrash(ctx context.Context, fileID uuid.UUID, path string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).

@@ -114,6 +114,7 @@ func (s *Server) Logout(c echo.Context) error {
 // @Failure 401 {object} model.ErrorResponse
 // @Router /users/me [get]
 func (s *Server) Me(c echo.Context) error {
+	s.PubSubService.Publish(c.Request().Context(), "test", "test2222")
 	return s.success(c, c.Get(ContextKeyUser))
 }
 
