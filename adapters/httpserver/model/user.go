@@ -55,3 +55,11 @@ type ChangeUserStorageCapacityRequest struct {
 func (r *ChangeUserStorageCapacityRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
+
+type SuggestRequest struct {
+	Query string `query:"query" validate:"required,min=2"`
+} // @name model.SuggestRequest
+
+func (r *SuggestRequest) Validate() error {
+	return validation.Validate().Struct(r)
+}
