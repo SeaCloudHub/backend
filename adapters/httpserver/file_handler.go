@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -273,6 +274,19 @@ func (s *Server) UploadFiles(c echo.Context) error {
 
 	// update user storage usage
 	if err := s.UserStore.UpdateStorageUsage(ctx, e.OwnerID, newStorageUsage); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	payload := lo.Map(resp, func(f file.File, index int) map[string]string {
+		return map[string]string{"id": f.ID.String(), "mime": f.MimeType}
+	})
+
+	message, err := json.Marshal(payload)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if err := s.PubSubService.Publish(ctx, "thumbnails", string(message)); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
@@ -1692,6 +1706,128 @@ func (s *Server) GetShared(c echo.Context) error {
 	return s.success(c, files)
 }
 
+// Star godoc
+// @Summary Star
+// @Description Star
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
+// @Param id path string true "File ID"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/{id}/star [patch]
+func (s *Server) Star(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		id  = c.Param("id")
+	)
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	e, err := s.FileStore.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canView, err := func() (bool, error) {
+		if e.IsDir {
+			return s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
+		}
+		return s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
+	}()
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+	}
+
+	if err := s.FileStore.Star(ctx, e.ID, user.ID); err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, nil)
+}
+
+// Unstar godoc
+// @Summary Unstar
+// @Description Unstar
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
+// @Param id path string true "File ID"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/{id}/unstar [patch]
+func (s *Server) Unstar(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		id  = c.Param("id")
+	)
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+	fileId, err := uuid.Parse(id)
+	if err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	if err := s.FileStore.Unstar(ctx, fileId, user.ID); err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, nil)
+}
+
+// ListStarred godoc
+// @Summary ListStarred
+// @Description ListStarred
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/starred [get]
+func (s *Server) ListStarred(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	files, err := s.FileStore.ListStarred(ctx, user.ID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, files)
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/trash", s.ListTrash)
@@ -1712,6 +1848,9 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/:id/metadata", s.GetMetadata)
 	router.GET("/:id/download", s.Download)
 	router.GET("/:id/access", s.Access) // get access to the shared file or directory
+	router.PATCH("/:id/star", s.Star)
+	router.PATCH("/:id/unstar", s.Unstar)
+	router.GET("/starred", s.ListStarred)
 }
 
 func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID) (*file.File, error) {

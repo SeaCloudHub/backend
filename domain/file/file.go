@@ -28,6 +28,7 @@ type Store interface {
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
 	UpdatePath(ctx context.Context, fileID uuid.UUID, path string) error
 	UpdateName(ctx context.Context, fileID uuid.UUID, name string) error
+	UpdateThumbnail(ctx context.Context, fileID uuid.UUID, thumbnail string) error
 	MoveToTrash(ctx context.Context, fileID uuid.UUID, path string) error
 	RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path string) error
 	RestoreChildrenFromTrash(ctx context.Context, parentPath, newPath string) ([]File, error)
@@ -35,6 +36,9 @@ type Store interface {
 	UpsertShare(ctx context.Context, fileID uuid.UUID, userIDs []uuid.UUID, role string) error
 	GetShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (*Share, error)
 	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
+	Star(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
+	Unstar(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
+	ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error)
 }
 
 type File struct {
@@ -47,6 +51,7 @@ type File struct {
 	Mode          os.FileMode `json:"mode"`
 	MimeType      string      `json:"mime_type"`
 	Type          string      `json:"type"`
+	Thumbnail     *string     `json:"thumbnail"`
 	MD5           []byte      `json:"md5"`
 	IsDir         bool        `json:"is_dir"`
 	GeneralAccess string      `json:"general_access"`
@@ -133,3 +138,9 @@ type Share struct {
 	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 } // @name file.Share
+
+type Stars struct {
+	FileID    uuid.UUID `json:"file_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+} // @name file.Stars
