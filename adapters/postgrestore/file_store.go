@@ -573,6 +573,23 @@ func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID) ([]file.F
 
 }
 
+func (s *FileStore) GetAllFiles(ctx context.Context) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("is_dir = ?", false).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
 type fsCursor struct {
 	CreatedAt *time.Time
 }

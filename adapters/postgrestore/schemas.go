@@ -27,6 +27,7 @@ type UserSchema struct {
 	CreatedAt         time.Time  `gorm:"column:created_at"`
 	UpdatedAt         time.Time  `gorm:"column:updated_at"`
 	DeletedAt         *time.Time `gorm:"column:deleted_at"`
+	BlockedAt         *time.Time `gorm:"column:blocked_at"`
 }
 
 func (UserSchema) TableName() string {
@@ -49,6 +50,8 @@ func (s *UserSchema) ToDomainUser() *identity.User {
 		StorageCapacity:   s.StorageCapacity,
 		CreatedAt:         s.CreatedAt,
 		UpdatedAt:         s.UpdatedAt,
+		DeletedAt:         s.DeletedAt,
+		BlockedAt:         s.BlockedAt,
 	}
 }
 
