@@ -15,7 +15,8 @@ import (
 type Store interface {
 	Create(ctx context.Context, file *File) error
 	ListPager(ctx context.Context, dirpath string, pager *pagination.Pager) ([]File, error)
-	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]File, error)
+	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter Filter) ([]File, error)
+	Search(ctx context.Context, query string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
 	GetRootDirectory(ctx context.Context) (*File, error)
@@ -60,7 +61,8 @@ type File struct {
 	CreatedAt     time.Time   `json:"created_at"`
 	UpdatedAt     time.Time   `json:"updated_at"`
 
-	Owner *identity.User `json:"owner,omitempty"`
+	Owner  *identity.User `json:"owner,omitempty"`
+	Parent *SimpleFile    `json:"parent,omitempty"`
 } // @name file.File
 
 func NewDirectory(name string) *File {
@@ -133,6 +135,10 @@ type SimpleFile struct {
 	Path string    `json:"path"`
 } // @name file.SimpleFile
 
+func (f *SimpleFile) FullPath() string {
+	return filepath.Join(f.Path, f.Name)
+}
+
 type Share struct {
 	FileID    uuid.UUID `json:"file_id"`
 	UserID    uuid.UUID `json:"user_id"`
@@ -145,3 +151,15 @@ type Stars struct {
 	UserID    uuid.UUID `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 } // @name file.Stars
+
+type Filter struct {
+	Type  string
+	After *time.Time
+}
+
+func NewFilter(_type string, after *time.Time) Filter {
+	return Filter{
+		Type:  _type,
+		After: after,
+	}
+}

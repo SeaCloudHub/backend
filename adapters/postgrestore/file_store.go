@@ -82,7 +82,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 	return files, nil
 }
 
-func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]file.File, error) {
+func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
 	// parse cursor
@@ -96,7 +96,59 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Where("name != ?", ".trash")
+	if len(q) > 0 {
+		query = query.Order(fmt.Sprintf("similarity(name, '%s') DESC", q))
+	}
+
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}

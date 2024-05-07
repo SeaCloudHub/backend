@@ -346,7 +346,9 @@ func (s *Server) ListEntries(c echo.Context) error {
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, e.FullPath(), cursor)
+	filter := file.NewFilter(req.Type, req.After)
+
+	files, err := s.FileStore.ListCursor(ctx, e.FullPath(), cursor, filter)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -469,7 +471,7 @@ func (s *Server) ListTrash(c echo.Context) error {
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, trash.FullPath(), cursor)
+	files, err := s.FileStore.ListCursor(ctx, trash.FullPath(), cursor, file.Filter{})
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -1828,10 +1830,65 @@ func (s *Server) ListStarred(c echo.Context) error {
 	return s.success(c, files)
 }
 
+// Search godoc
+// @Summary Search
+// @Description Search
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.SearchRequest true "Search request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/search [get]
+func (s *Server) Search(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.SearchRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After)
+
+	files, err := s.FileStore.Search(ctx, req.Query, cursor, filter)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	fullPaths := lo.Map(files, func(file file.File, index int) string {
+		return file.Path
+	})
+
+	parents, err := s.FileStore.ListByFullPaths(ctx, fullPaths)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	entries := s.MapperService.FileWithParents(files, parents)
+
+	return s.success(c, model.SearchResponse{
+		Entries: entries,
+		Cursor:  cursor.NextToken(),
+	})
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/trash", s.ListTrash)
 	router.GET("/share", s.GetShared)
+	router.GET("/search", s.Search)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/directories", s.CreateDirectory)
 	router.POST("/copy", s.CopyFiles)

@@ -170,6 +170,25 @@ func (s *UserStore) ListByEmails(ctx context.Context, emails []string) ([]identi
 	return users, nil
 }
 
+func (s *UserStore) FuzzySearch(ctx context.Context, query string) ([]identity.User, error) {
+	var userSchemas []UserSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("similarity(email, ?) > 0.1", query).
+		Limit(10).
+		Order(fmt.Sprintf("similarity(email, '%s') DESC", query)).
+		Find(&userSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	users := make([]identity.User, 0, len(userSchemas))
+	for _, userSchema := range userSchemas {
+		users = append(users, *userSchema.ToDomainUser())
+	}
+
+	return users, nil
+}
+
 func (s *UserStore) UpdateStorageCapacity(ctx context.Context, id uuid.UUID, storageCapacity uint64) error {
 	return s.db.WithContext(ctx).Model(&UserSchema{}).
 		Where("id = ?", id).

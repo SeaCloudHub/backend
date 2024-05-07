@@ -213,6 +213,39 @@ func (s *Server) GetByEmail(c echo.Context) error {
 	})
 }
 
+// Suggest godoc
+// @Summary Suggest users
+// @Description Suggest users
+// @Tags user
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param query query string true "Query"
+// @Success 200 {object} model.SuccessResponse{data=[]identity.User}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /users/suggest [get]
+func (s *Server) Suggest(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.SuggestRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	users, err := s.UserStore.FuzzySearch(ctx, req.Query)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, users)
+}
+
 // ChangeUserStorageCapacity godoc
 // @Summary Change user's storage capacity
 // @Description Change user's storage capacity
@@ -268,5 +301,6 @@ func (s *Server) RegisterUserRoutes(router *echo.Group) {
 	router.POST("/change-password", s.ChangePassword)
 	router.GET("/me", s.Me)
 	router.GET("/email", s.GetByEmail)
+	router.GET("/suggest", s.Suggest)
 	router.PATCH("/:id/storage", s.ChangeUserStorageCapacity, s.adminMiddleware)
 }
