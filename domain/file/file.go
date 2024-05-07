@@ -61,7 +61,8 @@ type File struct {
 	CreatedAt     time.Time   `json:"created_at"`
 	UpdatedAt     time.Time   `json:"updated_at"`
 
-	Owner *identity.User `json:"owner,omitempty"`
+	Owner  *identity.User `json:"owner,omitempty"`
+	Parent *SimpleFile    `json:"parent,omitempty"`
 } // @name file.File
 
 func NewDirectory(name string) *File {
@@ -133,6 +134,10 @@ type SimpleFile struct {
 	Name string    `json:"name"`
 	Path string    `json:"path"`
 } // @name file.SimpleFile
+
+func (f *SimpleFile) FullPath() string {
+	return filepath.Join(f.Path, f.Name)
+}
 
 type Share struct {
 	FileID    uuid.UUID `json:"file_id"`

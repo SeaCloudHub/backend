@@ -224,3 +224,8 @@ func (r *SearchRequest) Validate(ctx context.Context) error {
 
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type SearchResponse struct {
+	Entries []file.File `json:"entries"`
+	Cursor  string      `json:"cursor"`
+} // @name model.SearchResponse

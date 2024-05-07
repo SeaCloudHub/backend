@@ -24,6 +24,8 @@ definitions:
         $ref: '#/definitions/identity.User'
       owner_id:
         type: string
+      parent:
+        $ref: '#/definitions/file.SimpleFile'
       path:
         type: string
       shown_path:
@@ -35,6 +37,15 @@ definitions:
       type:
         type: string
       updated_at:
+        type: string
+    type: object
+  file.SimpleFile:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      path:
         type: string
     type: object
   identity.Identity:

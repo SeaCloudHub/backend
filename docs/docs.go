@@ -2815,6 +2815,9 @@ const docTemplate = `{
                 "owner_id": {
                     "type": "string"
                 },
+                "parent": {
+                    "$ref": "#/definitions/file.SimpleFile"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -2831,6 +2834,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "file.SimpleFile": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
                     "type": "string"
                 }
             }

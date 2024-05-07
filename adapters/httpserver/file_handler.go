@@ -1867,7 +1867,21 @@ func (s *Server) Search(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, files)
+	fullPaths := lo.Map(files, func(file file.File, index int) string {
+		return file.Path
+	})
+
+	parents, err := s.FileStore.ListByFullPaths(ctx, fullPaths)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	entries := s.MapperService.FileWithParents(files, parents)
+
+	return s.success(c, model.SearchResponse{
+		Entries: entries,
+		Cursor:  cursor.NextToken(),
+	})
 }
 
 func (s *Server) RegisterFileRoutes(router *echo.Group) {

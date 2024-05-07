@@ -104,7 +104,7 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 		query = query.Where("updated_at > ?", filter.After)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -148,7 +148,7 @@ func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cur
 		query = query.Where("updated_at > ?", filter.After)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
