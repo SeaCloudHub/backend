@@ -30,10 +30,21 @@ definitions:
         type: string
       size:
         type: integer
+      thumbnail:
+        type: string
       type:
         type: string
       updated_at:
         type: string
+    type: object
+  github_com_SeaCloudHub_backend_adapters_httpserver_model.StatisticUserComparison:
+    properties:
+      name:
+        type: string
+      percentage:
+        type: number
+      value:
+        type: integer
     type: object
   identity.Identity:
     properties:
@@ -48,7 +59,11 @@ definitions:
     properties:
       avatar_url:
         type: string
+      blocked_at:
+        type: string
       created_at:
+        type: string
+      deleted_at:
         type: string
       email:
         type: string
@@ -308,15 +323,32 @@ definitions:
     - id
     - role
     type: object
-  model.StatisticsResponse:
+  model.StatisticUser:
     properties:
       active_users:
         type: integer
       blocked_users:
         type: integer
-      total_storage_usage:
-        type: integer
       total_users:
+        type: integer
+    type: object
+  model.StatisticsResponse:
+    properties:
+      file_by_type:
+        additionalProperties:
+          type: integer
+        type: object
+      statistic_user:
+        items:
+          $ref: '#/definitions/github_com_SeaCloudHub_backend_adapters_httpserver_model.StatisticUserComparison'
+        type: array
+      statistic_user_by_month:
+        additionalProperties:
+          $ref: '#/definitions/model.StatisticUser'
+        type: object
+      total_storage_capacity:
+        type: integer
+      total_storage_usage:
         type: integer
     type: object
   model.SuccessResponse:

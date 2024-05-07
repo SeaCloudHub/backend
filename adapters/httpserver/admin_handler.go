@@ -345,9 +345,9 @@ func (s *Server) Statistics(c echo.Context) error {
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
-	fileByContentType := make(map[string]uint)
+	fileByType := make(map[string]uint)
 	for _, f := range files {
-		fileByContentType[f.MimeType]++
+		fileByType[f.Type]++
 	}
 
 	resp := model.StatisticsResponse{
@@ -355,7 +355,7 @@ func (s *Server) Statistics(c echo.Context) error {
 		StatisticUserByMonth: statisticUserByMonthMap,
 		TotalStorageUsage:    totalStorageUsage,
 		TotalStorageCapacity: 30 << 30, // 30GB
-		FileByType:           fileByContentType,
+		FileByType:           fileByType,
 	}
 
 	return s.success(c, resp)

@@ -2620,11 +2620,28 @@ const docTemplate = `{
                 "size": {
                     "type": "integer"
                 },
+                "thumbnail": {
+                    "type": "string"
+                },
                 "type": {
                     "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_SeaCloudHub_backend_adapters_httpserver_model.StatisticUserComparison": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "percentage": {
+                    "type": "number"
+                },
+                "value": {
+                    "type": "integer"
                 }
             }
         },
@@ -2648,7 +2665,13 @@ const docTemplate = `{
                 "avatar_url": {
                     "type": "string"
                 },
+                "blocked_at": {
+                    "type": "string"
+                },
                 "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
                     "type": "string"
                 },
                 "email": {
@@ -3035,7 +3058,7 @@ const docTemplate = `{
                 }
             }
         },
-        "model.StatisticsResponse": {
+        "model.StatisticUser": {
             "type": "object",
             "properties": {
                 "active_users": {
@@ -3044,10 +3067,36 @@ const docTemplate = `{
                 "blocked_users": {
                     "type": "integer"
                 },
-                "total_storage_usage": {
+                "total_users": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.StatisticsResponse": {
+            "type": "object",
+            "properties": {
+                "file_by_type": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "statistic_user": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_SeaCloudHub_backend_adapters_httpserver_model.StatisticUserComparison"
+                    }
+                },
+                "statistic_user_by_month": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/model.StatisticUser"
+                    }
+                },
+                "total_storage_capacity": {
                     "type": "integer"
                 },
-                "total_users": {
+                "total_storage_usage": {
                     "type": "integer"
                 }
             }
