@@ -208,3 +208,19 @@ func (r *DeleteRequest) Validate(ctx context.Context) error {
 type GetPermissionsRequest struct {
 	ID string `param:"id" validate:"required,uuid"`
 }
+
+type SearchRequest struct {
+	Query  string     `query:"query" validate:"required"`
+	Limit  int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string     `query:"cursor" validate:"omitempty,base64url"`
+	Type   string     `query:"type" validate:"omitempty,oneof=folder text document pdf json image video audio archive other"`
+	After  *time.Time `query:"after" validate:"omitempty"`
+} // @name model.SearchRequest
+
+func (r *SearchRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 10
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}

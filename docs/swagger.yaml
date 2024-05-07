@@ -37,15 +37,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  github_com_SeaCloudHub_backend_adapters_httpserver_model.StatisticUserComparison:
-    properties:
-      name:
-        type: string
-      percentage:
-        type: number
-      value:
-        type: integer
-    type: object
   identity.Identity:
     properties:
       email:
@@ -332,6 +323,15 @@ definitions:
       total_users:
         type: integer
     type: object
+  model.StatisticUserComparison:
+    properties:
+      name:
+        type: string
+      percentage:
+        type: number
+      value:
+        type: integer
+    type: object
   model.StatisticsResponse:
     properties:
       file_by_type:
@@ -340,7 +340,7 @@ definitions:
         type: object
       statistic_user:
         items:
-          $ref: '#/definitions/github_com_SeaCloudHub_backend_adapters_httpserver_model.StatisticUserComparison'
+          $ref: '#/definitions/model.StatisticUserComparison'
         type: array
       statistic_user_by_month:
         additionalProperties:
@@ -911,6 +911,9 @@ paths:
         required: true
         type: string
       - in: query
+        name: after
+        type: string
+      - in: query
         name: cursor
         type: string
       - in: query
@@ -918,6 +921,20 @@ paths:
         minimum: 1
         name: limit
         type: integer
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
       produces:
       - application/json
       responses:
@@ -1707,6 +1724,84 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: RestoreFromTrash
+      tags:
+      - file
+  /files/search:
+    get:
+      consumes:
+      - application/json
+      description: Search
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: after
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - in: query
+        name: query
+        required: true
+        type: string
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Search
       tags:
       - file
   /files/share:

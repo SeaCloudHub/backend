@@ -16,6 +16,7 @@ type Store interface {
 	Create(ctx context.Context, file *File) error
 	ListPager(ctx context.Context, dirpath string, pager *pagination.Pager) ([]File, error)
 	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter Filter) ([]File, error)
+	Search(ctx context.Context, query string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
 	GetRootDirectory(ctx context.Context) (*File, error)

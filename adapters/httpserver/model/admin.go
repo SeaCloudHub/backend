@@ -67,7 +67,7 @@ type StatisticUserComparison struct {
 	Name       string  `json:"name"`
 	Value      int     `json:"value"`
 	Percentage float64 `json:"percentage"`
-}
+} // @name model.StatisticUserComparison
 
 func (s *StatisticUser) Compare(oldValue StatisticUser) []StatisticUserComparison {
 	comparisons := []StatisticUserComparison{
