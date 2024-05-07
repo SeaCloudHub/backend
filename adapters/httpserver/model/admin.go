@@ -57,9 +57,54 @@ func (r *UpdateIdentityStateRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
+type StatisticUser struct {
+	TotalUsers   int `json:"total_users"`
+	ActiveUsers  int `json:"active_users"`
+	BlockedUsers int `json:"blocked_users"`
+} // @name model.StatisticUser
+
+type StatisticUserComparison struct {
+	Name       string  `json:"name"`
+	Value      int     `json:"value"`
+	Percentage float64 `json:"percentage"`
+}
+
+func (s *StatisticUser) Compare(oldValue StatisticUser) []StatisticUserComparison {
+	comparisons := []StatisticUserComparison{
+		{
+			Name:       "total_users",
+			Value:      s.TotalUsers,
+			Percentage: calculatePercentageChange(oldValue.TotalUsers, s.TotalUsers),
+		},
+		{
+			Name:       "active_users",
+			Value:      s.ActiveUsers,
+			Percentage: calculatePercentageChange(oldValue.ActiveUsers, s.ActiveUsers),
+		},
+		{
+			Name:       "blocked_users",
+			Value:      s.BlockedUsers,
+			Percentage: calculatePercentageChange(oldValue.BlockedUsers, s.BlockedUsers),
+		},
+	}
+
+	return comparisons
+}
+
+func calculatePercentageChange(old, new int) float64 {
+	if old == 0 {
+		if new == 0 {
+			return 0.0
+		}
+		return 100.0
+	}
+	return (float64(new-old) / float64(old)) * 100.0
+}
+
 type StatisticsResponse struct {
-	TotalUsers        int    `json:"total_users"`
-	ActiveUsers       int    `json:"active_users"`
-	BlockedUsers      int    `json:"blocked_users"`
-	TotalStorageUsage uint64 `json:"total_storage_usage"`
+	StatisticUser        []StatisticUserComparison `json:"statistic_user"`
+	StatisticUserByMonth map[string]StatisticUser  `json:"statistic_user_by_month"`
+	TotalStorageUsage    uint64                    `json:"total_storage_usage"`
+	TotalStorageCapacity uint64                    `json:"total_storage_capacity"`
+	FileByType           map[string]uint           `json:"file_by_type"`
 } // @name model.StatisticsResponse

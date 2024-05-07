@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"time"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -300,23 +301,61 @@ func (s *Server) Statistics(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	totalUsers := len(users)
-	activeUsers := 0
 	var totalStorageUsage uint64
+
+	statisticUserByMonthMap := make(map[string]model.StatisticUser)
 	for _, user := range users {
+		month := ""
 		if user.IsActive {
-			activeUsers++
+			month = user.CreatedAt.Format("2006-01")
+		} else {
+			month = user.BlockedAt.Format("2006-01")
 		}
 
+		statisticUser := statisticUserByMonthMap[month]
+
+		// Update statistics based on user's status
+		if user.IsActive {
+			statisticUser.ActiveUsers++
+		} else {
+			statisticUser.BlockedUsers++
+		}
+		statisticUser.TotalUsers++
+		statisticUserByMonthMap[month] = statisticUser
+
+		// Update totalStorageUsage
 		totalStorageUsage += user.StorageUsage
 	}
-	blockedUsers := totalUsers - activeUsers
+
+	currentMonth := time.Now().Format("2006-01")
+	statisticUser, ok := statisticUserByMonthMap[currentMonth]
+	if !ok {
+		statisticUser = model.StatisticUser{}
+	}
+
+	lasMonth := time.Now().AddDate(0, -1, 0).Format("2006-01")
+	lastStatisticUser, ok := statisticUserByMonthMap[lasMonth]
+	if !ok {
+		lastStatisticUser = model.StatisticUser{}
+	}
+
+	comparison := statisticUser.Compare(lastStatisticUser)
+
+	files, err := s.FileStore.GetAllFiles(ctx)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+	fileByType := make(map[string]uint)
+	for _, f := range files {
+		fileByType[f.Type]++
+	}
 
 	resp := model.StatisticsResponse{
-		TotalUsers:        totalUsers,
-		ActiveUsers:       activeUsers,
-		BlockedUsers:      blockedUsers,
-		TotalStorageUsage: totalStorageUsage,
+		StatisticUser:        comparison,
+		StatisticUserByMonth: statisticUserByMonthMap,
+		TotalStorageUsage:    totalStorageUsage,
+		TotalStorageCapacity: 30 << 30, // 30GB
+		FileByType:           fileByType,
 	}
 
 	return s.success(c, resp)

@@ -39,6 +39,7 @@ type Store interface {
 	Star(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	Unstar(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error)
+	GetAllFiles(ctx context.Context) ([]File, error)
 }
 
 type File struct {

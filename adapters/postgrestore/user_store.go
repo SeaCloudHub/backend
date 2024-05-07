@@ -180,6 +180,9 @@ func (s *UserStore) UpdateStorageCapacity(ctx context.Context, id uuid.UUID, sto
 func (s *UserStore) ToggleActive(ctx context.Context, id uuid.UUID) error {
 	return s.db.WithContext(ctx).Model(&UserSchema{}).
 		Where("id = ?", id).
-		Update("is_active", gorm.Expr("NOT is_active")).
+		Updates(map[string]interface{}{
+			"is_active":  gorm.Expr("NOT is_active"),
+			"blocked_at": gorm.Expr("CASE WHEN is_active THEN NULL ELSE NOW() END"),
+		}).
 		Error
 }

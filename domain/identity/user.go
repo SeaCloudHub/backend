@@ -39,6 +39,8 @@ type User struct {
 	StorageCapacity   uint64     `json:"storage_capacity"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+	DeletedAt         *time.Time `json:"deleted_at"`
+	BlockedAt         *time.Time `json:"blocked_at"`
 } // @name identity.User
 
 func (u *User) WithName(firstName, lastName string) *User {
