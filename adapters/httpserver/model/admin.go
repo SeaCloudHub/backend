@@ -108,3 +108,29 @@ type StatisticsResponse struct {
 	TotalStorageCapacity uint64                    `json:"total_storage_capacity"`
 	FileByType           map[string]uint           `json:"file_by_type"`
 } // @name model.StatisticsResponse
+
+type ChangeUserStorageCapacityRequest struct {
+	StorageCapacity uint64 `json:"storage_capacity" validate:"required,min=0"`
+} // @name model.ChangeUserStorageCapacityRequest
+
+func (r *ChangeUserStorageCapacityRequest) Validate() error {
+	return validation.Validate().Struct(r)
+}
+
+type GetUserFilesRequest struct {
+	IdentityId string `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
+	Page       int    `query:"page" validate:"required,min=1"`
+	Limit      int    `query:"limit" validate:"omitempty,min=1,max=100"`
+} // @name model.GetUserFilesRequest
+
+func (r *GetUserFilesRequest) Validate(ctx context.Context) error {
+	if r.Limit == 0 {
+		r.Limit = 10
+	}
+
+	if r.Page == 0 {
+		r.Page = 1
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}

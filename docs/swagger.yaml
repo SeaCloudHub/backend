@@ -624,6 +624,110 @@ paths:
       summary: CreateIdentity
       tags:
       - admin
+  /admin/identities/{identity_id}:
+    get:
+      description: Get user details
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/identity.User'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get user details
+      tags:
+      - admin
+  /admin/identities/{identity_id}/files:
+    get:
+      description: Get user files
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - in: query
+        minimum: 1
+        name: page
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get user files
+      tags:
+      - admin
   /admin/identities/{identity_id}/state:
     patch:
       consumes:
@@ -661,6 +765,55 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: UpdateIdentityState
+      tags:
+      - admin
+  /admin/identities/{identity_id}/storage:
+    patch:
+      consumes:
+      - application/json
+      description: Change user's storage capacity
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Change user's storage capacity request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.ChangeUserStorageCapacityRequest'
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Change user's storage capacity
       tags:
       - admin
   /admin/identities/bulk:
@@ -2009,55 +2162,6 @@ paths:
       summary: ListTrash
       tags:
       - file
-  /users/{id}/storage:
-    patch:
-      consumes:
-      - application/json
-      description: Change user's storage capacity
-      parameters:
-      - default: Bearer <session_token>
-        description: Bearer token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Change user's storage capacity request
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/model.ChangeUserStorageCapacityRequest'
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-      summary: Change user's storage capacity
-      tags:
-      - user
   /users/change-password:
     post:
       consumes:

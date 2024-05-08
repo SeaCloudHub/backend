@@ -48,14 +48,6 @@ type GetByEmailResponse struct {
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 } // @name model.GetByEmailResponse
 
-type ChangeUserStorageCapacityRequest struct {
-	StorageCapacity uint64 `json:"storage_capacity" validate:"required,min=0"`
-} // @name model.ChangeUserStorageCapacityRequest
-
-func (r *ChangeUserStorageCapacityRequest) Validate() error {
-	return validation.Validate().Struct(r)
-}
-
 type SuggestRequest struct {
 	Query string `query:"query" validate:"required,min=2"`
 } // @name model.SuggestRequest

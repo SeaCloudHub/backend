@@ -361,6 +361,147 @@ func (s *Server) Statistics(c echo.Context) error {
 	return s.success(c, resp)
 }
 
+// ChangeUserStorageCapacity godoc
+// @Summary Change user's storage capacity
+// @Description Change user's storage capacity
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.ChangeUserStorageCapacityRequest true "Change user's storage capacity request"
+// @Param identity_id path string true "Identity ID"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id}/storage [patch]
+func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ChangeUserStorageCapacityRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	identityId := uuid.MustParse(c.Param("identity_id"))
+
+	user, err := s.UserStore.GetByID(ctx, identityId)
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if req.StorageCapacity < user.StorageUsage {
+		return s.error(c, apperror.ErrInvalidParam(errors.New("storage capacity must be greater than storage usage")))
+	}
+
+	if err := s.UserStore.UpdateStorageCapacity(ctx, identityId, req.StorageCapacity); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, nil)
+}
+
+// GetIdentityDetails godoc
+// @Summary Get user details
+// @Description Get user details
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param identity_id path string true "Identity ID"
+// @Success 200 {object} model.SuccessResponse{data=identity.User}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id} [get]
+func (s *Server) GetIdentityDetails(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param("identity_id")))
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, user)
+}
+
+// GetIdentityFiles godoc
+// @Summary Get user files
+// @Description Get user files
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param identity_id path string true "Identity ID"
+// @Param request query model.GetUserFilesRequest true "Get user files request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id}/files [get]
+func (s *Server) GetIdentityFiles(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.GetUserFilesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(req.IdentityId))
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	userDir, err := s.FileStore.GetByID(ctx, user.RootID.String())
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	pager := pagination.NewPager(req.Page, req.Limit)
+	files, err := s.FileStore.ListPager(ctx, userDir.FullPath(), pager)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	for i := range files {
+		files[i] = *files[i].Response()
+	}
+
+	return s.success(c, model.ListPageEntriesResponse{
+		Entries:    files,
+		Pagination: pager.PageInfo(),
+	})
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
@@ -369,10 +510,13 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)
+	router.GET("/identities/:identity_id", s.GetIdentityDetails)
 	router.POST("/identities", s.CreateIdentity)
 	router.POST("/identities/bulk", s.CreateMultipleIdentities)
 	router.GET("/identities/template", s.DownloadIdentitiesTemplate)
 	router.PATCH("/identities/:identity_id/state", s.UpdateIdentityState)
+	router.PATCH("/identities/:identity_id/storage", s.ChangeUserStorageCapacity)
+	router.GET("/identities/:identity_id/files", s.GetIdentityFiles)
 }
 
 func (s *Server) createUser(ctx context.Context, user *identity.User, rootID string) error {
