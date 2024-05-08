@@ -228,6 +228,15 @@ definitions:
       pagination:
         $ref: '#/definitions/pagination.PageInfo'
     type: object
+  model.ListStoragesResponse:
+    properties:
+      pagination:
+        $ref: '#/definitions/pagination.PageInfo'
+      user_root_directories:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
+    type: object
   model.ListTrashResponse:
     properties:
       cursor:
@@ -946,6 +955,54 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Statistics
+      tags:
+      - admin
+  /admin/storages:
+    get:
+      description: ListStorages
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        required: true
+        type: integer
+      - in: query
+        minimum: 1
+        name: page
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListStoragesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListStorages
       tags:
       - admin
   /assets/images:

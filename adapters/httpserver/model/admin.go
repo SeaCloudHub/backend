@@ -2,7 +2,7 @@ package model
 
 import (
 	"context"
-
+	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 	"github.com/SeaCloudHub/backend/pkg/validation"
@@ -134,3 +134,25 @@ func (r *GetUserFilesRequest) Validate(ctx context.Context) error {
 
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type ListStoragesRequest struct {
+	Limit int `query:"limit" validate:"required,min=1,max=100"`
+	Page  int `query:"page" validate:"required,min=1"`
+} // @name model.ListStoragesRequest
+
+func (r *ListStoragesRequest) Validate() error {
+	if r.Limit == 0 {
+		r.Limit = 10
+	}
+
+	if r.Page == 0 {
+		r.Page = 1
+	}
+
+	return validation.Validate().Struct(r)
+}
+
+type ListStoragesResponse struct {
+	UserRootDirectories []file.File         `json:"user_root_directories"`
+	Pagination          pagination.PageInfo `json:"pagination"`
+} // @name model.ListStoragesResponse

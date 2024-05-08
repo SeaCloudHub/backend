@@ -502,6 +502,48 @@ func (s *Server) GetIdentityFiles(c echo.Context) error {
 	})
 }
 
+// ListStorages godoc
+// @Summary ListStorages
+// @Description ListStorages
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param paging query model.ListStoragesRequest false "Paging"
+// @Success 200 {object} model.SuccessResponse{data=model.ListStoragesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/storages [get]
+func (s *Server) ListStorages(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListStoragesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	pager := pagination.NewPager(req.Page, req.Limit)
+	rootDirectories, err := s.FileStore.ListRootDirectory(ctx, pager)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	for i := range rootDirectories {
+		rootDirectories[i] = *rootDirectories[i].Response()
+	}
+
+	return s.success(c, model.ListStoragesResponse{
+		UserRootDirectories: rootDirectories,
+		Pagination:          pager.PageInfo(),
+	})
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
@@ -517,6 +559,8 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.PATCH("/identities/:identity_id/state", s.UpdateIdentityState)
 	router.PATCH("/identities/:identity_id/storage", s.ChangeUserStorageCapacity)
 	router.GET("/identities/:identity_id/files", s.GetIdentityFiles)
+
+	router.GET("/storages", s.ListStorages)
 }
 
 func (s *Server) createUser(ctx context.Context, user *identity.User, rootID string) error {

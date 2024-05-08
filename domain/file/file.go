@@ -41,6 +41,7 @@ type Store interface {
 	Unstar(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error)
 	GetAllFiles(ctx context.Context) ([]File, error)
+	ListRootDirectory(ctx context.Context, pager *pagination.Pager) ([]File, error)
 }
 
 type File struct {
