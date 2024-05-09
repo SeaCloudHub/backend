@@ -642,6 +642,36 @@ func (s *FileStore) GetAllFiles(ctx context.Context) ([]file.File, error) {
 	return files, nil
 }
 
+func (s *FileStore) ListRootDirectory(ctx context.Context, pager *pagination.Pager) ([]file.File, error) {
+	var (
+		fileSchemas []FileSchema
+		total       int64
+	)
+
+	if err := s.db.WithContext(ctx).Model(&fileSchemas).
+		Where("path = ?", "/").
+		Count(&total).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	pager.SetTotal(total)
+
+	offset, limit := pager.Do()
+	if err := s.db.WithContext(ctx).
+		Preload("Owner").
+		Where("path = ?", "/").
+		Offset(offset).Limit(limit).Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
 type fsCursor struct {
 	CreatedAt *time.Time
 }
