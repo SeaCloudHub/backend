@@ -23,6 +23,8 @@ type Store interface {
 	FuzzySearch(ctx context.Context, keyword string) ([]User, error)
 	UpdateStorageCapacity(ctx context.Context, userID uuid.UUID, storageCapacity uint64) error
 	ToggleActive(ctx context.Context, userID uuid.UUID) error
+	Update(ctx context.Context, user *User) error
+	Delete(ctx context.Context, userID uuid.UUID) error
 }
 
 type User struct {
@@ -55,6 +57,12 @@ func (u *User) WithAvatarURL(avatarURL string) *User {
 	u.AvatarURL = avatarURL
 
 	return u
+}
+
+func (u *User) UpdateInfo(firstName, lastName, avatarURL string) {
+	u.FirstName = firstName
+	u.LastName = lastName
+	u.AvatarURL = avatarURL
 }
 
 type Filter struct {

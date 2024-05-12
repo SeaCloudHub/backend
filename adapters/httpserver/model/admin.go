@@ -156,3 +156,13 @@ type ListStoragesResponse struct {
 	UserRootDirectories []file.File         `json:"user_root_directories"`
 	Pagination          pagination.PageInfo `json:"pagination"`
 } // @name model.ListStoragesResponse
+
+type EditIdentityRequest struct {
+	FirstName string `json:"first_name" validate:"omitempty,max=50"`
+	LastName  string `json:"last_name" validate:"omitempty,max=50"`
+	AvatarURL string `json:"avatar_url" validate:"omitempty,url"`
+} // @name model.EditIdentityRequest
+
+func (r *EditIdentityRequest) Validate() error {
+	return validation.Validate().Struct(r)
+}

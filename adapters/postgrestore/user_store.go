@@ -205,3 +205,29 @@ func (s *UserStore) ToggleActive(ctx context.Context, id uuid.UUID) error {
 		}).
 		Error
 }
+
+func (s *UserStore) Update(ctx context.Context, user *identity.User) error {
+	userSchema := UserSchema{
+		Email:             user.Email,
+		FirstName:         user.FirstName,
+		LastName:          user.LastName,
+		AvatarURL:         user.AvatarURL,
+		IsActive:          user.IsActive,
+		IsAdmin:           user.IsAdmin,
+		PasswordChangedAt: user.PasswordChangedAt,
+		RootID:            user.RootID,
+		StorageUsage:      user.StorageUsage,
+		StorageCapacity:   user.StorageCapacity,
+		DeletedAt:         user.DeletedAt,
+		BlockedAt:         user.BlockedAt,
+	}
+
+	return s.db.WithContext(ctx).Model(&UserSchema{}).
+		Where("id = ?", user.ID).
+		Updates(&userSchema).
+		Error
+}
+
+func (s *UserStore) Delete(ctx context.Context, id uuid.UUID) error {
+	return s.db.WithContext(ctx).Delete(&UserSchema{}, id).Error
+}

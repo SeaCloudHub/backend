@@ -179,6 +179,17 @@ definitions:
     required:
     - source_ids
     type: object
+  model.EditIdentityRequest:
+    properties:
+      avatar_url:
+        type: string
+      first_name:
+        maxLength: 50
+        type: string
+      last_name:
+        maxLength: 50
+        type: string
+    type: object
   model.ErrorResponse:
     properties:
       code:
@@ -634,6 +645,42 @@ paths:
       tags:
       - admin
   /admin/identities/{identity_id}:
+    delete:
+      description: DeleteIdentity
+      parameters:
+      - default: Bearer <session_token>
+        description: ' Bearer token'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: DeleteIdentity
+      tags:
+      - admin
     get:
       description: Get user details
       parameters:
@@ -677,6 +724,55 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Get user details
+      tags:
+      - admin
+    patch:
+      consumes:
+      - application/json
+      description: EditIdentity
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      - description: Edit identity request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.EditIdentityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/identity.User'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: EditIdentity
       tags:
       - admin
   /admin/identities/{identity_id}/files:

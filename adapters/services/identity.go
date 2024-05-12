@@ -296,6 +296,19 @@ func (s *IdentityService) UpdateIdentityState(ctx context.Context, id string, st
 	return nil
 }
 
+func (s *IdentityService) DeleteIdentity(ctx context.Context, id string) error {
+	_, err := s.adminClient.IdentityAPI.DeleteIdentity(ctx, id).Execute()
+	if err != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("error deleting identity: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 func mapIdentity(id *kratos.Identity) (*identity.Identity, error) {
 	traits, ok := id.GetTraits().(map[string]interface{})
 	if !ok {

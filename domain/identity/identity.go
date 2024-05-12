@@ -31,6 +31,7 @@ type Service interface {
 	ListIdentities(ctx context.Context, paging *pagination.Cursor) ([]Identity, error)
 	CreateMultipleIdentities(ctx context.Context, simpleIdentities []SimpleIdentity) ([]*Identity, error)
 	UpdateIdentityState(ctx context.Context, id string, state string) error
+	DeleteIdentity(ctx context.Context, id string) error
 }
 
 type SimpleIdentity struct {

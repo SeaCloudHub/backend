@@ -520,6 +520,28 @@ func (s *PermissionService) GetFileUsers(ctx context.Context, fileID string) ([]
 	return fileUsers, nil
 }
 
+func (s *PermissionService) DeleteUserPermissions(ctx context.Context, userID string) error {
+	_, err := s.writeClient.RelationshipApi.DeleteRelationships(ctx).Namespace("File").SubjectId(userID).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	_, err = s.writeClient.RelationshipApi.DeleteRelationships(ctx).Namespace("Directory").SubjectId(userID).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 func assertKetoError[T any](err error) (*keto.GenericOpenAPIError, *T) {
 	var ketoErr *keto.GenericOpenAPIError
 
