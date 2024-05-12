@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	"maps"
 	"net/http"
 	"time"
@@ -689,6 +690,39 @@ func (s *Server) DeleteIdentity(c echo.Context) error {
 	return s.success(c, nil)
 }
 
+// ResetPassword godoc
+// @Summary ResetPassword
+// @Description ResetPassword
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param identity_id path string true "Identity ID"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id}/reset-password [patch]
+func (s *Server) ResetPassword(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+	)
+
+	identityID := uuid.MustParse(c.Param("identity_id"))
+
+	e, err := s.IdentityService.GetByID(ctx, identityID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	password := gonanoid.Must(11)
+	if err := s.IdentityService.ResetPassword(ctx, e, password); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.ResetPasswordResponse{Password: password})
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
@@ -700,6 +734,7 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.GET("/identities/:identity_id", s.GetIdentityDetails)
 	router.PATCH("/identities/:identity_id", s.EditIdentity)
 	router.DELETE("/identities/:identity_id", s.DeleteIdentity)
+	router.PATCH("/identities/:identity_id/reset-password", s.ResetPassword)
 	router.POST("/identities", s.CreateIdentity)
 	router.POST("/identities/bulk", s.CreateMultipleIdentities)
 	router.GET("/identities/template", s.DownloadIdentitiesTemplate)

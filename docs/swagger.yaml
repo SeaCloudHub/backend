@@ -833,6 +833,45 @@ paths:
       summary: Get user files
       tags:
       - admin
+  /admin/identities/{identity_id}/reset-password:
+    patch:
+      consumes:
+      - application/json
+      description: ResetPassword
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ResetPassword
+      tags:
+      - admin
   /admin/identities/{identity_id}/state:
     patch:
       consumes:

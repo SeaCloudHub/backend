@@ -166,3 +166,7 @@ type EditIdentityRequest struct {
 func (r *EditIdentityRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
+
+type ResetPasswordResponse struct {
+	Password string `json:"password"`
+} // @name model.ResetPasswordResponse

@@ -188,6 +188,19 @@ func (s *IdentityService) GetByEmail(ctx context.Context, email string) (*identi
 	return mapIdentity(&identities[0])
 }
 
+func (s *IdentityService) GetByID(ctx context.Context, id string) (*identity.Identity, error) {
+	iden, _, err := s.adminClient.IdentityAPI.GetIdentity(ctx, id).Execute()
+	if err != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return nil, fmt.Errorf("error getting identity: %s", genericErr.Error.GetReason())
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return mapIdentity(iden)
+}
+
 // Admin APIs
 func (s *IdentityService) CreateIdentity(ctx context.Context, in identity.SimpleIdentity) (*identity.Identity, error) {
 	id, _, err := s.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(
@@ -301,6 +314,33 @@ func (s *IdentityService) DeleteIdentity(ctx context.Context, id string) error {
 	if err != nil {
 		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
 			return fmt.Errorf("error deleting identity: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *IdentityService) ResetPassword(ctx context.Context, id *identity.Identity,
+	password string) error {
+	_, _, err := s.adminClient.IdentityAPI.UpdateIdentity(ctx, id.ID).UpdateIdentityBody(
+		kratos.UpdateIdentityBody{
+			Credentials: &kratos.IdentityWithCredentials{
+				Password: &kratos.IdentityWithCredentialsPassword{
+					Config: &kratos.IdentityWithCredentialsPasswordConfig{
+						Password: &password,
+					},
+				},
+			},
+			Traits: map[string]interface{}{
+				"email": id.Email,
+			},
+		},
+	).Execute()
+	if err != nil {
+		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("error resetting password: %s", genericErr.Error.GetReason())
 		}
 
 		return fmt.Errorf("unexpected error: %w", err)
