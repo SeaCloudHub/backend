@@ -196,8 +196,7 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 func (s *Server) UpdateIdentityState(c echo.Context) error {
 	ctx := app.NewEchoContextAdapter(c)
 
-	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param(
-		"identity_id")))
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -391,9 +390,7 @@ func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	identityId := uuid.MustParse(c.Param("identity_id"))
-
-	user, err := s.UserStore.GetByID(ctx, identityId)
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -406,7 +403,7 @@ func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(errors.New("storage capacity must be greater than storage usage")))
 	}
 
-	if err := s.UserStore.UpdateStorageCapacity(ctx, identityId, req.StorageCapacity); err != nil {
+	if err := s.UserStore.UpdateStorageCapacity(ctx, user.ID, req.StorageCapacity); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
@@ -429,7 +426,7 @@ func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
 func (s *Server) GetIdentityDetails(c echo.Context) error {
 	var ctx = app.NewEchoContextAdapter(c)
 
-	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param("identity_id")))
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -469,7 +466,7 @@ func (s *Server) GetIdentityFiles(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(req.IdentityId))
+	user, err := s.UserStore.GetByID(ctx, req.IdentityId)
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -573,9 +570,7 @@ func (s *Server) EditIdentity(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	identityID := uuid.MustParse(c.Param("identity_id"))
-
-	user, err := s.UserStore.GetByID(ctx, identityID)
+	user, err := s.UserStore.GetByID(ctx, req.IdentityID)
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -609,9 +604,7 @@ func (s *Server) DeleteIdentity(c echo.Context) error {
 		ctx = app.NewEchoContextAdapter(c)
 	)
 
-	identityID := uuid.MustParse(c.Param("identity_id"))
-
-	user, err := s.UserStore.GetByID(ctx, identityID)
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -630,12 +623,12 @@ func (s *Server) DeleteIdentity(c echo.Context) error {
 	}
 
 	// Delete user
-	if err := s.UserStore.Delete(ctx, identityID); err != nil {
+	if err := s.UserStore.Delete(ctx, user.ID); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
 	// Delete identity
-	if err := s.IdentityService.DeleteIdentity(ctx, identityID.String()); err != nil {
+	if err := s.IdentityService.DeleteIdentity(ctx, user.ID.String()); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 

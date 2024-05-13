@@ -676,11 +676,10 @@ func (s *FileStore) ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*fil
 	var fileSchemas []FileSchema
 
 	if err := s.db.WithContext(ctx).
-		Where("owner_id = ?", userID).
+		Where("path ~ ?", fmt.Sprintf(`^/%s(/.*)?$`, userID)).
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
-
 	files := make([]*file.File, len(fileSchemas))
 	for i, fileSchema := range fileSchemas {
 		files[i] = fileSchema.ToDomainFile()
@@ -691,7 +690,7 @@ func (s *FileStore) ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*fil
 
 func (s *FileStore) DeleteUserFiles(ctx context.Context, userID uuid.UUID) error {
 	if err := s.db.WithContext(ctx).
-		Where("owner_id = ?", userID).
+		Where("path ~ ?", fmt.Sprintf(`^/%s(/.*)?$`, userID)).
 		Delete(&FileSchema{}).Error; err != nil {
 		return fmt.Errorf("unexpected error: %w", err)
 	}

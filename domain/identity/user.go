@@ -15,7 +15,7 @@ type Store interface {
 	UpdateLastSignInAt(ctx context.Context, userID uuid.UUID) error
 	UpdateRootID(ctx context.Context, userID, rootID uuid.UUID) error
 	UpdateStorageUsage(ctx context.Context, userID uuid.UUID, usage uint64) error
-	GetByID(ctx context.Context, userID uuid.UUID) (*User, error)
+	GetByID(ctx context.Context, userID string) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetAll(ctx context.Context) ([]User, error)
 	List(ctx context.Context, pagination *pagination.Pager, filter Filter) ([]User, error)
@@ -42,7 +42,7 @@ type User struct {
 	StorageCapacity   uint64     `json:"storage_capacity"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
-	DeletedAt         *time.Time `json:"deleted_at"`
+	DeletedAt         time.Time  `json:"deleted_at"`
 	BlockedAt         *time.Time `json:"blocked_at"`
 } // @name identity.User
 

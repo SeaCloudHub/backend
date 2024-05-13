@@ -158,9 +158,10 @@ type ListStoragesResponse struct {
 } // @name model.ListStoragesResponse
 
 type EditIdentityRequest struct {
-	FirstName string `json:"first_name" validate:"omitempty,max=50"`
-	LastName  string `json:"last_name" validate:"omitempty,max=50"`
-	AvatarURL string `json:"avatar_url" validate:"omitempty,url"`
+	IdentityID string `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
+	FirstName  string `json:"first_name" validate:"omitempty,max=50"`
+	LastName   string `json:"last_name" validate:"omitempty,max=50"`
+	AvatarURL  string `json:"avatar_url" validate:"omitempty,url"`
 } // @name model.EditIdentityRequest
 
 func (r *EditIdentityRequest) Validate() error {

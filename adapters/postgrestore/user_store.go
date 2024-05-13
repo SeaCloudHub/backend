@@ -69,7 +69,7 @@ func (s *UserStore) UpdateStorageUsage(ctx context.Context, id uuid.UUID, usage 
 		Error
 }
 
-func (s *UserStore) GetByID(ctx context.Context, id uuid.UUID) (*identity.User, error) {
+func (s *UserStore) GetByID(ctx context.Context, id string) (*identity.User, error) {
 	var userSchema UserSchema
 	err := s.db.WithContext(ctx).Where("id = ?", id).First(&userSchema).Error
 	if err != nil {
@@ -218,7 +218,6 @@ func (s *UserStore) Update(ctx context.Context, user *identity.User) error {
 		RootID:            user.RootID,
 		StorageUsage:      user.StorageUsage,
 		StorageCapacity:   user.StorageCapacity,
-		DeletedAt:         user.DeletedAt,
 		BlockedAt:         user.BlockedAt,
 	}
 

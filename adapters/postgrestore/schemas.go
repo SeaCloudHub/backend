@@ -2,6 +2,7 @@ package postgrestore
 
 import (
 	"encoding/hex"
+	"gorm.io/gorm"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,22 +13,22 @@ import (
 )
 
 type UserSchema struct {
-	ID                uuid.UUID  `gorm:"column:id"`
-	Email             string     `gorm:"column:email"`
-	FirstName         string     `gorm:"column:first_name"`
-	LastName          string     `gorm:"column:last_name"`
-	AvatarURL         string     `gorm:"column:avatar_url"`
-	IsActive          bool       `gorm:"column:is_active"`
-	IsAdmin           bool       `gorm:"column:is_admin"`
-	PasswordChangedAt *time.Time `gorm:"column:password_changed_at"`
-	LastSignInAt      *time.Time `gorm:"column:last_signin_at"`
-	RootID            uuid.UUID  `gorm:"column:root_id"`
-	StorageUsage      uint64     `gorm:"column:storage_usage"`
-	StorageCapacity   uint64     `gorm:"column:storage_capacity"`
-	CreatedAt         time.Time  `gorm:"column:created_at"`
-	UpdatedAt         time.Time  `gorm:"column:updated_at"`
-	DeletedAt         *time.Time `gorm:"column:deleted_at"`
-	BlockedAt         *time.Time `gorm:"column:blocked_at"`
+	ID                uuid.UUID      `gorm:"column:id"`
+	Email             string         `gorm:"column:email"`
+	FirstName         string         `gorm:"column:first_name"`
+	LastName          string         `gorm:"column:last_name"`
+	AvatarURL         string         `gorm:"column:avatar_url"`
+	IsActive          bool           `gorm:"column:is_active"`
+	IsAdmin           bool           `gorm:"column:is_admin"`
+	PasswordChangedAt *time.Time     `gorm:"column:password_changed_at"`
+	LastSignInAt      *time.Time     `gorm:"column:last_signin_at"`
+	RootID            uuid.UUID      `gorm:"column:root_id"`
+	StorageUsage      uint64         `gorm:"column:storage_usage"`
+	StorageCapacity   uint64         `gorm:"column:storage_capacity"`
+	CreatedAt         time.Time      `gorm:"column:created_at"`
+	UpdatedAt         time.Time      `gorm:"column:updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at"`
+	BlockedAt         *time.Time     `gorm:"column:blocked_at"`
 }
 
 func (UserSchema) TableName() string {
@@ -50,7 +51,7 @@ func (s *UserSchema) ToDomainUser() *identity.User {
 		StorageCapacity:   s.StorageCapacity,
 		CreatedAt:         s.CreatedAt,
 		UpdatedAt:         s.UpdatedAt,
-		DeletedAt:         s.DeletedAt,
+		DeletedAt:         s.DeletedAt.Time,
 		BlockedAt:         s.BlockedAt,
 	}
 }
