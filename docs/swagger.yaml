@@ -425,6 +425,15 @@ definitions:
     - id
     - role
     type: object
+  model.StarRequest:
+    properties:
+      file_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - file_ids
+    type: object
   model.StatisticUser:
     properties:
       active_users:
@@ -467,6 +476,15 @@ definitions:
       data: {}
       message:
         type: string
+    type: object
+  model.UnstarRequest:
+    properties:
+      file_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - file_ids
     type: object
   model.UpdateAccessRequest:
     properties:
@@ -1710,100 +1728,6 @@ paths:
       summary: ListPageEntries
       tags:
       - file
-  /files/{id}/star:
-    patch:
-      consumes:
-      - application/json
-      description: Star
-      parameters:
-      - default: Bearer <session_token>
-        description: ' Bearer token'
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: File ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-      summary: Star
-      tags:
-      - file
-  /files/{id}/unstar:
-    patch:
-      consumes:
-      - application/json
-      description: Unstar
-      parameters:
-      - default: Bearer <session_token>
-        description: ' Bearer token'
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: File ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-      summary: Unstar
-      tags:
-      - file
   /files/access:
     patch:
       consumes:
@@ -2525,6 +2449,54 @@ paths:
       summary: ListFileSizes
       tags:
       - file
+  /files/star:
+    patch:
+      consumes:
+      - application/json
+      description: Star
+      parameters:
+      - default: Bearer <session_token>
+        description: ' Bearer token'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Star request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.StarRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Star
+      tags:
+      - file
   /files/starred:
     get:
       consumes:
@@ -2725,6 +2697,54 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: ListTrash
+      tags:
+      - file
+  /files/unstar:
+    patch:
+      consumes:
+      - application/json
+      description: Unstar
+      parameters:
+      - default: Bearer <session_token>
+        description: ' Bearer token'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Unstar request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.UnstarRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Unstar
       tags:
       - file
   /users/change-password:
