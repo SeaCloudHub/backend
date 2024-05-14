@@ -229,3 +229,16 @@ type SearchResponse struct {
 	Entries []file.File `json:"entries"`
 	Cursor  string      `json:"cursor"`
 } // @name model.SearchResponse
+
+type ListSuggestedRequest struct {
+	Limit int  `query:"limit" validate:"omitempty,min=1,max=100"`
+	Dir   bool `query:"dir" validate:"omitempty"`
+}
+
+func (r *ListSuggestedRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 20
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}

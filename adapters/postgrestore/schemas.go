@@ -139,3 +139,30 @@ type StarSchema struct {
 }
 
 func (StarSchema) TableName() string { return "stars" }
+
+type LogSchema struct {
+	UserID    uuid.UUID `gorm:"column:user_id"`
+	FileID    uuid.UUID `gorm:"column:file_id"`
+	Action    string    `gorm:"column:action"`
+	CreatedAt time.Time `gorm:"column:created_at"`
+
+	File *FileSchema `gorm:"foreignKey:FileID;references:ID"`
+}
+
+func (LogSchema) TableName() string { return "logs" }
+
+func (s *LogSchema) ToDomainLog() *file.Log {
+	return &file.Log{
+		FileID:    s.FileID,
+		UserID:    s.UserID,
+		Action:    s.Action,
+		CreatedAt: s.CreatedAt,
+	}
+}
+
+func (s *LogSchema) ToDomainFile() *file.File {
+	file := s.File.ToDomainFile()
+	file.Log = s.ToDomainLog()
+
+	return file
+}
