@@ -36,7 +36,7 @@ import (
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param request path model.GetMetadataRequest true "Get metadata request"
-// @Success 200 {object} model.SuccessResponse{data=file.File}
+// @Success 200 {object} model.SuccessResponse{data=model.GetMetadataResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
@@ -172,6 +172,11 @@ func (s *Server) Download(c echo.Context) error {
 	}
 	defer f.Close()
 
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, uuid.MustParse(id.ID), file.LogActionOpen)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return c.Stream(http.StatusOK, mime, f)
 }
 
@@ -290,6 +295,15 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	logs := lo.Map(resp, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionCreate)
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, resp)
 }
 
@@ -359,6 +373,11 @@ func (s *Server) ListEntries(c echo.Context) error {
 
 	for i := range files {
 		files[i] = *files[i].Response()
+	}
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, uuid.MustParse(identity.ID), file.LogActionOpen)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
 
 	return s.success(c, model.ListEntriesResponse{
@@ -551,6 +570,11 @@ func (s *Server) CreateDirectory(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(f.ID, user.ID, file.LogActionCreate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, f.Response())
 }
 
@@ -624,6 +648,11 @@ func (s *Server) Share(c echo.Context) error {
 	}
 
 	// TODO: notify users
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionShare)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 
 	return s.success(c, nil)
 }
@@ -777,6 +806,11 @@ func (s *Server) UpdateGeneralAccess(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionUpdate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, nil)
 }
 
@@ -871,6 +905,11 @@ func (s *Server) UpdateAccess(c echo.Context) error {
 	}
 
 	wp.StopWait()
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionUpdate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 
 	return s.success(c, nil)
 }
@@ -991,6 +1030,15 @@ func (s *Server) CopyFiles(c echo.Context) error {
 	// update user storage usage
 	if err := s.UserStore.UpdateStorageUsage(ctx, dest.OwnerID, newStorageUsage); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// write log
+	logs := lo.Map(files, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionCreate)
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
 
 	return s.success(c, resp)
@@ -1133,6 +1181,19 @@ func (s *Server) Move(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	logs := lo.FilterMap(resp, func(f file.File, index int) (file.Log, bool) {
+		if f.Path != src.FullPath() {
+			return file.Log{}, false
+		}
+
+		return file.NewLog(f.ID, user.ID, file.LogActionMove), true
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, resp)
 }
 
@@ -1197,6 +1258,11 @@ func (s *Server) Rename(c echo.Context) error {
 	}
 
 	resp := *e.WithName(req.Name).WithPath(newPath).Response()
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionUpdate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 
 	return s.success(c, resp)
 }
@@ -1335,6 +1401,19 @@ func (s *Server) MoveToTrash(c echo.Context) error {
 
 	if err := s.UserStore.UpdateStorageUsage(ctx, src.OwnerID, src.Owner.StorageUsage-totalSize); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// write log
+	logs := lo.FilterMap(resp, func(f file.File, index int) (file.Log, bool) {
+		if f.Path != src.FullPath() {
+			return file.Log{}, false
+		}
+
+		return file.NewLog(f.ID, user.ID, file.LogActionMove), true
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
 
 	return s.success(c, resp)
@@ -1486,6 +1565,15 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 
 	wp.StopWait()
 
+	// write log
+	logs := lo.Map(files, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionMove)
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, resp)
 }
 
@@ -1615,6 +1703,15 @@ func (s *Server) Delete(c echo.Context) error {
 	}
 
 	wp.StopWait()
+
+	// write log
+	logs := lo.Map(files, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionDelete)
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 
 	return s.success(c, resp)
 }
@@ -1762,6 +1859,10 @@ func (s *Server) Star(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionStar)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 	return s.success(c, nil)
 }
 
@@ -1884,11 +1985,105 @@ func (s *Server) Search(c echo.Context) error {
 	})
 }
 
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListSuggestedRequest true "List suggested request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/suggested [get]
+func (s *Server) ListSuggested(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListSuggestedRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	files, err := s.FileStore.ListSuggested(ctx, user.ID, req.Limit, req.Dir)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	fullPaths := lo.Map(files, func(file file.File, index int) string {
+		return file.Path
+	})
+
+	parents, err := s.FileStore.ListByFullPaths(ctx, fullPaths)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	entries := s.MapperService.FileWithParents(files, parents)
+
+	return s.success(c, entries)
+}
+
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param id path string true "File ID"
+// @Param request query model.ListActivitiesRequest true "List activities request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListActivitiesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/{id}/activity [get]
+func (s *Server) ListActivities(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListActivitiesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	activities, err := s.FileStore.ListActivities(ctx, uuid.MustParse(req.ID), cursor)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.ListActivitiesResponse{
+		Activities: activities,
+		Cursor:     cursor.NextToken(),
+	})
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/trash", s.ListTrash)
 	router.GET("/share", s.GetShared)
 	router.GET("/search", s.Search)
+	router.GET("/starred", s.ListStarred)
+	router.GET("/suggested", s.ListSuggested)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/directories", s.CreateDirectory)
 	router.POST("/copy", s.CopyFiles)
@@ -1905,9 +2100,10 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/:id/metadata", s.GetMetadata)
 	router.GET("/:id/download", s.Download)
 	router.GET("/:id/access", s.Access) // get access to the shared file or directory
+	router.GET("/:id/activities", s.ListActivities)
 	router.PATCH("/:id/star", s.Star)
 	router.PATCH("/:id/unstar", s.Unstar)
-	router.GET("/starred", s.ListStarred)
+
 }
 
 func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID) (*file.File, error) {

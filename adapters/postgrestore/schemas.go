@@ -36,6 +36,10 @@ func (UserSchema) TableName() string {
 }
 
 func (s *UserSchema) ToDomainUser() *identity.User {
+	if s == nil {
+		return nil
+	}
+
 	return &identity.User{
 		ID:                s.ID,
 		Email:             s.Email,
@@ -86,6 +90,10 @@ func (f *FileSchema) FullPath() string {
 }
 
 func (s *FileSchema) ToDomainFile() *file.File {
+	if s == nil {
+		return nil
+	}
+
 	md5, _ := hex.DecodeString(s.MD5)
 
 	var owner *identity.User
@@ -139,3 +147,38 @@ type StarSchema struct {
 }
 
 func (StarSchema) TableName() string { return "stars" }
+
+type LogSchema struct {
+	UserID    uuid.UUID `gorm:"column:user_id"`
+	FileID    uuid.UUID `gorm:"column:file_id"`
+	Action    string    `gorm:"column:action"`
+	CreatedAt time.Time `gorm:"column:created_at"`
+
+	File *FileSchema `gorm:"foreignKey:FileID;references:ID"`
+	User *UserSchema `gorm:"foreignKey:UserID;references:ID"`
+}
+
+func (LogSchema) TableName() string { return "logs" }
+
+func (s *LogSchema) ToDomainLog() *file.Log {
+	if s == nil {
+		return nil
+	}
+
+	return &file.Log{
+		FileID:    s.FileID,
+		UserID:    s.UserID,
+		Action:    s.Action,
+		CreatedAt: s.CreatedAt,
+		File:      s.File.ToDomainFile(),
+		User:      s.User.ToDomainUser(),
+	}
+}
+
+func (s *LogSchema) ToDomainFile() *file.File {
+	file := s.File.ToDomainFile()
+	file.Log = s.ToDomainLog()
+	file.Log.File = nil
+
+	return file
+}

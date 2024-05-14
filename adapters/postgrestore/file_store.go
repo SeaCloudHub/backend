@@ -741,3 +741,119 @@ func (s *FileStore) DeleteStarByUserID(ctx context.Context, userID uuid.UUID) er
 type fsCursor struct {
 	CreatedAt *time.Time
 }
+
+type logCursor struct {
+	CreatedAt *time.Time
+}
+
+func (s *FileStore) WriteLogs(ctx context.Context, logs []file.Log) error {
+	var logSchemas []LogSchema
+
+	for _, log := range logs {
+		logSchemas = append(logSchemas, LogSchema{
+			FileID: log.FileID,
+			UserID: log.UserID,
+			Action: log.Action,
+		})
+	}
+
+	if err := s.db.WithContext(ctx).Create(&logSchemas).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) ReadLogs(ctx context.Context, userID string, cursor *pagination.Cursor) ([]file.Log, error) {
+	var logSchemas []LogSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[logCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Preload("User").Preload("File")
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if userID != "" {
+		query = query.Where("user_id = ?", userID)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Find(&logSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(logSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(logCursor{CreatedAt: &logSchemas[cursor.Limit].CreatedAt}))
+		logSchemas = logSchemas[:cursor.Limit]
+	}
+
+	logs := make([]file.Log, len(logSchemas))
+	for i, logSchema := range logSchemas {
+		logs[i] = *logSchema.ToDomainLog()
+	}
+
+	return logs, nil
+}
+
+func (s *FileStore) ListSuggested(ctx context.Context, userID uuid.UUID, limit int, isDir bool) ([]file.File, error) {
+	var logSchemas []LogSchema
+
+	db := s.db
+
+	subQuery := db.WithContext(ctx).Table("logs").
+		Select("DISTINCT ON (logs.file_id) logs.*").
+		Where("logs.user_id = ?", userID).Where("logs.action IN ?", file.SuggestedActions).
+		Order("logs.file_id, logs.created_at DESC")
+
+	if err := db.WithContext(ctx).Table("(?) AS logs", subQuery).
+		Preload("File").
+		Joins("JOIN files ON logs.file_id = files.id").
+		Where("files.is_dir = ?", isDir).
+		Order("logs.created_at DESC").
+		Limit(limit).
+		Find(&logSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(logSchemas))
+	for i, logSchema := range logSchemas {
+		files[i] = *logSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) ListActivities(ctx context.Context, fileID uuid.UUID, cursor *pagination.Cursor) ([]file.Log, error) {
+	var logSchemas []LogSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[logCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Preload("User").Where("file_id = ?", fileID)
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Find(&logSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(logSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(logCursor{CreatedAt: &logSchemas[cursor.Limit].CreatedAt}))
+		logSchemas = logSchemas[:cursor.Limit]
+	}
+
+	logs := make([]file.Log, len(logSchemas))
+	for i, logSchema := range logSchemas {
+		logs[i] = *logSchema.ToDomainLog()
+	}
+
+	return logs, nil
+}

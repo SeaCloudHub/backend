@@ -48,6 +48,10 @@ type Store interface {
 	DeleteShareByUserID(ctx context.Context, userID uuid.UUID) error
 	DeleteStarByFileID(ctx context.Context, fileID uuid.UUID) error
 	DeleteStarByUserID(ctx context.Context, userID uuid.UUID) error
+	WriteLogs(ctx context.Context, logs []Log) error
+	ReadLogs(ctx context.Context, userID string, cursor *pagination.Cursor) ([]Log, error)
+	ListSuggested(ctx context.Context, userID uuid.UUID, limit int, isDir bool) ([]File, error)
+	ListActivities(ctx context.Context, fileID uuid.UUID, cursor *pagination.Cursor) ([]Log, error)
 }
 
 type File struct {
@@ -70,6 +74,7 @@ type File struct {
 
 	Owner  *identity.User `json:"owner,omitempty"`
 	Parent *SimpleFile    `json:"parent,omitempty"`
+	Log    *Log           `json:"log,omitempty"`
 } // @name file.File
 
 func NewDirectory(name string) *File {
@@ -170,3 +175,32 @@ func NewFilter(_type string, after *time.Time) Filter {
 		After: after,
 	}
 }
+
+type Log struct {
+	FileID    uuid.UUID `json:"file_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Action    string    `json:"action"`
+	CreatedAt time.Time `json:"created_at"`
+
+	File *File          `json:"file,omitempty"`
+	User *identity.User `json:"user,omitempty"`
+} // @name file.Log
+
+func NewLog(fileID, userID uuid.UUID, action string) Log {
+	return Log{
+		FileID: fileID,
+		UserID: userID,
+		Action: action,
+	}
+}
+
+var (
+	LogActionOpen    = "open"
+	LogActionCreate  = "create"
+	LogActionUpdate  = "update"
+	LogActionDelete  = "delete"
+	LogActionMove    = "move"
+	LogActionShare   = "share"
+	LogActionStar    = "star"
+	SuggestedActions = []string{LogActionOpen, LogActionCreate, LogActionUpdate, LogActionDelete}
+)

@@ -21,7 +21,7 @@ func NewFileService(cfg *config.Config) *FileService {
 	swcfg := seaweedfs.NewConfigWithFilerURL(cfg.SeaweedFS.MasterServer, cfg.SeaweedFS.FilerServer)
 
 	if cfg.Debug {
-		swcfg = swcfg.Debug()
+		// swcfg = swcfg.Debug()
 	}
 
 	sw, err := seaweedfs.NewSeaweed(swcfg)
