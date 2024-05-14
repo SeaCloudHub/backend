@@ -10,6 +10,8 @@ definitions:
         type: string
       is_dir:
         type: boolean
+      log:
+        $ref: '#/definitions/file.Log'
       md5:
         items:
           type: integer
@@ -37,6 +39,21 @@ definitions:
       type:
         type: string
       updated_at:
+        type: string
+    type: object
+  file.Log:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      file:
+        $ref: '#/definitions/file.File'
+      file_id:
+        type: string
+      user:
+        $ref: '#/definitions/identity.User'
+      user_id:
         type: string
     type: object
   file.SimpleFile:
@@ -212,6 +229,28 @@ definitions:
       password_changed_at:
         type: string
     type: object
+  model.GetMetadataResponse:
+    properties:
+      file:
+        $ref: '#/definitions/file.File'
+      parents:
+        items:
+          $ref: '#/definitions/file.SimpleFile'
+        type: array
+      users:
+        items:
+          $ref: '#/definitions/permission.FileUser'
+        type: array
+    type: object
+  model.ListActivitiesResponse:
+    properties:
+      activities:
+        items:
+          $ref: '#/definitions/file.Log'
+        type: array
+      cursor:
+        type: string
+    type: object
   model.ListEntriesResponse:
     properties:
       cursor:
@@ -279,6 +318,15 @@ definitions:
         type: string
       session_token:
         type: string
+    type: object
+  model.LogsResponse:
+    properties:
+      cursor:
+        type: string
+      logs:
+        items:
+          $ref: '#/definitions/file.Log'
+        type: array
     type: object
   model.MoveRequest:
     properties:
@@ -507,6 +555,13 @@ definitions:
         type: integer
       total_pages:
         type: integer
+    type: object
+  permission.FileUser:
+    properties:
+      role:
+        type: string
+      user_id:
+        type: string
     type: object
 info:
   contact: {}
@@ -1030,6 +1085,54 @@ paths:
       summary: Download Identities Template CSV
       tags:
       - admin
+  /admin/logs:
+    get:
+      description: Logs
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - in: query
+        name: userID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.LogsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Logs
+      tags:
+      - admin
   /admin/me:
     get:
       description: AdminMe
@@ -1368,6 +1471,66 @@ paths:
       summary: Access
       tags:
       - file
+  /files/{id}/activity:
+    get:
+      consumes:
+      - application/json
+      description: ListTrash
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListActivitiesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListTrash
+      tags:
+      - file
   /files/{id}/download:
     get:
       description: Download
@@ -1434,7 +1597,7 @@ paths:
             - $ref: '#/definitions/model.SuccessResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/file.File'
+                  $ref: '#/definitions/model.GetMetadataResponse'
               type: object
         "400":
           description: Bad Request
@@ -2303,6 +2466,63 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: ListStarred
+      tags:
+      - file
+  /files/suggested:
+    get:
+      consumes:
+      - application/json
+      description: ListTrash
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: dir
+        type: boolean
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListTrash
       tags:
       - file
   /files/trash:

@@ -1985,6 +1985,21 @@ func (s *Server) Search(c echo.Context) error {
 	})
 }
 
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListSuggestedRequest true "List suggested request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/suggested [get]
 func (s *Server) ListSuggested(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
@@ -2020,6 +2035,48 @@ func (s *Server) ListSuggested(c echo.Context) error {
 	return s.success(c, entries)
 }
 
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param id path string true "File ID"
+// @Param request query model.ListActivitiesRequest true "List activities request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListActivitiesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/{id}/activity [get]
+func (s *Server) ListActivities(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListActivitiesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	activities, err := s.FileStore.ListActivities(ctx, uuid.MustParse(req.ID), cursor)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.ListActivitiesResponse{
+		Activities: activities,
+		Cursor:     cursor.NextToken(),
+	})
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/trash", s.ListTrash)
@@ -2043,6 +2100,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/:id/metadata", s.GetMetadata)
 	router.GET("/:id/download", s.Download)
 	router.GET("/:id/access", s.Access) // get access to the shared file or directory
+	router.GET("/:id/activities", s.ListActivities)
 	router.PATCH("/:id/star", s.Star)
 	router.PATCH("/:id/unstar", s.Unstar)
 

@@ -233,7 +233,7 @@ type SearchResponse struct {
 type ListSuggestedRequest struct {
 	Limit int  `query:"limit" validate:"omitempty,min=1,max=100"`
 	Dir   bool `query:"dir" validate:"omitempty"`
-}
+} // @name model.ListSuggestedRequest
 
 func (r *ListSuggestedRequest) Validate(ctx context.Context) error {
 	if r.Limit <= 0 {
@@ -242,3 +242,22 @@ func (r *ListSuggestedRequest) Validate(ctx context.Context) error {
 
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type ListActivitiesRequest struct {
+	ID     string `param:"id" validate:"required,uuid" swaggerignore:"true"`
+	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string `query:"cursor" validate:"omitempty,base64url"`
+} // @name model.ListActivitiesRequest
+
+func (r *ListActivitiesRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 100
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type ListActivitiesResponse struct {
+	Activities []file.Log `json:"activities"`
+	Cursor     string     `json:"cursor"`
+} // @name model.ListActivitiesResponse

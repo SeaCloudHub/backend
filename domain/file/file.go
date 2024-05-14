@@ -49,7 +49,9 @@ type Store interface {
 	DeleteStarByFileID(ctx context.Context, fileID uuid.UUID) error
 	DeleteStarByUserID(ctx context.Context, userID uuid.UUID) error
 	WriteLogs(ctx context.Context, logs []Log) error
+	ReadLogs(ctx context.Context, userID string, cursor *pagination.Cursor) ([]Log, error)
 	ListSuggested(ctx context.Context, userID uuid.UUID, limit int, isDir bool) ([]File, error)
+	ListActivities(ctx context.Context, fileID uuid.UUID, cursor *pagination.Cursor) ([]Log, error)
 }
 
 type File struct {
@@ -179,7 +181,10 @@ type Log struct {
 	UserID    uuid.UUID `json:"user_id"`
 	Action    string    `json:"action"`
 	CreatedAt time.Time `json:"created_at"`
-}
+
+	File *File          `json:"file,omitempty"`
+	User *identity.User `json:"user,omitempty"`
+} // @name file.Log
 
 func NewLog(fileID, userID uuid.UUID, action string) Log {
 	return Log{

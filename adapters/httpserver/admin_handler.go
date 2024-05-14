@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 	"maps"
 	"net/http"
 	"time"
+
+	gonanoid "github.com/matoous/go-nanoid/v2"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
 	"github.com/SeaCloudHub/backend/domain/file"
@@ -716,11 +717,50 @@ func (s *Server) ResetPassword(c echo.Context) error {
 	return s.success(c, model.ResetPasswordResponse{Password: password})
 }
 
+// Logs godoc
+// @Summary Logs
+// @Description Logs
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.LogsRequest false "Request"
+// @Success 200 {object} model.SuccessResponse{data=model.LogsResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/logs [get]
+func (s *Server) Logs(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.LogsRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	logs, err := s.FileStore.ReadLogs(ctx, req.UserID, cursor)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.LogsResponse{
+		Logs:   logs,
+		Cursor: cursor.NextToken(),
+	})
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
 	router.GET("/dashboard", s.Dashboard)
 	router.GET("/statistics", s.Statistics)
+	router.GET("/logs", s.Logs)
 
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)

@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/pkg/pagination"
@@ -171,3 +172,22 @@ func (r *EditIdentityRequest) Validate() error {
 type ResetPasswordResponse struct {
 	Password string `json:"password"`
 } // @name model.ResetPasswordResponse
+
+type LogsRequest struct {
+	UserID string `query:"user_id" validate:"omitempty,uuid"`
+	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string `query:"cursor" validate:"omitempty,base64url"`
+} // @name model.LogsRequest
+
+func (r *LogsRequest) Validate(ctx context.Context) error {
+	if r.Limit == 0 {
+		r.Limit = 20
+	}
+
+	return validation.Validate().Struct(r)
+}
+
+type LogsResponse struct {
+	Logs   []file.Log `json:"logs"`
+	Cursor string     `json:"cursor"`
+} // @name model.LogsResponse
