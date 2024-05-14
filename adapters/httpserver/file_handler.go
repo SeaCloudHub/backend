@@ -1812,56 +1812,66 @@ func (s *Server) GetShared(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
-// @Param id path string true "File ID"
+// @Param payload body model.StarRequest true "Star request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
-// @Router /files/{id}/star [patch]
+// @Router /files/star [patch]
 func (s *Server) Star(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
-		id  = c.Param("id")
+		req model.StarRequest
 	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
 
 	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
-	e, err := s.FileStore.GetByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, file.ErrNotFound) {
-			return s.error(c, apperror.ErrEntityNotFound(err))
+	for _, id := range req.FileIDs {
+		e, err := s.FileStore.GetByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	canView, err := func() (bool, error) {
-		if e.IsDir {
-			return s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
-		}
-		return s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
-	}()
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	if !canView {
-		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
-	}
-
-	if err := s.FileStore.Star(ctx, e.ID, user.ID); err != nil {
-		if errors.Is(err, file.ErrNotFound) {
-			return s.error(c, apperror.ErrEntityNotFound(err))
+		canView, err := func() (bool, error) {
+			if e.IsDir {
+				return s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
+			}
+			return s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
+		}()
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
+		if !canView {
+			return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+		}
 
-	// write log
-	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionStar)}); err != nil {
-		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+		if err := s.FileStore.Star(ctx, e.ID, user.ID); err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		// write log
+		if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionStar)}); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+		}
 	}
 	return s.success(c, nil)
 }
@@ -1873,32 +1883,42 @@ func (s *Server) Star(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
-// @Param id path string true "File ID"
+// @Param payload body model.UnstarRequest true "Unstar request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
-// @Router /files/{id}/unstar [patch]
+// @Router /files/unstar [patch]
 func (s *Server) Unstar(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
-		id  = c.Param("id")
+		req model.UnstarRequest
 	)
 
-	user, _ := c.Get(ContextKeyUser).(*identity.User)
-	fileId, err := uuid.Parse(id)
-	if err != nil {
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	if err := s.FileStore.Unstar(ctx, fileId, user.ID); err != nil {
-		if errors.Is(err, file.ErrNotFound) {
-			return s.error(c, apperror.ErrEntityNotFound(err))
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+	for _, id := range req.FileIDs {
+		fileId, err := uuid.Parse(id)
+		if err != nil {
+			return s.error(c, apperror.ErrInvalidParam(err))
 		}
 
-		return s.error(c, apperror.ErrInternalServer(err))
+		if err := s.FileStore.Unstar(ctx, fileId, user.ID); err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
 	}
 
 	return s.success(c, nil)
@@ -2189,8 +2209,8 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/:id/download", s.Download)
 	router.GET("/:id/access", s.Access) // get access to the shared file or directory
 	router.GET("/:id/activities", s.ListActivities)
-	router.PATCH("/:id/star", s.Star)
-	router.PATCH("/:id/unstar", s.Unstar)
+	router.PATCH("/star", s.Star)
+	router.PATCH("/unstar", s.Unstar)
 
 }
 
