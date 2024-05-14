@@ -6,10 +6,8 @@ import (
 	"strings"
 
 	"github.com/SeaCloudHub/backend/domain/identity"
-	"github.com/SeaCloudHub/backend/pkg/apperror"
-	"github.com/google/uuid"
-
 	"github.com/SeaCloudHub/backend/pkg/app"
+	"github.com/SeaCloudHub/backend/pkg/apperror"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -68,7 +66,7 @@ func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (boo
 		return false, fmt.Errorf("invalid token: %w", err)
 	}
 
-	user, err := a.server.UserStore.GetByID(ctx, uuid.MustParse(id.ID))
+	user, err := a.server.UserStore.GetByID(ctx, id.ID)
 	if err != nil {
 		return false, fmt.Errorf("user not found: %w", err)
 	}

@@ -52,7 +52,7 @@ func (s *Server) Login(c echo.Context) error {
 	}
 
 	// get user from db
-	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(session.Identity.ID))
+	user, err := s.UserStore.GetByID(ctx, session.Identity.ID)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}

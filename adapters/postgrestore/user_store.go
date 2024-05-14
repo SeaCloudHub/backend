@@ -69,7 +69,7 @@ func (s *UserStore) UpdateStorageUsage(ctx context.Context, id uuid.UUID, usage 
 		Error
 }
 
-func (s *UserStore) GetByID(ctx context.Context, id uuid.UUID) (*identity.User, error) {
+func (s *UserStore) GetByID(ctx context.Context, id string) (*identity.User, error) {
 	var userSchema UserSchema
 	err := s.db.WithContext(ctx).Where("id = ?", id).First(&userSchema).Error
 	if err != nil {
@@ -204,4 +204,29 @@ func (s *UserStore) ToggleActive(ctx context.Context, id uuid.UUID) error {
 			"blocked_at": gorm.Expr("CASE WHEN is_active THEN NULL ELSE NOW() END"),
 		}).
 		Error
+}
+
+func (s *UserStore) Update(ctx context.Context, user *identity.User) error {
+	userSchema := UserSchema{
+		Email:             user.Email,
+		FirstName:         user.FirstName,
+		LastName:          user.LastName,
+		AvatarURL:         user.AvatarURL,
+		IsActive:          user.IsActive,
+		IsAdmin:           user.IsAdmin,
+		PasswordChangedAt: user.PasswordChangedAt,
+		RootID:            user.RootID,
+		StorageUsage:      user.StorageUsage,
+		StorageCapacity:   user.StorageCapacity,
+		BlockedAt:         user.BlockedAt,
+	}
+
+	return s.db.WithContext(ctx).Model(&UserSchema{}).
+		Where("id = ?", user.ID).
+		Updates(&userSchema).
+		Error
+}
+
+func (s *UserStore) Delete(ctx context.Context, id uuid.UUID) error {
+	return s.db.WithContext(ctx).Delete(&UserSchema{}, id).Error
 }

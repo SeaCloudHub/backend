@@ -672,6 +672,72 @@ func (s *FileStore) ListRootDirectory(ctx context.Context, pager *pagination.Pag
 	return files, nil
 }
 
+func (s *FileStore) ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*file.File, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("path ~ ?", fmt.Sprintf(`^/%s(/.*)?$`, userID)).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+	files := make([]*file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) DeleteUserFiles(ctx context.Context, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("path ~ ?", fmt.Sprintf(`^/%s(/.*)?$`, userID)).
+		Delete(&FileSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteShareByFileID(ctx context.Context, fileID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ?", fileID).
+		Delete(&ShareSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteShareByUserID(ctx context.Context, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Delete(&ShareSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteStarByFileID(ctx context.Context, fileID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ?", fileID).
+		Delete(&StarSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteStarByUserID(ctx context.Context, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Delete(&StarSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 type fsCursor struct {
 	CreatedAt *time.Time
 }

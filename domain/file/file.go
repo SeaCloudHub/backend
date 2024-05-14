@@ -42,6 +42,12 @@ type Store interface {
 	ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error)
 	GetAllFiles(ctx context.Context) ([]File, error)
 	ListRootDirectory(ctx context.Context, pager *pagination.Pager) ([]File, error)
+	ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*File, error)
+	DeleteUserFiles(ctx context.Context, userID uuid.UUID) error
+	DeleteShareByFileID(ctx context.Context, fileID uuid.UUID) error
+	DeleteShareByUserID(ctx context.Context, userID uuid.UUID) error
+	DeleteStarByFileID(ctx context.Context, fileID uuid.UUID) error
+	DeleteStarByUserID(ctx context.Context, userID uuid.UUID) error
 }
 
 type File struct {

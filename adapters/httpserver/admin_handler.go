@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	"maps"
 	"net/http"
 	"time"
@@ -195,8 +196,7 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 func (s *Server) UpdateIdentityState(c echo.Context) error {
 	ctx := app.NewEchoContextAdapter(c)
 
-	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param(
-		"identity_id")))
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -390,9 +390,7 @@ func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	identityId := uuid.MustParse(c.Param("identity_id"))
-
-	user, err := s.UserStore.GetByID(ctx, identityId)
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -405,7 +403,7 @@ func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(errors.New("storage capacity must be greater than storage usage")))
 	}
 
-	if err := s.UserStore.UpdateStorageCapacity(ctx, identityId, req.StorageCapacity); err != nil {
+	if err := s.UserStore.UpdateStorageCapacity(ctx, user.ID, req.StorageCapacity); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
@@ -428,7 +426,7 @@ func (s *Server) ChangeUserStorageCapacity(c echo.Context) error {
 func (s *Server) GetIdentityDetails(c echo.Context) error {
 	var ctx = app.NewEchoContextAdapter(c)
 
-	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(c.Param("identity_id")))
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -468,7 +466,7 @@ func (s *Server) GetIdentityFiles(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	user, err := s.UserStore.GetByID(ctx, uuid.MustParse(req.IdentityId))
+	user, err := s.UserStore.GetByID(ctx, req.IdentityId)
 	if err != nil {
 		if errors.Is(err, identity.ErrIdentityNotFound) {
 			return s.error(c, apperror.ErrIdentityNotFound(err))
@@ -544,6 +542,180 @@ func (s *Server) ListStorages(c echo.Context) error {
 	})
 }
 
+// EditIdentity godoc
+// @Summary EditIdentity
+// @Description EditIdentity
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param identity_id path string true "Identity ID"
+// @Param payload body model.EditIdentityRequest true "Edit identity request"
+// @Success 200 {object} model.SuccessResponse{data=identity.User}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id} [patch]
+func (s *Server) EditIdentity(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.EditIdentityRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, err := s.UserStore.GetByID(ctx, req.IdentityID)
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	user.UpdateInfo(req.FirstName, req.LastName, req.AvatarURL)
+	if err := s.UserStore.Update(ctx, user); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, user)
+}
+
+// DeleteIdentity godoc
+// @Summary DeleteIdentity
+// @Description DeleteIdentity
+// @Tags admin
+// @Produce json
+// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
+// @Param identity_id path string true "Identity ID"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id} [delete]
+func (s *Server) DeleteIdentity(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+	)
+
+	user, err := s.UserStore.GetByID(ctx, c.Param("identity_id"))
+	if err != nil {
+		if errors.Is(err, identity.ErrIdentityNotFound) {
+			return s.error(c, apperror.ErrIdentityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if user.IsAdmin {
+		return s.error(c, apperror.ErrForbidden(errors.New("cannot delete admin user")))
+	}
+
+	files, err := s.FileStore.ListUserFiles(ctx, user.ID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Delete user
+	if err := s.UserStore.Delete(ctx, user.ID); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Delete identity
+	if err := s.IdentityService.DeleteIdentity(ctx, user.ID.String()); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Delete user files
+	if err := s.FileStore.DeleteUserFiles(ctx, user.ID); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Delete shared files by user
+	if err := s.FileStore.DeleteShareByUserID(ctx, user.ID); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Delete starred files by user
+	if err := s.FileStore.DeleteStarByUserID(ctx, user.ID); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Delete permissions
+	if err := s.PermissionService.DeleteUserPermissions(ctx, user.ID.String()); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	for _, f := range files {
+		// Delete file from storage
+		if err := s.FileService.Delete(ctx, f.ID.String()); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		// Delete file permissions
+		if f.IsDir {
+			if err := s.PermissionService.DeleteDirectoryPermissions(ctx, f.ID.String()); err != nil {
+				return s.error(c, apperror.ErrInternalServer(err))
+			}
+		} else {
+			if err := s.PermissionService.DeleteFilePermissions(ctx, f.ID.String()); err != nil {
+				return s.error(c, apperror.ErrInternalServer(err))
+			}
+		}
+
+		// Delete shared files
+		if err := s.FileStore.DeleteShareByFileID(ctx, f.ID); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		// Delete starred files
+		if err := s.FileStore.DeleteStarByFileID(ctx, f.ID); err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	return s.success(c, nil)
+}
+
+// ResetPassword godoc
+// @Summary ResetPassword
+// @Description ResetPassword
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param identity_id path string true "Identity ID"
+// @Success 200 {object} model.SuccessResponse
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /admin/identities/{identity_id}/reset-password [patch]
+func (s *Server) ResetPassword(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+	)
+
+	identityID := uuid.MustParse(c.Param("identity_id"))
+
+	e, err := s.IdentityService.GetByID(ctx, identityID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	password := gonanoid.Must(11)
+	if err := s.IdentityService.ResetPassword(ctx, e, password); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.ResetPasswordResponse{Password: password})
+}
+
 func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.adminMiddleware)
 	router.GET("/me", s.AdminMe)
@@ -553,6 +725,9 @@ func (s *Server) RegisterAdminRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/identities", s.ListIdentities)
 	router.GET("/identities/:identity_id", s.GetIdentityDetails)
+	router.PATCH("/identities/:identity_id", s.EditIdentity)
+	router.DELETE("/identities/:identity_id", s.DeleteIdentity)
+	router.PATCH("/identities/:identity_id/reset-password", s.ResetPassword)
 	router.POST("/identities", s.CreateIdentity)
 	router.POST("/identities/bulk", s.CreateMultipleIdentities)
 	router.GET("/identities/template", s.DownloadIdentitiesTemplate)
