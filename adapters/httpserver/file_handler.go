@@ -2077,6 +2077,92 @@ func (s *Server) ListActivities(c echo.Context) error {
 	})
 }
 
+// GetStorage godoc
+// @Summary GetStorage
+// @Description GetStorage
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=model.GetStorageResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/storage [get]
+func (s *Server) GetStorage(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	root, err := s.FileStore.GetByID(ctx, user.RootID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	files, err := s.FileStore.GetAllFiles(ctx, root.FullPath())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	storage := file.NewStorage(files)
+
+	return s.success(c, model.GetStorageResponse{
+		Storage:  storage,
+		Capacity: user.StorageCapacity,
+	})
+}
+
+// ListFileSizes godoc
+// @Summary ListFileSizes
+// @Description ListFileSizes
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListFileSizesRequest true "List file sizes request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListFileSizesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/sizes [get]
+func (s *Server) ListFileSizes(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListFileSizesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	root, err := s.FileStore.GetByID(ctx, user.RootID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After)
+
+	sizes, err := s.FileStore.ListFiles(ctx, root.FullPath(), cursor, filter, req.Asc)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.ListFileSizesResponse{
+		Entries: sizes,
+		Cursor:  cursor.NextToken(),
+	})
+}
+
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/trash", s.ListTrash)
@@ -2084,6 +2170,8 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/search", s.Search)
 	router.GET("/starred", s.ListStarred)
 	router.GET("/suggested", s.ListSuggested)
+	router.GET("/storage", s.GetStorage)
+	router.GET("/sizes", s.ListFileSizes)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/directories", s.CreateDirectory)
 	router.POST("/copy", s.CopyFiles)

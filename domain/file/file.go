@@ -26,6 +26,7 @@ type Store interface {
 	ListSelected(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedChildren(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedOwnedChildren(ctx context.Context, userID uuid.UUID, parent *File, ids []string) ([]File, error)
+	ListFiles(ctx context.Context, path string, cursor *pagination.Cursor, filter Filter, asc bool) ([]File, error)
 	UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error
 	UpdatePath(ctx context.Context, fileID uuid.UUID, path string) error
 	UpdateName(ctx context.Context, fileID uuid.UUID, name string) error
@@ -40,7 +41,7 @@ type Store interface {
 	Star(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	Unstar(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error)
-	GetAllFiles(ctx context.Context) ([]File, error)
+	GetAllFiles(ctx context.Context, path ...string) ([]File, error)
 	ListRootDirectory(ctx context.Context, pager *pagination.Pager) ([]File, error)
 	ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*File, error)
 	DeleteUserFiles(ctx context.Context, userID uuid.UUID) error
@@ -204,3 +205,44 @@ var (
 	LogActionStar    = "star"
 	SuggestedActions = []string{LogActionOpen, LogActionCreate, LogActionUpdate, LogActionDelete}
 )
+
+type Storage struct {
+	Text     uint64 `json:"text"`
+	Document uint64 `json:"document"`
+	PDF      uint64 `json:"pdf"`
+	JSON     uint64 `json:"json"`
+	Image    uint64 `json:"image"`
+	Video    uint64 `json:"video"`
+	Audio    uint64 `json:"audio"`
+	Archive  uint64 `json:"archive"`
+	Other    uint64 `json:"other"`
+}
+
+func NewStorage(files []File) Storage {
+	var storage Storage
+
+	for _, file := range files {
+		switch file.Type {
+		case "text":
+			storage.Text += file.Size
+		case "document":
+			storage.Document += file.Size
+		case "pdf":
+			storage.PDF += file.Size
+		case "json":
+			storage.JSON += file.Size
+		case "image":
+			storage.Image += file.Size
+		case "video":
+			storage.Video += file.Size
+		case "audio":
+			storage.Audio += file.Size
+		case "archive":
+			storage.Archive += file.Size
+		default:
+			storage.Other += file.Size
+		}
+	}
+
+	return storage
+}

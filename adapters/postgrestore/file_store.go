@@ -625,12 +625,16 @@ func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID) ([]file.F
 
 }
 
-func (s *FileStore) GetAllFiles(ctx context.Context) ([]file.File, error) {
+func (s *FileStore) GetAllFiles(ctx context.Context, path ...string) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
-	if err := s.db.WithContext(ctx).
-		Where("is_dir = ?", false).
-		Find(&fileSchemas).Error; err != nil {
+	query := s.db.WithContext(ctx).
+		Where("is_dir = ?", false)
+	if len(path) == 1 {
+		query = query.Where("path ~ ?", fmt.Sprintf(`^%s(/.*)?$`, path[0]))
+	}
+
+	if err := query.Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
@@ -856,4 +860,49 @@ func (s *FileStore) ListActivities(ctx context.Context, fileID uuid.UUID, cursor
 	}
 
 	return logs, nil
+}
+
+func (s *FileStore) ListFiles(ctx context.Context, path string, cursor *pagination.Cursor, filter file.Filter, asc bool) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, path))
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if asc {
+		query = query.Order("size ASC")
+	} else {
+		query = query.Order("size DESC")
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
 }

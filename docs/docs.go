@@ -2249,6 +2249,119 @@ const docTemplate = `{
                 }
             }
         },
+        "/files/sizes": {
+            "get": {
+                "description": "ListFileSizes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "file"
+                ],
+                "summary": "ListFileSizes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "name": "asc",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "text",
+                            "document",
+                            "pdf",
+                            "json",
+                            "image",
+                            "video",
+                            "audio",
+                            "archive",
+                            "other"
+                        ],
+                        "type": "string",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.ListFileSizesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/files/starred": {
             "get": {
                 "description": "ListStarred",
@@ -2288,6 +2401,81 @@ const docTemplate = `{
                                             "items": {
                                                 "$ref": "#/definitions/file.File"
                                             }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/files/storage": {
+            "get": {
+                "description": "GetStorage",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "file"
+                ],
+                "summary": "GetStorage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "Bearer \u003csession_token\u003e",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.GetStorageResponse"
                                         }
                                     }
                                 }
@@ -3828,6 +4016,41 @@ const docTemplate = `{
                 }
             }
         },
+        "model.GetStorageResponse": {
+            "type": "object",
+            "properties": {
+                "archive": {
+                    "type": "integer"
+                },
+                "audio": {
+                    "type": "integer"
+                },
+                "capacity": {
+                    "type": "integer"
+                },
+                "document": {
+                    "type": "integer"
+                },
+                "image": {
+                    "type": "integer"
+                },
+                "json": {
+                    "type": "integer"
+                },
+                "other": {
+                    "type": "integer"
+                },
+                "pdf": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "integer"
+                },
+                "video": {
+                    "type": "integer"
+                }
+            }
+        },
         "model.ListActivitiesResponse": {
             "type": "object",
             "properties": {
@@ -3843,6 +4066,20 @@ const docTemplate = `{
             }
         },
         "model.ListEntriesResponse": {
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "type": "string"
+                },
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/file.File"
+                    }
+                }
+            }
+        },
+        "model.ListFileSizesResponse": {
             "type": "object",
             "properties": {
                 "cursor": {
