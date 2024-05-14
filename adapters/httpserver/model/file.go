@@ -261,3 +261,29 @@ type ListActivitiesResponse struct {
 	Activities []file.Log `json:"activities"`
 	Cursor     string     `json:"cursor"`
 } // @name model.ListActivitiesResponse
+
+type GetStorageResponse struct {
+	Capacity     uint64 `json:"capacity"`
+	file.Storage `json:",inline"`
+} // @name model.GetStorageResponse
+
+type ListFileSizesRequest struct {
+	Type   string     `query:"type" validate:"omitempty,oneof=text document pdf json image video audio archive other"`
+	After  *time.Time `query:"after" validate:"omitempty"`
+	Limit  int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string     `query:"cursor" validate:"omitempty,base64url"`
+	Asc    bool       `query:"asc" validate:"omitempty"`
+} // @name model.ListFileSizesRequest
+
+func (r *ListFileSizesRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 30
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type ListFileSizesResponse struct {
+	Entries []file.File `json:"entries"`
+	Cursor  string      `json:"cursor"`
+} // @name model.ListFileSizesResponse

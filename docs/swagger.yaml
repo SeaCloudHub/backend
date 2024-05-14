@@ -242,6 +242,29 @@ definitions:
           $ref: '#/definitions/permission.FileUser'
         type: array
     type: object
+  model.GetStorageResponse:
+    properties:
+      archive:
+        type: integer
+      audio:
+        type: integer
+      capacity:
+        type: integer
+      document:
+        type: integer
+      image:
+        type: integer
+      json:
+        type: integer
+      other:
+        type: integer
+      pdf:
+        type: integer
+      text:
+        type: integer
+      video:
+        type: integer
+    type: object
   model.ListActivitiesResponse:
     properties:
       activities:
@@ -252,6 +275,15 @@ definitions:
         type: string
     type: object
   model.ListEntriesResponse:
+    properties:
+      cursor:
+        type: string
+      entries:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
+    type: object
+  model.ListFileSizesResponse:
     properties:
       cursor:
         type: string
@@ -2419,6 +2451,80 @@ paths:
       summary: Share
       tags:
       - file
+  /files/sizes:
+    get:
+      consumes:
+      - application/json
+      description: ListFileSizes
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: after
+        type: string
+      - in: query
+        name: asc
+        type: boolean
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - enum:
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListFileSizesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListFileSizes
+      tags:
+      - file
   /files/starred:
     get:
       consumes:
@@ -2466,6 +2572,53 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: ListStarred
+      tags:
+      - file
+  /files/storage:
+    get:
+      consumes:
+      - application/json
+      description: GetStorage
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.GetStorageResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: GetStorage
       tags:
       - file
   /files/suggested:
