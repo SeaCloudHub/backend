@@ -814,7 +814,7 @@ func (s *FileStore) ListSuggested(ctx context.Context, userID uuid.UUID, limit i
 		Order("logs.file_id, logs.created_at DESC")
 
 	if err := db.WithContext(ctx).Table("(?) AS logs", subQuery).
-		Preload("File").
+		Preload("File").Preload("File.Owner").
 		Joins("JOIN files ON logs.file_id = files.id").
 		Where("files.is_dir = ?", isDir).
 		Order("logs.created_at DESC").
