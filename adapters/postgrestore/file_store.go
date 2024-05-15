@@ -131,7 +131,8 @@ func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cur
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("name != ?", ".trash")
+	query := s.db.WithContext(ctx).Where("name != ?", ".trash").
+		Where("path ~ ?", fmt.Sprintf(`^%s(/.*)?$`, filter.Path))
 	if len(q) > 0 {
 		query = query.Order(fmt.Sprintf("similarity(name, '%s') DESC", q))
 	}

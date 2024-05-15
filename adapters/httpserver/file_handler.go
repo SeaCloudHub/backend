@@ -1042,7 +1042,6 @@ func (s *Server) CopyFiles(c echo.Context) error {
 	}
 
 	return s.success(c, resp)
-
 }
 
 // Move godoc
@@ -1980,8 +1979,28 @@ func (s *Server) Search(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	if req.ParentID == "" {
+		req.ParentID = user.RootID.String()
+	}
+
+	parent, err := s.FileStore.GetByID(ctx, req.ParentID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canView, err := s.PermissionService.CanViewDirectory(ctx, user.ID.String(), parent.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+	}
+
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	filter := file.NewFilter(req.Type, req.After)
+	filter := file.NewFilter(req.Type, req.After).WithPath(parent.FullPath())
 
 	files, err := s.FileStore.Search(ctx, req.Query, cursor, filter)
 	if err != nil {
