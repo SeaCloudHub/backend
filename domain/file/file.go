@@ -168,6 +168,7 @@ type Stars struct {
 type Filter struct {
 	Type  string
 	After *time.Time
+	Path  string
 }
 
 func NewFilter(_type string, after *time.Time) Filter {
@@ -175,6 +176,12 @@ func NewFilter(_type string, after *time.Time) Filter {
 		Type:  _type,
 		After: after,
 	}
+}
+
+func (f Filter) WithPath(path string) Filter {
+	f.Path = path
+
+	return f
 }
 
 type Log struct {
