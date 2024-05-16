@@ -132,7 +132,7 @@ func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cur
 	}
 
 	query := s.db.WithContext(ctx).Where("name != ?", ".trash").
-		Where("path ~ ?", fmt.Sprintf(`^%s(/.*)?$`, filter.Path))
+		Where("path ~ ?", fmt.Sprintf(`^%s(\/(?!\.trash(\/|$)).*)?$`, filter.Path))
 	if len(q) > 0 {
 		query = query.Order(fmt.Sprintf("similarity(name, '%s') DESC", q))
 	}
@@ -326,7 +326,7 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File,
 		var childFileSchemas []FileSchema
 
 		if err := db.WithContext(ctx).
-			Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, fileSchema.FullPath())).
+			Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, fileSchema.FullPath())).
 			Find(&childFileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)
 		}
@@ -365,7 +365,7 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 		var childFileSchemas []FileSchema
 
 		if err := db.WithContext(ctx).
-			Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, fileSchema.FullPath())).
+			Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, fileSchema.FullPath())).
 			Find(&childFileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)
 		}
@@ -423,7 +423,7 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 		// Update child folders and file paths only if it's a folder
 		if fileSchema.IsDir {
 			if err := tx.WithContext(ctx).Model(&FileSchema{}).
-				Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, fileSchema.FullPath())).
+				Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, fileSchema.FullPath())).
 				Updates(map[string]interface{}{
 					"path": gorm.Expr("REPLACE(path, ?, ?)", fileSchema.FullPath(), filepath.Join(fileSchema.Path, name)),
 				}).Error; err != nil {
@@ -482,7 +482,7 @@ func (s *FileStore) RestoreChildrenFromTrash(ctx context.Context, parentPath, ne
 	if err := s.db.WithContext(ctx).
 		Model(&fileSchemas).
 		Clauses(clause.Returning{}).
-		Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, parentPath)).
+		Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, parentPath)).
 		Updates(map[string]interface{}{
 			"path":          gorm.Expr("replace(path, ?, ?)", parentPath, newPath),
 			"previous_path": nil,
@@ -513,7 +513,7 @@ func (s *FileStore) Delete(ctx context.Context, e file.File) ([]file.File, error
 	if e.IsDir {
 		if err := s.db.WithContext(ctx).Unscoped().
 			Clauses(clause.Returning{}).
-			Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, e.FullPath())).
+			Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, e.FullPath())).
 			Delete(&fileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)
 		}
@@ -632,7 +632,7 @@ func (s *FileStore) GetAllFiles(ctx context.Context, path ...string) ([]file.Fil
 	query := s.db.WithContext(ctx).
 		Where("is_dir = ?", false)
 	if len(path) == 1 {
-		query = query.Where("path ~ ?", fmt.Sprintf(`^%s(/.*)?$`, path[0]))
+		query = query.Where("path ~ ?", fmt.Sprintf(`^\%s(\/.*)?$`, path[0]))
 	}
 
 	if err := query.Find(&fileSchemas).Error; err != nil {
@@ -681,7 +681,7 @@ func (s *FileStore) ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*fil
 	var fileSchemas []FileSchema
 
 	if err := s.db.WithContext(ctx).
-		Where("path ~ ?", fmt.Sprintf(`^/%s(/.*)?$`, userID)).
+		Where("path ~ ?", fmt.Sprintf(`^\/%s(\/.*)?$`, userID)).
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -695,7 +695,7 @@ func (s *FileStore) ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*fil
 
 func (s *FileStore) DeleteUserFiles(ctx context.Context, userID uuid.UUID) error {
 	if err := s.db.WithContext(ctx).
-		Where("path ~ ?", fmt.Sprintf(`^/%s(/.*)?$`, userID)).
+		Where("path ~ ?", fmt.Sprintf(`^\/%s(\/.*)?$`, userID)).
 		Delete(&FileSchema{}).Error; err != nil {
 		return fmt.Errorf("unexpected error: %w", err)
 	}
@@ -872,7 +872,7 @@ func (s *FileStore) ListFiles(ctx context.Context, path string, cursor *paginati
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, path))
+	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path))
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
