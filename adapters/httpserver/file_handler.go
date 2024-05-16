@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/SeaCloudHub/backend/domain/notification"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -647,7 +648,24 @@ func (s *Server) Share(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	// TODO: notify users
+	go func() {
+		var eg errgroup.Group
+
+		for _, u := range users {
+			u := u
+			notifications := []notification.Notification{
+				{UserID: u.ID.String(),
+					Content: "You have been shared a file"},
+			}
+			eg.Go(func() error {
+				return s.NotificationService.SendNotification(ctx, notifications)
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+		}
+	}()
 
 	// write log
 	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionShare)}); err != nil {
