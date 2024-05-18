@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -116,7 +117,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 // @Description Download
 // @Tags file
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param request path model.DownloadFileRequest true "Download file request"
+// @Param request path model.DownloadRequest true "Download file request"
 // @Success 200 {file} file
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -127,7 +128,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 func (s *Server) Download(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
-		req model.DownloadFileRequest
+		req model.DownloadRequest
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -150,7 +151,16 @@ func (s *Server) Download(c echo.Context) error {
 	}
 
 	if e.IsDir {
-		return s.error(c, apperror.ErrFileOnlyOperation())
+		canView, err := s.PermissionService.CanViewDirectory(ctx, id.ID, e.ID.String())
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		if !canView {
+			return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+		}
+
+		return s.downloadZip(c, e.Path, []string{e.ID.String()})
 	}
 
 	canView, err := s.PermissionService.CanViewFile(ctx, id.ID, e.ID.String())
@@ -178,6 +188,57 @@ func (s *Server) Download(c echo.Context) error {
 	}
 
 	return c.Stream(http.StatusOK, mime, f)
+}
+
+// DownloadBatch godoc
+// @Summary DownloadBatch
+// @Description DownloadBatch
+// @Tags file
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request body model.DownloadBatchRequest true "Download batch request"
+// @Success 200 {file} file
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/download [post]
+func (s *Server) DownloadBatch(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.DownloadBatchRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// check if user has view permission to the parent directory
+	parent, err := s.FileStore.GetByID(ctx, req.ParentID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canView, err := s.PermissionService.CanViewDirectory(ctx, user.ID.String(), parent.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+	}
+
+	return s.downloadZip(c, parent.FullPath(), req.IDs)
 }
 
 // UploadFiles godoc
@@ -1113,7 +1174,7 @@ func (s *Server) Move(c echo.Context) error {
 		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
-	files, err := s.FileStore.ListSelectedChildren(ctx, src, req.SourceIDs)
+	files, err := s.FileStore.ListSelectedChildren(ctx, src.FullPath(), req.SourceIDs)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -2211,6 +2272,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/suggested", s.ListSuggested)
 	router.GET("/storage", s.GetStorage)
 	router.GET("/sizes", s.ListFileSizes)
+	router.POST("/download", s.DownloadBatch)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/directories", s.CreateDirectory)
 	router.POST("/copy", s.CopyFiles)
@@ -2262,4 +2324,56 @@ func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Re
 	}
 
 	return f, nil
+}
+
+func (s *Server) downloadZip(c echo.Context, path string, ids []string) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	// list selected children
+	files, err := s.FileStore.ListSelectedChildren(ctx, path, ids)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if len(files) == 0 {
+		return s.error(c, apperror.ErrNoFilesSelected(nil))
+	}
+
+	zw := zip.NewWriter(c.Response().Writer)
+	defer zw.Close()
+
+	for _, f := range files {
+		path := strings.TrimPrefix(f.FullPath(), path+"/")
+
+		if f.IsDir {
+			_, err := zw.Create(path + "/")
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			}
+
+			continue
+		}
+
+		r, _, err := s.FileService.DownloadFile(ctx, f.ID.String())
+		if err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			continue
+		}
+		defer r.Close()
+
+		w, err := zw.Create(path)
+		if err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			continue
+		}
+
+		if _, err := io.Copy(w, r); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			continue
+		}
+	}
+
+	c.Response().Header().Set(echo.HeaderContentType, "application/zip")
+
+	return nil
 }

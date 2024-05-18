@@ -196,6 +196,18 @@ definitions:
     required:
     - source_ids
     type: object
+  model.DownloadBatchRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        type: array
+      parent_id:
+        type: string
+    required:
+    - ids
+    - parent_id
+    type: object
   model.EditIdentityRequest:
     properties:
       avatar_url:
@@ -1935,6 +1947,50 @@ paths:
       summary: CreateDirectory
       tags:
       - file
+  /files/download:
+    post:
+      description: DownloadBatch
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Download batch request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.DownloadBatchRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: DownloadBatch
+      tags:
+      - file
   /files/general-access:
     patch:
       consumes:
@@ -2224,6 +2280,9 @@ paths:
         minimum: 1
         name: limit
         type: integer
+      - in: query
+        name: parentID
+        type: string
       - in: query
         name: query
         required: true

@@ -24,11 +24,11 @@ type GetMetadataResponse struct {
 	Users   []permission.FileUser `json:"users"`
 } // @name model.GetMetadataResponse
 
-type DownloadFileRequest struct {
+type DownloadRequest struct {
 	ID string `param:"id" validate:"required,uuid"`
-}
+} // @name model.DownloadRequest
 
-func (r *DownloadFileRequest) Validate(ctx context.Context) error {
+func (r *DownloadRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
@@ -288,3 +288,12 @@ type ListFileSizesResponse struct {
 	Entries []file.File `json:"entries"`
 	Cursor  string      `json:"cursor"`
 } // @name model.ListFileSizesResponse
+
+type DownloadBatchRequest struct {
+	ParentID string   `json:"parent_id" validate:"required,uuid"`
+	IDs      []string `json:"ids" validate:"required,dive,uuid"`
+} // @name model.DownloadBatchRequest
+
+func (r *DownloadBatchRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
