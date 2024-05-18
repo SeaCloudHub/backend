@@ -70,7 +70,7 @@ func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (boo
 	if err != nil {
 		return false, fmt.Errorf("user not found: %w", err)
 	}
-
+	
 	c.Set(ContextKeyIdentity, id)
 	c.Set(ContextKeyUser, user)
 

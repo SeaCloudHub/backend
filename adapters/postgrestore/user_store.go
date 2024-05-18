@@ -201,7 +201,7 @@ func (s *UserStore) ToggleActive(ctx context.Context, id uuid.UUID) error {
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"is_active":  gorm.Expr("NOT is_active"),
-			"blocked_at": gorm.Expr("CASE WHEN is_active THEN NULL ELSE NOW() END"),
+			"blocked_at": gorm.Expr("CASE WHEN is_active THEN NOW() ELSE NULL END"),
 		}).
 		Error
 }

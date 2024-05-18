@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/SeaCloudHub/backend/adapters/notificationhub"
 	"log"
 	"net/http"
 
@@ -79,6 +80,10 @@ func main() {
 	server.FileService = services.NewFileService(cfg)
 	server.IdentityService = services.NewIdentityService(cfg)
 	server.PermissionService = services.NewPermissionService(cfg)
+	server.NotificationService, err = notificationhub.NewNotificationHub(cfg)
+	if err != nil {
+		applog.Fatal(err)
+	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	applog.Info("server started!")

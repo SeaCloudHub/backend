@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/SeaCloudHub/backend/domain/notification"
 	"net/http"
 	"strings"
 
@@ -44,9 +45,10 @@ type Server struct {
 	PubSubService pubsub.Service
 
 	// services
-	FileService       file.Service
-	IdentityService   identity.Service
-	PermissionService permission.Service
+	FileService         file.Service
+	IdentityService     identity.Service
+	PermissionService   permission.Service
+	NotificationService notification.Service
 
 	// event bus
 	EventDispatcher domain.EventDispatcher

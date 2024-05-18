@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/SeaCloudHub/backend/domain/notification"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -708,7 +709,46 @@ func (s *Server) Share(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	// TODO: notify users
+	token := *c.Get(ContextKeyIdentity).(*identity.Identity).Session.Token
+
+	go func() {
+		var eg errgroup.Group
+		notifications := make([]notification.Notification, len(users))
+
+		for i, u := range users {
+			eg.Go(func() error {
+				content := map[string]interface{}{
+					"file":       e.Name,
+					"file_id":    e.ID.String(),
+					"role":       req.Role,
+					"owner_id":   user.ID.String(),
+					"owner_name": fmt.Sprint(user.FirstName, " ", user.LastName),
+				}
+
+				contentBytes, err := json.Marshal(content)
+				if err != nil {
+					return err
+				}
+
+				contentString := string(contentBytes)
+				notifications[i] = notification.Notification{
+					UserID:  u.ID.String(),
+					Content: contentString,
+				}
+				return nil
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			return
+		}
+
+		// Send all notifications in one batch
+		if err := s.NotificationService.SendNotification(context.Background(), notifications, user.ID.String(), token); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+		}
+	}()
 
 	// write log
 	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionShare)}); err != nil {
