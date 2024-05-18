@@ -290,4 +290,4 @@ jobs:
             docker compose --env-file ~/.env -f docker-compose.yml up -d
 
             docker image prune -f
-            rm ~/.env ~/docker-compose.yml
+#            rm ~/.env ~/docker-compose.yml
