@@ -15,7 +15,6 @@ import (
 const (
 	ContextKeyIdentity string = "identity"
 	ContextKeyUser     string = "user"
-	ContextKeyToken    string = "token"
 )
 
 type Authentication struct {
@@ -71,8 +70,7 @@ func (a *Authentication) ValidateSessionToken(token string, c echo.Context) (boo
 	if err != nil {
 		return false, fmt.Errorf("user not found: %w", err)
 	}
-
-	c.Set(ContextKeyToken, token)
+	
 	c.Set(ContextKeyIdentity, id)
 	c.Set(ContextKeyUser, user)
 

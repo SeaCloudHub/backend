@@ -3,8 +3,6 @@ package notificationhub
 import (
 	"context"
 	"fmt"
-	"github.com/SeaCloudHub/backend/adapters/httpserver"
-	"github.com/SeaCloudHub/backend/domain/identity"
 	"github.com/SeaCloudHub/backend/domain/notification"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	"github.com/go-resty/resty/v2"
@@ -28,9 +26,7 @@ func NewNotificationHub(cfg *config.Config) (*NotificationHub, error) {
 	}, nil
 }
 
-func (n *NotificationHub) pushNotification(ctx context.Context, notificationReq NotificationRequest) error {
-	token := ctx.Value(httpserver.ContextKeyToken).(string)
-
+func (n *NotificationHub) pushNotification(ctx context.Context, notificationReq NotificationRequest, token string) error {
 	resp, err := n.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", fmt.Sprintf("Bearer %s", token)).
@@ -48,12 +44,11 @@ func (n *NotificationHub) pushNotification(ctx context.Context, notificationReq 
 	return nil
 }
 
-func (n *NotificationHub) SendNotification(ctx context.Context, notifications []notification.Notification) error {
-	user := ctx.Value(httpserver.ContextKeyUser).(*identity.User)
-
+func (n *NotificationHub) SendNotification(ctx context.Context,
+	notifications []notification.Notification, userId, token string) error {
 	notificationReq := NotificationRequest{
 		Notifications: notifications,
-		From:          user.ID.String(),
+		From:          userId,
 	}
-	return n.pushNotification(ctx, notificationReq)
+	return n.pushNotification(ctx, notificationReq, token)
 }

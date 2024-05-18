@@ -8,5 +8,6 @@ type Notification struct {
 }
 
 type Service interface {
-	SendNotification(ctx context.Context, notifications []Notification) error
+	SendNotification(ctx context.Context, notifications []Notification,
+		userId, token string) error
 }

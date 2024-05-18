@@ -648,17 +648,33 @@ func (s *Server) Share(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	token := *c.Get(ContextKeyIdentity).(*identity.Identity).Session.Token
+
 	go func() {
 		var eg errgroup.Group
 
 		for _, u := range users {
-			u := u
-			notifications := []notification.Notification{
-				{UserID: u.ID.String(),
-					Content: "You have been shared a file"},
-			}
 			eg.Go(func() error {
-				return s.NotificationService.SendNotification(ctx, notifications)
+				content := map[string]interface{}{
+					"file":       e.Name,
+					"file_id":    e.ID.String(),
+					"role":       req.Role,
+					"owner_id":   user.ID.String(),
+					"owner_name": fmt.Sprint(user.FirstName, " ", user.LastName),
+				}
+
+				contentBytes, err := json.Marshal(content)
+				if err != nil {
+					return err
+				}
+
+				contentString := string(contentBytes)
+				notifications := []notification.Notification{
+					{UserID: u.ID.String(),
+						Content: contentString},
+				}
+				return s.NotificationService.SendNotification(context.
+					Background(), notifications, user.ID.String(), token)
 			})
 		}
 
