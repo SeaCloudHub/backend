@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  app:
+    image: seacloudserver/app:latest
+    env_file:
+      - .env
+    expose:
+      - "8088"
+    deploy:
+      replicas: 3
+    networks:
+      - seacloudhub
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - ENABLE_IPV6=true
+    privileged: true
+    volumes:
+      - vhostd:/etc/nginx/vhost.d
+      - nginxcerts:/etc/nginx/certs:ro
+      - nginxconf:/etc/nginx/conf.d
+      - nginxlogs:/var/log/nginx
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - seacloudhub
+    labels:
+      - "nginx_proxy=true"
+
+  letsencrypt-nginx-proxy:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: letsencrypt-nginx-proxy
+    volumes:
+      - vhostd:/etc/nginx/vhost.d
+      - nginxcerts:/etc/nginx/certs:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    privileged: true
+    volumes_from:
+      - nginx-proxy
+    networks:
+      - seacloudhub
+
+volumes:
+  vhostd:
+  nginxcerts:
+  nginxconf:
+  nginxlogs:
+  html:
+
+networks:
+  seacloudhub:
