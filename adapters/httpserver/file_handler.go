@@ -652,8 +652,9 @@ func (s *Server) Share(c echo.Context) error {
 
 	go func() {
 		var eg errgroup.Group
+		notifications := make([]notification.Notification, len(users))
 
-		for _, u := range users {
+		for i, u := range users {
 			eg.Go(func() error {
 				content := map[string]interface{}{
 					"file":       e.Name,
@@ -669,16 +670,21 @@ func (s *Server) Share(c echo.Context) error {
 				}
 
 				contentString := string(contentBytes)
-				notifications := []notification.Notification{
-					{UserID: u.ID.String(),
-						Content: contentString},
+				notifications[i] = notification.Notification{
+					UserID:  u.ID.String(),
+					Content: contentString,
 				}
-				return s.NotificationService.SendNotification(context.
-					Background(), notifications, user.ID.String(), token)
+				return nil
 			})
 		}
 
 		if err := eg.Wait(); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			return
+		}
+
+		// Send all notifications in one batch
+		if err := s.NotificationService.SendNotification(context.Background(), notifications, user.ID.String(), token); err != nil {
 			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 		}
 	}()
