@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/SeaCloudHub/backend/domain/notification"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/SeaCloudHub/backend/domain/notification"
 
 	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
@@ -712,37 +713,22 @@ func (s *Server) Share(c echo.Context) error {
 	token := *c.Get(ContextKeyIdentity).(*identity.Identity).Session.Token
 
 	go func() {
-		var eg errgroup.Group
-		notifications := make([]notification.Notification, len(users))
+		notifications := lo.Map(users, func(u identity.User, index int) notification.Notification {
+			content := map[string]interface{}{
+				"file":       e.Name,
+				"file_id":    e.ID.String(),
+				"role":       req.Role,
+				"owner_id":   user.ID.String(),
+				"owner_name": fmt.Sprint(user.FirstName, " ", user.LastName),
+			}
 
-		for i, u := range users {
-			eg.Go(func() error {
-				content := map[string]interface{}{
-					"file":       e.Name,
-					"file_id":    e.ID.String(),
-					"role":       req.Role,
-					"owner_id":   user.ID.String(),
-					"owner_name": fmt.Sprint(user.FirstName, " ", user.LastName),
-				}
+			contentBytes, _ := json.Marshal(content)
 
-				contentBytes, err := json.Marshal(content)
-				if err != nil {
-					return err
-				}
-
-				contentString := string(contentBytes)
-				notifications[i] = notification.Notification{
-					UserID:  u.ID.String(),
-					Content: contentString,
-				}
-				return nil
-			})
-		}
-
-		if err := eg.Wait(); err != nil {
-			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
-			return
-		}
+			return notification.Notification{
+				UserID:  u.ID.String(),
+				Content: string(contentBytes),
+			}
+		})
 
 		// Send all notifications in one batch
 		if err := s.NotificationService.SendNotification(context.Background(), notifications, user.ID.String(), token); err != nil {
