@@ -609,14 +609,39 @@ func (s *FileStore) Unstar(ctx context.Context, fileID, userID uuid.UUID) error 
 	return nil
 }
 
-func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID) ([]file.File, error) {
+func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
-	if err := s.db.WithContext(ctx).
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).
 		Joins("JOIN stars ON files.id = stars.file_id").
-		Where("stars.user_id = ?", userID).
+		Where("stars.user_id = ?", userID)
+
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("files.created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("files.type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("files.updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("files.created_at ASC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
 	}
 
 	files := make([]file.File, len(fileSchemas))

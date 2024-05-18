@@ -191,19 +191,3 @@ type LogsResponse struct {
 	Logs   []file.Log `json:"logs"`
 	Cursor string     `json:"cursor"`
 } // @name model.LogsResponse
-
-type StarRequest struct {
-	FileIDs []string `json:"file_ids" validate:"required,dive,uuid"`
-} // @name model.StarRequest
-
-func (r *StarRequest) Validate() error {
-	return validation.Validate().Struct(r)
-}
-
-type UnstarRequest struct {
-	FileIDs []string `json:"file_ids" validate:"required,dive,uuid"`
-} // @name model.UnstarRequest
-
-func (r *UnstarRequest) Validate() error {
-	return validation.Validate().Struct(r)
-}

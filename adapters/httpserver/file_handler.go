@@ -1871,7 +1871,7 @@ func (s *Server) GetShared(c echo.Context) error {
 // @Tags file
 // @Accept json
 // @Produce json
-// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param payload body model.StarRequest true "Star request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
@@ -1942,7 +1942,7 @@ func (s *Server) Star(c echo.Context) error {
 // @Tags file
 // @Accept json
 // @Produce json
-// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param payload body model.UnstarRequest true "Unstar request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
@@ -1990,8 +1990,9 @@ func (s *Server) Unstar(c echo.Context) error {
 // @Tags file
 // @Accept json
 // @Produce json
-// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
-// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListStarredRequest true "List starred request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListStarredResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
@@ -1999,16 +2000,33 @@ func (s *Server) Unstar(c echo.Context) error {
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/starred [get]
 func (s *Server) ListStarred(c echo.Context) error {
-	var ctx = app.NewEchoContextAdapter(c)
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListStarredRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
 
 	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
-	files, err := s.FileStore.ListStarred(ctx, user.ID)
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After)
+
+	files, err := s.FileStore.ListStarred(ctx, user.ID, cursor, filter)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, files)
+	return s.success(c, model.ListStarredResponse{
+		Entries: files,
+		Cursor:  cursor.NextToken(),
+	})
 }
 
 // Search godoc

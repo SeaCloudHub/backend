@@ -322,6 +322,15 @@ definitions:
       pagination:
         $ref: '#/definitions/pagination.PageInfo'
     type: object
+  model.ListStarredResponse:
+    properties:
+      cursor:
+        type: string
+      entries:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
+    type: object
   model.ListStoragesResponse:
     properties:
       pagination:
@@ -2515,7 +2524,7 @@ paths:
       description: Star
       parameters:
       - default: Bearer <session_token>
-        description: ' Bearer token'
+        description: Bearer token
         in: header
         name: Authorization
         required: true
@@ -2563,10 +2572,35 @@ paths:
       description: ListStarred
       parameters:
       - default: Bearer <session_token>
-        description: ' Bearer token'
+        description: Bearer token
         in: header
         name: Authorization
         required: true
+        type: string
+      - in: query
+        name: after
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
         type: string
       produces:
       - application/json
@@ -2578,9 +2612,7 @@ paths:
             - $ref: '#/definitions/model.SuccessResponse'
             - properties:
                 data:
-                  items:
-                    $ref: '#/definitions/file.File'
-                  type: array
+                  $ref: '#/definitions/model.ListStarredResponse'
               type: object
         "400":
           description: Bad Request
@@ -2765,7 +2797,7 @@ paths:
       description: Unstar
       parameters:
       - default: Bearer <session_token>
-        description: ' Bearer token'
+        description: Bearer token
         in: header
         name: Authorization
         required: true

@@ -297,3 +297,39 @@ type DownloadBatchRequest struct {
 func (r *DownloadBatchRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
+
+type StarRequest struct {
+	FileIDs []string `json:"file_ids" validate:"required,dive,uuid"`
+} // @name model.StarRequest
+
+func (r *StarRequest) Validate() error {
+	return validation.Validate().Struct(r)
+}
+
+type UnstarRequest struct {
+	FileIDs []string `json:"file_ids" validate:"required,dive,uuid"`
+} // @name model.UnstarRequest
+
+func (r *UnstarRequest) Validate() error {
+	return validation.Validate().Struct(r)
+}
+
+type ListStarredRequest struct {
+	Limit  int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string     `query:"cursor" validate:"omitempty,base64url"`
+	Type   string     `query:"type" validate:"omitempty,oneof=folder text document pdf json image video audio archive other"`
+	After  *time.Time `query:"after" validate:"omitempty"`
+} // @name model.ListStarredRequest
+
+func (r *ListStarredRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 10
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type ListStarredResponse struct {
+	Entries []file.File `json:"entries"`
+	Cursor  string      `json:"cursor"`
+} // @name model.ListStarredResponse
