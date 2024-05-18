@@ -287,10 +287,12 @@ func (s *FileStore) ListSelected(ctx context.Context, parent *file.File, ids []s
 		files       []file.File
 	)
 
-	if err := s.db.WithContext(ctx).
-		Where("id IN ?", ids).
-		Where("path = ?", parent.FullPath()).
-		Find(&fileSchemas).Error; err != nil {
+	query := s.db.WithContext(ctx).Where("id IN ?", ids)
+	if parent != nil {
+		query = query.Where("path = ?", parent.FullPath())
+	}
+
+	if err := query.Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
@@ -301,7 +303,7 @@ func (s *FileStore) ListSelected(ctx context.Context, parent *file.File, ids []s
 	return files, nil
 }
 
-func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File, ids []string) ([]file.File, error) {
+func (s *FileStore) ListSelectedChildren(ctx context.Context, path string, ids []string) ([]file.File, error) {
 	var (
 		fileSchemas []FileSchema
 		files       []file.File
@@ -311,7 +313,7 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File,
 
 	if err := db.WithContext(ctx).
 		Where("id IN ?", ids).
-		Where("path = ?", parent.FullPath()).
+		Where("path = ?", path).
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
