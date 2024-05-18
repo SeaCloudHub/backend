@@ -235,15 +235,22 @@ jobs:
       - name: Generate env file
         run: echo "${{ secrets.ENV_FILE }}" >> .env
 
-      - name: SCP SCP env and docker-compose.yml files to VM
+      - name: SCP env to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: |
-            .env
-            docker-compose.yml
+          source: '.env'
+          target: '~'
+
+      - name: SCP docker-compose to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: 'docker-compose.yml'
           target: '~'
 
       - name: SSH into VM
