@@ -2450,7 +2450,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "default": "Bearer \u003csession_token\u003e",
-                        "description": " Bearer token",
+                        "description": "Bearer token",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
@@ -2522,10 +2522,44 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "default": "Bearer \u003csession_token\u003e",
-                        "description": " Bearer token",
+                        "description": "Bearer token",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "folder",
+                            "text",
+                            "document",
+                            "pdf",
+                            "json",
+                            "image",
+                            "video",
+                            "audio",
+                            "archive",
+                            "other"
+                        ],
+                        "type": "string",
+                        "name": "type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2540,10 +2574,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/file.File"
-                                            }
+                                            "$ref": "#/definitions/model.ListStarredResponse"
                                         }
                                     }
                                 }
@@ -2843,7 +2874,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "default": "Bearer \u003csession_token\u003e",
-                        "description": " Bearer token",
+                        "description": "Bearer token",
                         "name": "Authorization",
                         "in": "header",
                         "required": true
@@ -4211,6 +4242,20 @@ const docTemplate = `{
                 },
                 "pagination": {
                     "$ref": "#/definitions/pagination.PageInfo"
+                }
+            }
+        },
+        "model.ListStarredResponse": {
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "type": "string"
+                },
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/file.File"
+                    }
                 }
             }
         },

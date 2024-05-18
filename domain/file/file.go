@@ -40,7 +40,7 @@ type Store interface {
 	DeleteShare(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	Star(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	Unstar(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
-	ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error)
+	ListStarred(ctx context.Context, userID uuid.UUID, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	GetAllFiles(ctx context.Context, path ...string) ([]File, error)
 	ListRootDirectory(ctx context.Context, pager *pagination.Pager) ([]File, error)
 	ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*File, error)
