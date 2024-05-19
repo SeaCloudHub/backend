@@ -715,11 +715,12 @@ func (s *Server) Share(c echo.Context) error {
 	go func() {
 		notifications := lo.Map(users, func(u identity.User, index int) notification.Notification {
 			content := map[string]interface{}{
-				"file":       e.Name,
-				"file_id":    e.ID.String(),
-				"role":       req.Role,
-				"owner_id":   user.ID.String(),
-				"owner_name": fmt.Sprint(user.FirstName, " ", user.LastName),
+				"file":         e.Name,
+				"file_id":      e.ID.String(),
+				"is_dir":       e.IsDir,
+				"role":         req.Role,
+				"owner_avatar": user.AvatarURL,
+				"owner_name":   fmt.Sprint(user.FirstName, " ", user.LastName),
 			}
 
 			contentBytes, _ := json.Marshal(content)
