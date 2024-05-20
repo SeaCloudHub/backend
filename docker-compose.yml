@@ -28,6 +28,7 @@ services:
       - nginxlogs:/var/log/nginx
       - html:/usr/share/nginx/html
       - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./custom-nginx.conf:/etc/nginx/conf.d/custom-nginx.conf:ro
     networks:
       - seacloudhub
     labels:

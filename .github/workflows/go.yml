@@ -253,13 +253,13 @@ jobs:
           source: 'docker-compose.yml'
           target: '~'
 
-      - name: SCP docker-compose to VM
+      - name: SCP custom-nginx.conf to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: 'docker-compose.yml'
+          source: 'custom-nginx.conf'
           target: '~'
 
       - name: SSH into VM
