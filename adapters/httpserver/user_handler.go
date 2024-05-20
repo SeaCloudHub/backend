@@ -171,6 +171,27 @@ func (s *Server) ChangePassword(c echo.Context) error {
 	return s.success(c, nil)
 }
 
+func (s *Server) UpdateProfile(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.UpdateProfileRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
+
+	if err := s.UserStore.UpdateNameAndAvatar(ctx, uuid.MustParse(id.ID), req.AvatarUrl, req.FirstName, req.LastName); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.UpdateProfileResponse{
+		Id: req.Id,
+	})
+}
+
 // GetByEmail godoc
 // @Summary Get user by email
 // @Description Get user by email
@@ -250,6 +271,7 @@ func (s *Server) RegisterUserRoutes(router *echo.Group) {
 	router.POST("/login", s.Login)
 	router.POST("/logout", s.Logout)
 	router.POST("/change-password", s.ChangePassword)
+	router.PATCH("/update-profile", s.UpdateProfile)
 	router.GET("/me", s.Me)
 	router.GET("/email", s.GetByEmail)
 	router.GET("/suggest", s.Suggest)

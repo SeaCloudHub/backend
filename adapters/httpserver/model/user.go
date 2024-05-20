@@ -28,6 +28,17 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"new_password" validate:"required,min=6,max=32"`
 } // @name model.ChangePasswordRequest
 
+type UpdateProfileRequest struct {
+	Id        string `json:"id" validate:"required"`
+	AvatarUrl string `json:"avatar_url"`
+	FirstName string `json:"first_name" validate:"required,min=1,"`
+	LastName  string `json:"last_name" validate:"required,min=1,"`
+}
+
+type UpdateProfileResponse struct {
+	Id string `json:"id"`
+} // @name model.LoginResponse
+
 func (r *ChangePasswordRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }

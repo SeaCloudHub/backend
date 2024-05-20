@@ -12,6 +12,7 @@ type Store interface {
 	Create(ctx context.Context, user *User) error
 	UpdateAdmin(ctx context.Context, userID uuid.UUID) error
 	UpdatePasswordChangedAt(ctx context.Context, userID uuid.UUID) error
+	UpdateNameAndAvatar(ctx context.Context, id uuid.UUID, avatar string, firstName string, lastName string) error
 	UpdateLastSignInAt(ctx context.Context, userID uuid.UUID) error
 	UpdateRootID(ctx context.Context, userID, rootID uuid.UUID) error
 	UpdateStorageUsage(ctx context.Context, userID uuid.UUID, usage uint64) error
