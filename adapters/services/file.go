@@ -81,6 +81,18 @@ func (s *FileService) CreateFile(ctx context.Context, content io.Reader, id stri
 	return result.Size, nil
 }
 
+func (s *FileService) AppendFile(ctx context.Context, content io.Reader, id string) (int64, error) {
+	result, err := s.filer.AppendFile(ctx, &seaweedfs.AppendFileRequest{
+		Content:      content,
+		FullFileName: filepath.Join("/", id),
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return result.Size, nil
+}
+
 func (s *FileService) Delete(ctx context.Context, id string) error {
 	err := s.filer.Delete(ctx, &seaweedfs.DeleteRequest{FullPath: filepath.Join("/", id)})
 	if err != nil {

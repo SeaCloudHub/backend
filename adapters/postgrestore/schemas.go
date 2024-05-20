@@ -1,11 +1,13 @@
 package postgrestore
 
 import (
+	"database/sql"
 	"encoding/hex"
-	"gorm.io/gorm"
 	"os"
 	"path/filepath"
 	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
@@ -61,22 +63,23 @@ func (s *UserSchema) ToDomainUser() *identity.User {
 }
 
 type FileSchema struct {
-	ID            uuid.UUID  `gorm:"column:id"`
-	Name          string     `gorm:"column:name"`
-	Path          string     `gorm:"column:path"`
-	PreviousPath  *string    `gorm:"column:previous_path"` // user for move to trash
-	Size          uint64     `gorm:"column:size"`
-	Mode          uint32     `gorm:"column:mode"`
-	MimeType      string     `gorm:"column:mime_type"`
-	Type          string     `gorm:"column:type;->"`
-	Thumbnail     *string    `gorm:"column:thumbnail"`
-	MD5           string     `gorm:"column:md5"`
-	IsDir         bool       `gorm:"column:is_dir"`
-	GeneralAccess string     `gorm:"column:general_access"`
-	OwnerID       uuid.UUID  `gorm:"column:owner_id"`
-	CreatedAt     time.Time  `gorm:"column:created_at"`
-	UpdatedAt     time.Time  `gorm:"column:updated_at"`
-	DeletedAt     *time.Time `gorm:"column:deleted_at"`
+	ID            uuid.UUID    `gorm:"column:id"`
+	Name          string       `gorm:"column:name"`
+	Path          string       `gorm:"column:path"`
+	PreviousPath  *string      `gorm:"column:previous_path"` // user for move to trash
+	Size          uint64       `gorm:"column:size"`
+	Mode          uint32       `gorm:"column:mode"`
+	MimeType      string       `gorm:"column:mime_type"`
+	Type          string       `gorm:"column:type;->"`
+	Thumbnail     *string      `gorm:"column:thumbnail"`
+	MD5           string       `gorm:"column:md5"`
+	IsDir         bool         `gorm:"column:is_dir"`
+	GeneralAccess string       `gorm:"column:general_access"`
+	OwnerID       uuid.UUID    `gorm:"column:owner_id"`
+	CreatedAt     time.Time    `gorm:"column:created_at"`
+	UpdatedAt     time.Time    `gorm:"column:updated_at"`
+	DeletedAt     *time.Time   `gorm:"column:deleted_at"`
+	FinishedAt    sql.NullTime `gorm:"column:finished_at"`
 
 	Owner *UserSchema `gorm:"foreignKey:OwnerID;references:ID"`
 }

@@ -1797,6 +1797,67 @@ paths:
       summary: UpdateAccess
       tags:
       - file
+  /files/chunks:
+    post:
+      consumes:
+      - multipart/form-data
+      description: UploadChunk
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File ID
+        in: formData
+        name: file_id
+        type: string
+      - description: Directory ID
+        in: formData
+        name: id
+        required: true
+        type: string
+      - in: formData
+        name: last
+        type: boolean
+      - in: formData
+        name: total_size
+        type: integer
+      - description: File
+        in: formData
+        name: file
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/file.File'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: UploadChunk
+      tags:
+      - file
   /files/copy:
     post:
       consumes:
