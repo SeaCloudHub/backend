@@ -40,7 +40,12 @@ func (s *FileStore) Create(ctx context.Context, f *file.File) error {
 		OwnerID:       f.OwnerID,
 	}
 
-	if err := s.db.WithContext(ctx).Create(&fileSchema).Error; err != nil {
+	query := s.db.WithContext(ctx)
+	if !f.More() {
+		query = query.Omit("finished_at")
+	}
+
+	if err := query.Create(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return file.ErrDirAlreadyExists
 		}
