@@ -322,7 +322,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 
 		wp.Submit(func() {
 			// save files
-			f, err := s.createFile(ctx, e, src, file.Filename, user.ID)
+			f, err := s.createFile(ctx, e, src, file.Filename, user.ID, false)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -368,6 +368,123 @@ func (s *Server) UploadFiles(c echo.Context) error {
 	}
 
 	return s.success(c, resp)
+}
+
+// UploadChunk godoc
+// @Summary UploadChunk
+// @Description UploadChunk
+// @Tags file
+// @Accept multipart/form-data
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request formData model.UploadChunkRequest true "Upload chunk request"
+// @Param file formData file true "File"
+// @Success 200 {object} model.SuccessResponse{data=file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/chunks [post]
+func (s *Server) UploadChunk(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.UploadChunkRequest
+		f   *file.File
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	e, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Check if user has permission to upload files
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), e.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	mpFile, fileHeader, err := c.Request().FormFile("file")
+	if err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+	defer mpFile.Close()
+
+	// chec storage limit from file size
+	if uint64(fileHeader.Size)+e.Owner.StorageUsage > e.Owner.StorageCapacity {
+		return s.error(c, apperror.ErrStorageCapacityExceeded())
+	}
+
+	if req.FileID != "" {
+		// append chunk to file
+		f, err = s.FileStore.GetUnfinishedByID(ctx, req.FileID)
+		if err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		f, err = s.appendChunk(ctx, f.ID.String(), mpFile, req.Last)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		if req.Last {
+			payload := []map[string]string{
+				{"id": f.ID.String(), "mime": f.MimeType},
+			}
+
+			message, err := json.Marshal(payload)
+			if err != nil {
+				return s.error(c, apperror.ErrInternalServer(err))
+			}
+
+			if err := s.PubSubService.Publish(ctx, "thumbnails", string(message)); err != nil {
+				return s.error(c, apperror.ErrInternalServer(err))
+			}
+
+			// write log
+			if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(f.ID, user.ID, file.LogActionCreate)}); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			}
+		}
+	} else {
+		// check storage limit from client input
+		if req.TotalSize+e.Owner.StorageUsage > e.Owner.StorageCapacity {
+			return s.error(c, apperror.ErrStorageCapacityExceeded())
+		}
+
+		// create file
+		f, err = s.createFile(ctx, e, mpFile, fileHeader.Filename, user.ID, true)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	// update user storage usage
+	if err := s.UserStore.UpdateStorageUsage(ctx, e.OwnerID, e.Owner.StorageUsage+uint64(fileHeader.Size)); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, f.Response())
 }
 
 // ListEntries godoc
@@ -1097,7 +1214,7 @@ func (s *Server) CopyFiles(c echo.Context) error {
 
 			newName := fmt.Sprintf("Copy of %s", e.Name)
 
-			f, err := s.createFile(ctx, dest, src, newName, user.ID)
+			f, err := s.createFile(ctx, dest, src, newName, user.ID, false)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -2327,6 +2444,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.POST("/restore", s.RestoreFromTrash)
 	router.POST("/delete", s.Delete)
 	router.POST("", s.UploadFiles)
+	router.POST("/chunks", s.UploadChunk)
 	router.PATCH("/general-access", s.UpdateGeneralAccess)
 	router.PATCH("/access", s.UpdateAccess)
 	router.GET("/:id", s.ListEntries)
@@ -2340,7 +2458,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 
 }
 
-func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID) (*file.File, error) {
+func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID, more bool) (*file.File, error) {
 	id := uuid.New()
 
 	contentType, src, err := app.DetectContentType(reader)
@@ -2358,7 +2476,7 @@ func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Re
 		return nil, fmt.Errorf("get metadata: %w", err)
 	}
 
-	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID)
+	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID).WithMore(more)
 	if err := s.FileStore.Create(ctx, f); err != nil {
 		return nil, fmt.Errorf("create file: %w", err)
 	}
@@ -2366,6 +2484,25 @@ func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Re
 	// create file permissions
 	if err := s.PermissionService.CreateFilePermissions(ctx, ownerID.String(), f.ID.String(), parent.ID.String()); err != nil {
 		return nil, fmt.Errorf("create file permissions: %w", err)
+	}
+
+	return f, nil
+}
+
+func (s *Server) appendChunk(ctx context.Context, fileID string, reader io.Reader, last bool) (*file.File, error) {
+	_, err := s.FileService.AppendFile(ctx, reader, fileID)
+	if err != nil {
+		return nil, fmt.Errorf("append file: %w", err)
+	}
+
+	entry, err := s.FileService.GetMetadata(ctx, fileID)
+	if err != nil {
+		return nil, fmt.Errorf("get metadata: %w", err)
+	}
+
+	f, err := s.FileStore.UpdateChunk(ctx, uuid.MustParse(fileID), entry.Size, last)
+	if err != nil {
+		return nil, fmt.Errorf("update chunk: %w", err)
 	}
 
 	return f, nil
