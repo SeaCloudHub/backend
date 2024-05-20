@@ -18,6 +18,7 @@ type Store interface {
 	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	Search(ctx context.Context, query string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	GetByID(ctx context.Context, id string) (*File, error)
+	GetUnfinishedByID(ctx context.Context, id string) (*File, error)
 	GetByFullPath(ctx context.Context, fullPath string) (*File, error)
 	GetRootDirectory(ctx context.Context) (*File, error)
 	GetTrashByUserID(ctx context.Context, userID uuid.UUID) (*File, error)
@@ -31,6 +32,7 @@ type Store interface {
 	UpdatePath(ctx context.Context, fileID uuid.UUID, path string) error
 	UpdateName(ctx context.Context, fileID uuid.UUID, name string) error
 	UpdateThumbnail(ctx context.Context, fileID uuid.UUID, thumbnail string) error
+	UpdateChunk(ctx context.Context, fileID uuid.UUID, size uint64, last bool) (*File, error)
 	MoveToTrash(ctx context.Context, fileID uuid.UUID, path string) error
 	RestoreFromTrash(ctx context.Context, fileID uuid.UUID, path string) error
 	RestoreChildrenFromTrash(ctx context.Context, parentPath, newPath string) ([]File, error)
@@ -76,6 +78,8 @@ type File struct {
 	Owner  *identity.User `json:"owner,omitempty"`
 	Parent *SimpleFile    `json:"parent,omitempty"`
 	Log    *Log           `json:"log,omitempty"`
+
+	more bool
 } // @name file.File
 
 func NewDirectory(name string) *File {
@@ -140,6 +144,16 @@ func (f *File) Parents() []string {
 	}
 
 	return result
+}
+
+func (f *File) More() bool {
+	return f.more
+}
+
+func (f *File) WithMore(more bool) *File {
+	f.more = more
+
+	return f
 }
 
 type SimpleFile struct {

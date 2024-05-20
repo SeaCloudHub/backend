@@ -2,6 +2,7 @@ package postgrestore
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -173,6 +174,24 @@ func (s *FileStore) GetByID(ctx context.Context, id string) (*file.File, error) 
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
 		Where("id = ?", id).
+		First(&fileSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, file.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return fileSchema.ToDomainFile(), nil
+}
+
+func (s *FileStore) GetUnfinishedByID(ctx context.Context, id string) (*file.File, error) {
+	var fileSchema FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Preload("Owner").
+		Where("id = ?", id).
+		Where("finished_at IS NULL").
 		First(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
@@ -446,6 +465,25 @@ func (s *FileStore) UpdateThumbnail(ctx context.Context, fileID uuid.UUID, thumb
 	}
 
 	return nil
+}
+
+func (s *FileStore) UpdateChunk(ctx context.Context, fileID uuid.UUID, size uint64, last bool) (*file.File, error) {
+	fileSchema := FileSchema{
+		ID:   fileID,
+		Size: size,
+	}
+
+	if last {
+		fileSchema.FinishedAt = sql.NullTime{Time: time.Now(), Valid: true}
+	}
+
+	if err := s.db.WithContext(ctx).Model(&fileSchema).
+		Clauses(clause.Returning{}).
+		Updates(&fileSchema).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return fileSchema.ToDomainFile(), nil
 }
 
 func (s *FileStore) MoveToTrash(ctx context.Context, fileID uuid.UUID, path string) error {

@@ -333,3 +333,14 @@ type ListStarredResponse struct {
 	Entries []file.File `json:"entries"`
 	Cursor  string      `json:"cursor"`
 } // @name model.ListStarredResponse
+
+type UploadChunkRequest struct {
+	ID        string `form:"id" validate:"required,uuid"`       // Directory ID
+	FileID    string `form:"file_id" validate:"omitempty,uuid"` // File ID
+	TotalSize uint64 `form:"total_size" validate:"required_without=FileID"`
+	Last      bool   `form:"last"`
+} // @name model.UploadChunkRequest
+
+func (r *UploadChunkRequest) Validate(ctx context.Context) error {
+	return validation.Validate().StructCtx(ctx, r)
+}
