@@ -64,7 +64,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 		total       int64
 	)
 
-	if err := s.db.WithContext(ctx).Model(&fileSchemas).
+	if err := s.db.WithContext(ctx).Model(&fileSchemas).Where("finished_at IS NOT NULL").
 		Where("path = ?", dirpath).
 		Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
@@ -75,7 +75,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 	offset, limit := pager.Do()
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
-		Where("path = ?", dirpath).
+		Where("path = ?", dirpath).Where("finished_at IS NOT NULL").
 		Offset(offset).Limit(limit).Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -97,7 +97,7 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("path = ?", dirpath).Where("name != ?", ".trash")
+	query := s.db.WithContext(ctx).Where("path = ?", dirpath).Where("finished_at IS NOT NULL").Where("name != ?", ".trash")
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
@@ -137,7 +137,7 @@ func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cur
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("name != ?", ".trash").
+	query := s.db.WithContext(ctx).Where("name != ?", ".trash").Where("finished_at IS NOT NULL").
 		Where("path ~ ?", fmt.Sprintf(`^%s(\/(?!\.trash(\/|$)).*)?$`, filter.Path))
 	if len(q) > 0 {
 		query = query.Order(fmt.Sprintf("similarity(name, '%s') DESC", q))
@@ -178,7 +178,7 @@ func (s *FileStore) GetByID(ctx context.Context, id string) (*file.File, error) 
 
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
-		Where("id = ?", id).
+		Where("id = ?", id).Where("finished_at IS NOT NULL").
 		First(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
@@ -215,7 +215,7 @@ func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.F
 
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
-		Where("path = ?", filepath.Clean(path)).
+		Where("path = ?", filepath.Clean(path)).Where("finished_at IS NOT NULL").
 		Where("name = ?", name).
 		First(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -263,7 +263,7 @@ func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, e
 
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
-		Where("id IN ?", ids).
+		Where("id IN ?", ids).Where("finished_at IS NOT NULL").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -288,7 +288,7 @@ func (s *FileStore) ListByFullPaths(ctx context.Context, fullPaths []string) ([]
 	}
 
 	if err := s.db.WithContext(ctx).
-		Where("(path, name) IN ?", conditions).
+		Where("(path, name) IN ?", conditions).Where("finished_at IS NOT NULL").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -311,7 +311,7 @@ func (s *FileStore) ListSelected(ctx context.Context, parent *file.File, ids []s
 		files       []file.File
 	)
 
-	query := s.db.WithContext(ctx).Where("id IN ?", ids)
+	query := s.db.WithContext(ctx).Where("finished_at IS NOT NULL").Where("id IN ?", ids)
 	if parent != nil {
 		query = query.Where("path = ?", parent.FullPath())
 	}
@@ -337,7 +337,7 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, path string, ids [
 
 	if err := db.WithContext(ctx).
 		Where("id IN ?", ids).
-		Where("path = ?", path).
+		Where("path = ?", path).Where("finished_at IS NOT NULL").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -374,7 +374,7 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 	db := s.db
 
 	if err := db.WithContext(ctx).
-		Where("id IN ?", ids).
+		Where("id IN ?", ids).Where("finished_at IS NOT NULL").
 		Where("path = ?", parent.FullPath()).
 		Where("owner_id = ?", userID).
 		Find(&fileSchemas).Error; err != nil {
@@ -407,7 +407,7 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
-		Where("id = ?", fileID).
+		Where("id = ?", fileID).Where("finished_at IS NOT NULL").
 		Update("general_access", generalAccess).Error; err != nil {
 		return fmt.Errorf("unexpected error: %w", err)
 	}
@@ -418,7 +418,7 @@ func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, g
 func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, path string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
-		Where("id = ?", fileID).
+		Where("id = ?", fileID).Where("finished_at IS NOT NULL").
 		Updates(map[string]interface{}{
 			"id":   fileID,
 			"path": path,
@@ -433,7 +433,7 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 	var fileSchema FileSchema
 
 	// Retrieve file information
-	if err := s.db.WithContext(ctx).Where("id = ?", fileID).First(&fileSchema).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ?", fileID).Where("finished_at IS NOT NULL").First(&fileSchema).Error; err != nil {
 		return fmt.Errorf("get file: %w", err)
 	}
 
@@ -596,7 +596,7 @@ func (s *FileStore) GetShare(ctx context.Context, fileID, userID uuid.UUID) (*fi
 	var shareSchema ShareSchema
 
 	if err := s.db.WithContext(ctx).
-		Where("file_id = ? AND user_id = ?", fileID, userID).
+		Where("file_id = ?", fileID).Where("user_id = ?", userID).
 		First(&shareSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
@@ -662,7 +662,7 @@ func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID, cursor *p
 	}
 
 	query := s.db.WithContext(ctx).
-		Joins("JOIN stars ON files.id = stars.file_id").
+		Joins("JOIN stars ON files.id = stars.file_id").Where("files.finished_at IS NOT NULL").
 		Where("stars.user_id = ?", userID)
 
 	if cursorObj.CreatedAt != nil {
@@ -887,7 +887,7 @@ func (s *FileStore) ListSuggested(ctx context.Context, userID uuid.UUID, limit i
 	if err := db.WithContext(ctx).Table("(?) AS logs", subQuery).
 		Preload("File").Preload("File.Owner").
 		Joins("JOIN files ON logs.file_id = files.id").
-		Where("files.is_dir = ?", isDir).
+		Where("files.is_dir = ?", isDir).Where("files.finished_at IS NOT NULL").
 		Order("logs.created_at DESC").
 		Limit(limit).
 		Find(&logSchemas).Error; err != nil {
@@ -911,7 +911,7 @@ func (s *FileStore) ListActivities(ctx context.Context, fileID uuid.UUID, cursor
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Preload("User").Where("file_id = ?", fileID)
+	query := s.db.WithContext(ctx).Preload("User").Where("file_id = ?", fileID).Where("finished_at IS NOT NULL")
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
@@ -942,7 +942,7 @@ func (s *FileStore) ListFiles(ctx context.Context, path string, cursor *paginati
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path))
+	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path)).Where("finished_at IS NOT NULL")
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
