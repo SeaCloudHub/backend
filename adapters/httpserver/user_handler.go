@@ -179,7 +179,7 @@ func (s *Server) ChangePassword(c echo.Context) error {
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param payload body model.UpdateProfileRequest true "Update profile request"
-// @Success 200 {object} model.SuccessResponse{data=[]=model.UpdateProfileResponse}
+// @Success 200 {object} model.SuccessResponse{data=model.UpdateProfileResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse

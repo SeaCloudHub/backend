@@ -533,6 +533,28 @@ definitions:
     - general_access
     - id
     type: object
+  model.UpdateProfileRequest:
+    properties:
+      avatar_url:
+        type: string
+      first_name:
+        minLength: 1
+        type: string
+      id:
+        type: string
+      last_name:
+        minLength: 1
+        type: string
+    required:
+    - first_name
+    - id
+    - last_name
+    type: object
+  model.UpdateProfileResponse:
+    properties:
+      id:
+        type: string
+    type: object
   model.UploadImageResponse:
     properties:
       file_name:
@@ -3065,6 +3087,55 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Me
+      tags:
+      - user
+  /users/profile:
+    patch:
+      consumes:
+      - application/json
+      description: Update Profile
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Update profile request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.UpdateProfileResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Update Profile
       tags:
       - user
   /users/suggest:
