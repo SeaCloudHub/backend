@@ -20,6 +20,7 @@ type Service interface {
 	GetMetadata(ctx context.Context, id string) (*Entry, error)
 	DownloadFile(ctx context.Context, id string) (io.ReadCloser, string, error)
 	CreateFile(ctx context.Context, content io.Reader, id string, contentType string) (int64, error)
+	AppendFile(ctx context.Context, content io.Reader, id string) (int64, error)
 	Delete(ctx context.Context, id string) error
 	DirStatus(ctx context.Context) (map[string]interface{}, error)
 	VolStatus(ctx context.Context) (map[string]interface{}, error)

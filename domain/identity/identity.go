@@ -25,12 +25,15 @@ type Service interface {
 	WhoAmI(ctx context.Context, token string) (*Identity, error)
 	ChangePassword(ctx context.Context, id *Identity, oldPassword string, newPassword string) error
 	GetByEmail(ctx context.Context, email string) (*Identity, error)
+	GetByID(ctx context.Context, id string) (*Identity, error)
 
 	// Admin APIs
 	CreateIdentity(ctx context.Context, in SimpleIdentity) (*Identity, error)
 	ListIdentities(ctx context.Context, paging *pagination.Cursor) ([]Identity, error)
 	CreateMultipleIdentities(ctx context.Context, simpleIdentities []SimpleIdentity) ([]*Identity, error)
 	UpdateIdentityState(ctx context.Context, id string, state string) error
+	DeleteIdentity(ctx context.Context, id string) error
+	ResetPassword(ctx context.Context, id *Identity, password string) error
 }
 
 type SimpleIdentity struct {

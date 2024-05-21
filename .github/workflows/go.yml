@@ -8,11 +8,10 @@ on:
       - database
       - seed-admin
       - migrate
+      - thumbnail
 
 env:
   IMAGE_NAME: seacloudserver/app
-  CONTAINER_NAME: server
-  PORT: 8088
 
 jobs:
   make_db:
@@ -192,8 +191,8 @@ jobs:
             
             # Check if the container exists
             if docker ps -a --format '{{.Names}}' | grep -Eq "^thumbnail"; then
-              docker stop migrate
-              docker rm migrate
+              docker stop thumbnail
+              docker rm thumbnail
             fi
             
             docker run -d --name thumbnail --env-file ~/.env ghcr.io/$repository_lowercase/thumbnail
@@ -236,13 +235,31 @@ jobs:
       - name: Generate env file
         run: echo "${{ secrets.ENV_FILE }}" >> .env
 
-      - name: SCP env file to VM
+      - name: SCP env to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: '.env'
+          target: '~'
+
+      - name: SCP docker-compose to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: 'docker-compose.yml'
+          target: '~'
+
+      - name: SCP custom-nginx.conf to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: 'custom-nginx.conf'
           target: '~'
 
       - name: SSH into VM
@@ -258,13 +275,9 @@ jobs:
             docker tag ghcr.io/$repository_lowercase ${{ env.IMAGE_NAME }}
             docker rmi ghcr.io/$repository_lowercase
             
-            # Check if the container exists
-            if docker ps -a --format '{{.Names}}' | grep -Eq "^${{ env.CONTAINER_NAME }}$"; then
-              docker stop ${{ env.CONTAINER_NAME }}
-              docker rm ${{ env.CONTAINER_NAME }}
-            fi
-            
-            docker run -d --name ${{ env.CONTAINER_NAME }} --network my-net --env-file ~/.env -e VIRTUAL_HOST=${{ secrets.VIRTUAL_HOST }} -e LETSENCRYPT_HOST=${{ secrets.LETSENCRYPT_HOST }} -e LETSENCRYPT_EMAIL=${{ secrets.LETSENCRYPT_EMAIL }} -p ${{ env.PORT }}:8088 ${{ env.IMAGE_NAME }}
+            cd ~
+            docker compose --env-file ~/.env -f docker-compose.yml down
+            docker compose --env-file ~/.env -f docker-compose.yml up -d
 
             docker image prune -f
-            rm ~/.env
+            rm ~/.env ~/docker-compose.yml

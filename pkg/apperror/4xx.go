@@ -15,6 +15,7 @@ const (
 	StorageCapacityExceededCode = "400012"
 	FileOnlyOperationCode       = "400013"
 	DirectoryOnlyOperationCode  = "400014"
+	NoFilesSelectedCode         = "400015"
 	UnauthorizedCode            = "401004"
 	IdentityWasDisableCode      = "401009"
 	ForbiddenCode               = "403005"
@@ -46,6 +47,10 @@ func ErrInvalidImage(err error) Error {
 
 func ErrDirAlreadyExists(err error) Error {
 	return NewError(err, http.StatusBadRequest, DirAlreadyExistsCode, "Directory already exists")
+}
+
+func ErrNoFilesSelected(err error) Error {
+	return NewError(err, http.StatusBadRequest, NoFilesSelectedCode, "No files selected")
 }
 
 // 401 Unauthorized

@@ -21,7 +21,7 @@ func NewFileService(cfg *config.Config) *FileService {
 	swcfg := seaweedfs.NewConfigWithFilerURL(cfg.SeaweedFS.MasterServer, cfg.SeaweedFS.FilerServer)
 
 	if cfg.Debug {
-		swcfg = swcfg.Debug()
+		// swcfg = swcfg.Debug()
 	}
 
 	sw, err := seaweedfs.NewSeaweed(swcfg)
@@ -73,6 +73,18 @@ func (s *FileService) CreateFile(ctx context.Context, content io.Reader, id stri
 		Content:      content,
 		FullFileName: filepath.Join("/", id),
 		ContentType:  contentType,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return result.Size, nil
+}
+
+func (s *FileService) AppendFile(ctx context.Context, content io.Reader, id string) (int64, error) {
+	result, err := s.filer.AppendFile(ctx, &seaweedfs.AppendFileRequest{
+		Content:      content,
+		FullFileName: filepath.Join("/", id),
 	})
 	if err != nil {
 		return 0, err

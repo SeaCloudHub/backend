@@ -15,7 +15,7 @@ services:
     ports:
       - 9333:9333
       - 19333:19333
-    command: master -ip=seaweedfs-master -ip.bind=0.0.0.0
+    command: master -ip=seaweedfs-master -ip.bind=0.0.0.0 -metrics.address=http://pushgateway:9091
     networks:
       - seacloudserver
 

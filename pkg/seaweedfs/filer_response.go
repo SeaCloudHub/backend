@@ -13,3 +13,8 @@ type UploadFileResponse struct {
 	Name string `json:"name"`
 	Size int64  `json:"size"`
 }
+
+type AppendFileResponse struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}

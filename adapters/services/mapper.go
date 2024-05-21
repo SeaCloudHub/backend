@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/SeaCloudHub/backend/adapters/httpserver/model"
+	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
 )
 
@@ -37,4 +38,23 @@ func (s *mapper) ToIdentities(request []model.CreateIdentityRequest) ([]identity
 		identities = append(identities, s.ToIdentity(r))
 	}
 	return identities, nil
+}
+
+func (s *mapper) FileWithParents(files []file.File, parents []file.SimpleFile) []file.File {
+	var parentMap = make(map[string]file.SimpleFile)
+	for _, parent := range parents {
+		parentMap[parent.FullPath()] = parent
+	}
+
+	var newFiles []file.File
+
+	for _, f := range files {
+		if parent, ok := parentMap[f.Path]; ok {
+			f.Parent = &parent
+
+			newFiles = append(newFiles, f)
+		}
+	}
+
+	return newFiles
 }

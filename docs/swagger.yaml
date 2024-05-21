@@ -10,6 +10,8 @@ definitions:
         type: string
       is_dir:
         type: boolean
+      log:
+        $ref: '#/definitions/file.Log'
       md5:
         items:
           type: integer
@@ -24,15 +26,43 @@ definitions:
         $ref: '#/definitions/identity.User'
       owner_id:
         type: string
+      parent:
+        $ref: '#/definitions/file.SimpleFile'
       path:
         type: string
       shown_path:
         type: string
       size:
         type: integer
+      thumbnail:
+        type: string
       type:
         type: string
       updated_at:
+        type: string
+    type: object
+  file.Log:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      file:
+        $ref: '#/definitions/file.File'
+      file_id:
+        type: string
+      user:
+        $ref: '#/definitions/identity.User'
+      user_id:
+        type: string
+    type: object
+  file.SimpleFile:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      path:
         type: string
     type: object
   identity.Identity:
@@ -48,7 +78,11 @@ definitions:
     properties:
       avatar_url:
         type: string
+      blocked_at:
+        type: string
       created_at:
+        type: string
+      deleted_at:
         type: string
       email:
         type: string
@@ -162,6 +196,29 @@ definitions:
     required:
     - source_ids
     type: object
+  model.DownloadBatchRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        type: array
+      parent_id:
+        type: string
+    required:
+    - ids
+    - parent_id
+    type: object
+  model.EditIdentityRequest:
+    properties:
+      avatar_url:
+        type: string
+      first_name:
+        maxLength: 50
+        type: string
+      last_name:
+        maxLength: 50
+        type: string
+    type: object
   model.ErrorResponse:
     properties:
       code:
@@ -184,7 +241,61 @@ definitions:
       password_changed_at:
         type: string
     type: object
+  model.GetMetadataResponse:
+    properties:
+      file:
+        $ref: '#/definitions/file.File'
+      parents:
+        items:
+          $ref: '#/definitions/file.SimpleFile'
+        type: array
+      users:
+        items:
+          $ref: '#/definitions/permission.FileUser'
+        type: array
+    type: object
+  model.GetStorageResponse:
+    properties:
+      archive:
+        type: integer
+      audio:
+        type: integer
+      capacity:
+        type: integer
+      document:
+        type: integer
+      image:
+        type: integer
+      json:
+        type: integer
+      other:
+        type: integer
+      pdf:
+        type: integer
+      text:
+        type: integer
+      video:
+        type: integer
+    type: object
+  model.ListActivitiesResponse:
+    properties:
+      activities:
+        items:
+          $ref: '#/definitions/file.Log'
+        type: array
+      cursor:
+        type: string
+    type: object
   model.ListEntriesResponse:
+    properties:
+      cursor:
+        type: string
+      entries:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
+    type: object
+  model.ListFileSizesResponse:
     properties:
       cursor:
         type: string
@@ -210,6 +321,24 @@ definitions:
         type: array
       pagination:
         $ref: '#/definitions/pagination.PageInfo'
+    type: object
+  model.ListStarredResponse:
+    properties:
+      cursor:
+        type: string
+      entries:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
+    type: object
+  model.ListStoragesResponse:
+    properties:
+      pagination:
+        $ref: '#/definitions/pagination.PageInfo'
+      user_root_directories:
+        items:
+          $ref: '#/definitions/file.File'
+        type: array
     type: object
   model.ListTrashResponse:
     properties:
@@ -242,6 +371,15 @@ definitions:
         type: string
       session_token:
         type: string
+    type: object
+  model.LogsResponse:
+    properties:
+      cursor:
+        type: string
+      logs:
+        items:
+          $ref: '#/definitions/file.Log'
+        type: array
     type: object
   model.MoveRequest:
     properties:
@@ -308,15 +446,50 @@ definitions:
     - id
     - role
     type: object
-  model.StatisticsResponse:
+  model.StarRequest:
+    properties:
+      file_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - file_ids
+    type: object
+  model.StatisticUser:
     properties:
       active_users:
         type: integer
       blocked_users:
         type: integer
-      total_storage_usage:
-        type: integer
       total_users:
+        type: integer
+    type: object
+  model.StatisticUserComparison:
+    properties:
+      name:
+        type: string
+      percentage:
+        type: number
+      value:
+        type: integer
+    type: object
+  model.StatisticsResponse:
+    properties:
+      file_by_type:
+        additionalProperties:
+          type: integer
+        type: object
+      statistic_user:
+        items:
+          $ref: '#/definitions/model.StatisticUserComparison'
+        type: array
+      statistic_user_by_month:
+        additionalProperties:
+          $ref: '#/definitions/model.StatisticUser'
+        type: object
+      total_storage_capacity:
+        type: integer
+      total_storage_usage:
         type: integer
     type: object
   model.SuccessResponse:
@@ -324,6 +497,15 @@ definitions:
       data: {}
       message:
         type: string
+    type: object
+  model.UnstarRequest:
+    properties:
+      file_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - file_ids
     type: object
   model.UpdateAccessRequest:
     properties:
@@ -350,6 +532,25 @@ definitions:
     required:
     - general_access
     - id
+    type: object
+  model.UpdateProfileRequest:
+    properties:
+      avatar_url:
+        type: string
+      first_name:
+        minLength: 1
+        type: string
+      last_name:
+        minLength: 1
+        type: string
+    required:
+    - first_name
+    - last_name
+    type: object
+  model.UpdateProfileResponse:
+    properties:
+      id:
+        type: string
     type: object
   model.UploadImageResponse:
     properties:
@@ -444,6 +645,13 @@ definitions:
         type: integer
       total_pages:
         type: integer
+    type: object
+  permission.FileUser:
+    properties:
+      role:
+        type: string
+      user_id:
+        type: string
     type: object
 info:
   contact: {}
@@ -581,6 +789,234 @@ paths:
       summary: CreateIdentity
       tags:
       - admin
+  /admin/identities/{identity_id}:
+    delete:
+      description: DeleteIdentity
+      parameters:
+      - default: Bearer <session_token>
+        description: ' Bearer token'
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: DeleteIdentity
+      tags:
+      - admin
+    get:
+      description: Get user details
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/identity.User'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get user details
+      tags:
+      - admin
+    patch:
+      consumes:
+      - application/json
+      description: EditIdentity
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      - description: Edit identity request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.EditIdentityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/identity.User'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: EditIdentity
+      tags:
+      - admin
+  /admin/identities/{identity_id}/files:
+    get:
+      description: Get user files
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - in: query
+        minimum: 1
+        name: page
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Get user files
+      tags:
+      - admin
+  /admin/identities/{identity_id}/reset-password:
+    patch:
+      consumes:
+      - application/json
+      description: ResetPassword
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ResetPassword
+      tags:
+      - admin
   /admin/identities/{identity_id}/state:
     patch:
       consumes:
@@ -618,6 +1054,55 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: UpdateIdentityState
+      tags:
+      - admin
+  /admin/identities/{identity_id}/storage:
+    patch:
+      consumes:
+      - application/json
+      description: Change user's storage capacity
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Change user's storage capacity request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.ChangeUserStorageCapacityRequest'
+      - description: Identity ID
+        in: path
+        name: identity_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Change user's storage capacity
       tags:
       - admin
   /admin/identities/bulk:
@@ -690,6 +1175,54 @@ paths:
       summary: Download Identities Template CSV
       tags:
       - admin
+  /admin/logs:
+    get:
+      description: Logs
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - in: query
+        name: userID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.LogsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Logs
+      tags:
+      - admin
   /admin/me:
     get:
       description: AdminMe
@@ -750,6 +1283,54 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Statistics
+      tags:
+      - admin
+  /admin/storages:
+    get:
+      description: ListStorages
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        required: true
+        type: integer
+      - in: query
+        minimum: 1
+        name: page
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListStoragesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListStorages
       tags:
       - admin
   /assets/images:
@@ -879,6 +1460,9 @@ paths:
         required: true
         type: string
       - in: query
+        name: after
+        type: string
+      - in: query
         name: cursor
         type: string
       - in: query
@@ -886,6 +1470,20 @@ paths:
         minimum: 1
         name: limit
         type: integer
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
       produces:
       - application/json
       responses:
@@ -963,6 +1561,66 @@ paths:
       summary: Access
       tags:
       - file
+  /files/{id}/activities:
+    get:
+      consumes:
+      - application/json
+      description: ListActivities
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListActivitiesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListActivities
+      tags:
+      - file
   /files/{id}/download:
     get:
       description: Download
@@ -1029,7 +1687,7 @@ paths:
             - $ref: '#/definitions/model.SuccessResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/file.File'
+                  $ref: '#/definitions/model.GetMetadataResponse'
               type: object
         "400":
           description: Bad Request
@@ -1110,100 +1768,6 @@ paths:
       summary: ListPageEntries
       tags:
       - file
-  /files/{id}/star:
-    patch:
-      consumes:
-      - application/json
-      description: Star
-      parameters:
-      - default: Bearer <session_token>
-        description: ' Bearer token'
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: File ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-      summary: Star
-      tags:
-      - file
-  /files/{id}/unstar:
-    patch:
-      consumes:
-      - application/json
-      description: Unstar
-      parameters:
-      - default: Bearer <session_token>
-        description: ' Bearer token'
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: File ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-      summary: Unstar
-      tags:
-      - file
   /files/access:
     patch:
       consumes:
@@ -1250,6 +1814,67 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: UpdateAccess
+      tags:
+      - file
+  /files/chunks:
+    post:
+      consumes:
+      - multipart/form-data
+      description: UploadChunk
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: File ID
+        in: formData
+        name: file_id
+        type: string
+      - description: Directory ID
+        in: formData
+        name: id
+        required: true
+        type: string
+      - in: formData
+        name: last
+        type: boolean
+      - in: formData
+        name: total_size
+        type: integer
+      - description: File
+        in: formData
+        name: file
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/file.File'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: UploadChunk
       tags:
       - file
   /files/copy:
@@ -1409,6 +2034,50 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: CreateDirectory
+      tags:
+      - file
+  /files/download:
+    post:
+      description: DownloadBatch
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Download batch request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.DownloadBatchRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: DownloadBatch
       tags:
       - file
   /files/general-access:
@@ -1677,6 +2346,87 @@ paths:
       summary: RestoreFromTrash
       tags:
       - file
+  /files/search:
+    get:
+      consumes:
+      - application/json
+      description: Search
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: after
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - in: query
+        name: parentID
+        type: string
+      - in: query
+        name: query
+        required: true
+        type: string
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/file.File'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Search
+      tags:
+      - file
   /files/share:
     get:
       consumes:
@@ -1773,6 +2523,128 @@ paths:
       summary: Share
       tags:
       - file
+  /files/sizes:
+    get:
+      consumes:
+      - application/json
+      description: ListFileSizes
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: after
+        type: string
+      - in: query
+        name: asc
+        type: boolean
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - enum:
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListFileSizesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListFileSizes
+      tags:
+      - file
+  /files/star:
+    patch:
+      consumes:
+      - application/json
+      description: Star
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Star request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.StarRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Star
+      tags:
+      - file
   /files/starred:
     get:
       consumes:
@@ -1780,11 +2652,138 @@ paths:
       description: ListStarred
       parameters:
       - default: Bearer <session_token>
-        description: ' Bearer token'
+        description: Bearer token
         in: header
         name: Authorization
         required: true
         type: string
+      - in: query
+        name: after
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListStarredResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: ListStarred
+      tags:
+      - file
+  /files/storage:
+    get:
+      consumes:
+      - application/json
+      description: GetStorage
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.GetStorageResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: GetStorage
+      tags:
+      - file
+  /files/suggested:
+    get:
+      consumes:
+      - application/json
+      description: ListTrash
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - in: query
+        name: dir
+        type: boolean
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -1819,7 +2818,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.ErrorResponse'
-      summary: ListStarred
+      summary: ListTrash
       tags:
       - file
   /files/trash:
@@ -1871,11 +2870,11 @@ paths:
       summary: ListTrash
       tags:
       - file
-  /users/{id}/storage:
+  /files/unstar:
     patch:
       consumes:
       - application/json
-      description: Change user's storage capacity
+      description: Unstar
       parameters:
       - default: Bearer <session_token>
         description: Bearer token
@@ -1883,17 +2882,12 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: Change user's storage capacity request
+      - description: Unstar request
         in: body
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/model.ChangeUserStorageCapacityRequest'
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
+          $ref: '#/definitions/model.UnstarRequest'
       produces:
       - application/json
       responses:
@@ -1913,13 +2907,17 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.ErrorResponse'
-      summary: Change user's storage capacity
+      summary: Unstar
       tags:
-      - user
+      - file
   /users/change-password:
     post:
       consumes:
@@ -2086,6 +3084,95 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: Me
+      tags:
+      - user
+  /users/profile:
+    patch:
+      consumes:
+      - application/json
+      description: Update Profile
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Update profile request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.UpdateProfileResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Update Profile
+      tags:
+      - user
+  /users/suggest:
+    get:
+      description: Suggest users
+      parameters:
+      - default: Bearer <session_token>
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Query
+        in: query
+        name: query
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/identity.User'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Suggest users
       tags:
       - user
 schemes:
