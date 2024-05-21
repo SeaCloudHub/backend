@@ -44,6 +44,9 @@ services:
       - vhostd:/etc/nginx/vhost.d
       - nginxcerts:/etc/nginx/certs:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DEFAULT_EMAIL=your_email@example.com
+      - LETSENCRYPT_TEST=true
     privileged: true
     volumes_from:
       - nginx-proxy
