@@ -16,6 +16,10 @@ func (r *LoginRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }
 
+func (r *UpdateProfileRequest) Validate() error {
+	return validation.Validate().Struct(r)
+}
+
 type LoginResponse struct {
 	SessionID        string         `json:"session_id"`
 	SessionToken     string         `json:"session_token"`
@@ -27,6 +31,16 @@ type ChangePasswordRequest struct {
 	OldPassword string `json:"old_password" validate:"required,min=6,max=32"`
 	NewPassword string `json:"new_password" validate:"required,min=6,max=32"`
 } // @name model.ChangePasswordRequest
+
+type UpdateProfileRequest struct {
+	AvatarUrl string `json:"avatar_url"`
+	FirstName string `json:"first_name" validate:"required,min=1"`
+	LastName  string `json:"last_name" validate:"required,min=1"`
+} // @name model.UpdateProfileRequest
+
+type UpdateProfileResponse struct {
+	Id string `json:"id"`
+} // @name model.UpdateProfileResponse
 
 func (r *ChangePasswordRequest) Validate() error {
 	return validation.Validate().Struct(r)
@@ -48,10 +62,10 @@ type GetByEmailResponse struct {
 	PasswordChangedAt *time.Time `json:"password_changed_at"`
 } // @name model.GetByEmailResponse
 
-type ChangeUserStorageCapacityRequest struct {
-	StorageCapacity uint64 `json:"storage_capacity" validate:"required,min=0"`
-} // @name model.ChangeUserStorageCapacityRequest
+type SuggestRequest struct {
+	Query string `query:"query" validate:"required,min=2"`
+} // @name model.SuggestRequest
 
-func (r *ChangeUserStorageCapacityRequest) Validate() error {
+func (r *SuggestRequest) Validate() error {
 	return validation.Validate().Struct(r)
 }

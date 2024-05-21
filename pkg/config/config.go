@@ -45,6 +45,10 @@ type Config struct {
 		Password string `envconfig:"REDIS_PASSWORD"`
 		DB       int    `envconfig:"REDIS_DB"`
 	}
+
+	NotificationHub struct {
+		Endpoint string `envconfig:"NOTIFICATION_HUB_ENDPOINT"`
+	}
 }
 
 func LoadConfig() (*Config, error) {

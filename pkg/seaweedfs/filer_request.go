@@ -24,6 +24,11 @@ type UploadFileRequest struct {
 	ContentType  string
 }
 
+type AppendFileRequest struct {
+	Content      io.Reader
+	FullFileName string
+}
+
 type CreateDirectoryRequest struct {
 	DirPath string
 }

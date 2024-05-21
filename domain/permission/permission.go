@@ -49,6 +49,8 @@ type Service interface {
 	UpdateFileParent(ctx context.Context, fileID string, parentID string, oldParentID string) error
 	DeleteFilePermissions(ctx context.Context, fileID string) error
 	GetFileUsers(ctx context.Context, fileID string) ([]FileUser, error)
+
+	DeleteUserPermissions(ctx context.Context, userID string) error
 }
 
 type CreatePermission struct {

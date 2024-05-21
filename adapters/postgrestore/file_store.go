@@ -2,6 +2,7 @@ package postgrestore
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -39,7 +40,12 @@ func (s *FileStore) Create(ctx context.Context, f *file.File) error {
 		OwnerID:       f.OwnerID,
 	}
 
-	if err := s.db.WithContext(ctx).Create(&fileSchema).Error; err != nil {
+	query := s.db.WithContext(ctx)
+	if !f.More() {
+		query = query.Omit("finished_at")
+	}
+
+	if err := query.Create(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return file.ErrDirAlreadyExists
 		}
@@ -58,7 +64,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 		total       int64
 	)
 
-	if err := s.db.WithContext(ctx).Model(&fileSchemas).
+	if err := s.db.WithContext(ctx).Model(&fileSchemas).Where("finished_at IS NOT NULL").
 		Where("path = ?", dirpath).
 		Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
@@ -69,7 +75,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 	offset, limit := pager.Do()
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
-		Where("path = ?", dirpath).
+		Where("path = ?", dirpath).Where("finished_at IS NOT NULL").
 		Offset(offset).Limit(limit).Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -82,7 +88,7 @@ func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagina
 	return files, nil
 }
 
-func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor) ([]file.File, error) {
+func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
 	// parse cursor
@@ -91,12 +97,65 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("path = ?", dirpath).Where("name != ?", ".trash")
+	query := s.db.WithContext(ctx).Where("path = ?", dirpath).Where("finished_at IS NOT NULL").Where("name != ?", ".trash")
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Where("name != ?", ".trash").Where("finished_at IS NOT NULL").
+		Where("path ~ ?", fmt.Sprintf(`^%s(\/(?!\.trash(\/|$)).*)?$`, filter.Path))
+	if len(q) > 0 {
+		query = query.Order(fmt.Sprintf("similarity(name, '%s') DESC", q))
+	}
+
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -119,7 +178,25 @@ func (s *FileStore) GetByID(ctx context.Context, id string) (*file.File, error) 
 
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
+		Where("id = ?", id).Where("finished_at IS NOT NULL").
+		First(&fileSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, file.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return fileSchema.ToDomainFile(), nil
+}
+
+func (s *FileStore) GetUnfinishedByID(ctx context.Context, id string) (*file.File, error) {
+	var fileSchema FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Preload("Owner").
 		Where("id = ?", id).
+		Where("finished_at IS NULL").
 		First(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
@@ -138,7 +215,7 @@ func (s *FileStore) GetByFullPath(ctx context.Context, fullPath string) (*file.F
 
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
-		Where("path = ?", filepath.Clean(path)).
+		Where("path = ?", filepath.Clean(path)).Where("finished_at IS NOT NULL").
 		Where("name = ?", name).
 		First(&fileSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -186,7 +263,7 @@ func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, e
 
 	if err := s.db.WithContext(ctx).
 		Preload("Owner").
-		Where("id IN ?", ids).
+		Where("id IN ?", ids).Where("finished_at IS NOT NULL").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -211,7 +288,7 @@ func (s *FileStore) ListByFullPaths(ctx context.Context, fullPaths []string) ([]
 	}
 
 	if err := s.db.WithContext(ctx).
-		Where("(path, name) IN ?", conditions).
+		Where("(path, name) IN ?", conditions).Where("finished_at IS NOT NULL").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -234,10 +311,12 @@ func (s *FileStore) ListSelected(ctx context.Context, parent *file.File, ids []s
 		files       []file.File
 	)
 
-	if err := s.db.WithContext(ctx).
-		Where("id IN ?", ids).
-		Where("path = ?", parent.FullPath()).
-		Find(&fileSchemas).Error; err != nil {
+	query := s.db.WithContext(ctx).Where("finished_at IS NOT NULL").Where("id IN ?", ids)
+	if parent != nil {
+		query = query.Where("path = ?", parent.FullPath())
+	}
+
+	if err := query.Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
@@ -248,7 +327,7 @@ func (s *FileStore) ListSelected(ctx context.Context, parent *file.File, ids []s
 	return files, nil
 }
 
-func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File, ids []string) ([]file.File, error) {
+func (s *FileStore) ListSelectedChildren(ctx context.Context, path string, ids []string) ([]file.File, error) {
 	var (
 		fileSchemas []FileSchema
 		files       []file.File
@@ -258,7 +337,7 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File,
 
 	if err := db.WithContext(ctx).
 		Where("id IN ?", ids).
-		Where("path = ?", parent.FullPath()).
+		Where("path = ?", path).Where("finished_at IS NOT NULL").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -273,7 +352,7 @@ func (s *FileStore) ListSelectedChildren(ctx context.Context, parent *file.File,
 		var childFileSchemas []FileSchema
 
 		if err := db.WithContext(ctx).
-			Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, fileSchema.FullPath())).
+			Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, fileSchema.FullPath())).
 			Find(&childFileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)
 		}
@@ -295,7 +374,7 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 	db := s.db
 
 	if err := db.WithContext(ctx).
-		Where("id IN ?", ids).
+		Where("id IN ?", ids).Where("finished_at IS NOT NULL").
 		Where("path = ?", parent.FullPath()).
 		Where("owner_id = ?", userID).
 		Find(&fileSchemas).Error; err != nil {
@@ -312,7 +391,7 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 		var childFileSchemas []FileSchema
 
 		if err := db.WithContext(ctx).
-			Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, fileSchema.FullPath())).
+			Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, fileSchema.FullPath())).
 			Find(&childFileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)
 		}
@@ -328,7 +407,7 @@ func (s *FileStore) ListSelectedOwnedChildren(ctx context.Context, userID uuid.U
 func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, generalAccess string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
-		Where("id = ?", fileID).
+		Where("id = ?", fileID).Where("finished_at IS NOT NULL").
 		Update("general_access", generalAccess).Error; err != nil {
 		return fmt.Errorf("unexpected error: %w", err)
 	}
@@ -339,7 +418,7 @@ func (s *FileStore) UpdateGeneralAccess(ctx context.Context, fileID uuid.UUID, g
 func (s *FileStore) UpdatePath(ctx context.Context, fileID uuid.UUID, path string) error {
 	if err := s.db.WithContext(ctx).
 		Model(&FileSchema{}).
-		Where("id = ?", fileID).
+		Where("id = ?", fileID).Where("finished_at IS NOT NULL").
 		Updates(map[string]interface{}{
 			"id":   fileID,
 			"path": path,
@@ -354,7 +433,7 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 	var fileSchema FileSchema
 
 	// Retrieve file information
-	if err := s.db.WithContext(ctx).Where("id = ?", fileID).First(&fileSchema).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ?", fileID).Where("finished_at IS NOT NULL").First(&fileSchema).Error; err != nil {
 		return fmt.Errorf("get file: %w", err)
 	}
 
@@ -370,7 +449,7 @@ func (s *FileStore) UpdateName(ctx context.Context, fileID uuid.UUID, name strin
 		// Update child folders and file paths only if it's a folder
 		if fileSchema.IsDir {
 			if err := tx.WithContext(ctx).Model(&FileSchema{}).
-				Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, fileSchema.FullPath())).
+				Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, fileSchema.FullPath())).
 				Updates(map[string]interface{}{
 					"path": gorm.Expr("REPLACE(path, ?, ?)", fileSchema.FullPath(), filepath.Join(fileSchema.Path, name)),
 				}).Error; err != nil {
@@ -391,6 +470,25 @@ func (s *FileStore) UpdateThumbnail(ctx context.Context, fileID uuid.UUID, thumb
 	}
 
 	return nil
+}
+
+func (s *FileStore) UpdateChunk(ctx context.Context, fileID uuid.UUID, size uint64, last bool) (*file.File, error) {
+	fileSchema := FileSchema{
+		ID:   fileID,
+		Size: size,
+	}
+
+	if last {
+		fileSchema.FinishedAt = sql.NullTime{Time: time.Now(), Valid: true}
+	}
+
+	if err := s.db.WithContext(ctx).Model(&fileSchema).
+		Clauses(clause.Returning{}).
+		Updates(&fileSchema).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return fileSchema.ToDomainFile(), nil
 }
 
 func (s *FileStore) MoveToTrash(ctx context.Context, fileID uuid.UUID, path string) error {
@@ -429,7 +527,7 @@ func (s *FileStore) RestoreChildrenFromTrash(ctx context.Context, parentPath, ne
 	if err := s.db.WithContext(ctx).
 		Model(&fileSchemas).
 		Clauses(clause.Returning{}).
-		Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, parentPath)).
+		Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, parentPath)).
 		Updates(map[string]interface{}{
 			"path":          gorm.Expr("replace(path, ?, ?)", parentPath, newPath),
 			"previous_path": nil,
@@ -460,7 +558,7 @@ func (s *FileStore) Delete(ctx context.Context, e file.File) ([]file.File, error
 	if e.IsDir {
 		if err := s.db.WithContext(ctx).Unscoped().
 			Clauses(clause.Returning{}).
-			Where("path ~ ?", fmt.Sprintf(`^(%s(/.*)?)?$`, e.FullPath())).
+			Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, e.FullPath())).
 			Delete(&fileSchemas).Error; err != nil {
 			return nil, fmt.Errorf("unexpected error: %w", err)
 		}
@@ -498,7 +596,7 @@ func (s *FileStore) GetShare(ctx context.Context, fileID, userID uuid.UUID) (*fi
 	var shareSchema ShareSchema
 
 	if err := s.db.WithContext(ctx).
-		Where("file_id = ? AND user_id = ?", fileID, userID).
+		Where("file_id = ?", fileID).Where("user_id = ?", userID).
 		First(&shareSchema).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, file.ErrNotFound
@@ -554,14 +652,39 @@ func (s *FileStore) Unstar(ctx context.Context, fileID, userID uuid.UUID) error 
 	return nil
 }
 
-func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID) ([]file.File, error) {
+func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
-	if err := s.db.WithContext(ctx).
-		Joins("JOIN stars ON files.id = stars.file_id").
-		Where("stars.user_id = ?", userID).
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).
+		Joins("JOIN stars ON files.id = stars.file_id").Where("files.finished_at IS NOT NULL").
+		Where("stars.user_id = ?", userID)
+
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("files.created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("files.type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("files.updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("files.created_at ASC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
 	}
 
 	files := make([]file.File, len(fileSchemas))
@@ -573,6 +696,284 @@ func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID) ([]file.F
 
 }
 
+func (s *FileStore) GetAllFiles(ctx context.Context, path ...string) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	query := s.db.WithContext(ctx).
+		Where("is_dir = ?", false)
+	if len(path) == 1 {
+		query = query.Where("path ~ ?", fmt.Sprintf(`^\%s(\/.*)?$`, path[0]))
+	}
+
+	if err := query.Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) ListRootDirectory(ctx context.Context, pager *pagination.Pager) ([]file.File, error) {
+	var (
+		fileSchemas []FileSchema
+		total       int64
+	)
+
+	if err := s.db.WithContext(ctx).Model(&fileSchemas).
+		Where("path = ?", "/").
+		Count(&total).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	pager.SetTotal(total)
+
+	offset, limit := pager.Do()
+	if err := s.db.WithContext(ctx).
+		Preload("Owner").
+		Where("path = ?", "/").
+		Offset(offset).Limit(limit).Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*file.File, error) {
+	var fileSchemas []FileSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("path ~ ?", fmt.Sprintf(`^\/%s(\/.*)?$`, userID)).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+	files := make([]*file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) DeleteUserFiles(ctx context.Context, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("path ~ ?", fmt.Sprintf(`^\/%s(\/.*)?$`, userID)).
+		Delete(&FileSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteShareByFileID(ctx context.Context, fileID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ?", fileID).
+		Delete(&ShareSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteShareByUserID(ctx context.Context, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Delete(&ShareSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteStarByFileID(ctx context.Context, fileID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ?", fileID).
+		Delete(&StarSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) DeleteStarByUserID(ctx context.Context, userID uuid.UUID) error {
+	if err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Delete(&StarSchema{}).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 type fsCursor struct {
 	CreatedAt *time.Time
+}
+
+type logCursor struct {
+	CreatedAt *time.Time
+}
+
+func (s *FileStore) WriteLogs(ctx context.Context, logs []file.Log) error {
+	var logSchemas []LogSchema
+
+	for _, log := range logs {
+		logSchemas = append(logSchemas, LogSchema{
+			FileID: log.FileID,
+			UserID: log.UserID,
+			Action: log.Action,
+		})
+	}
+
+	if err := s.db.WithContext(ctx).Create(&logSchemas).Error; err != nil {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *FileStore) ReadLogs(ctx context.Context, userID string, cursor *pagination.Cursor) ([]file.Log, error) {
+	var logSchemas []LogSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[logCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Preload("User").Preload("File")
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if userID != "" {
+		query = query.Where("user_id = ?", userID)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Find(&logSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(logSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(logCursor{CreatedAt: &logSchemas[cursor.Limit].CreatedAt}))
+		logSchemas = logSchemas[:cursor.Limit]
+	}
+
+	logs := make([]file.Log, len(logSchemas))
+	for i, logSchema := range logSchemas {
+		logs[i] = *logSchema.ToDomainLog()
+	}
+
+	return logs, nil
+}
+
+func (s *FileStore) ListSuggested(ctx context.Context, userID uuid.UUID, limit int, isDir bool) ([]file.File, error) {
+	var logSchemas []LogSchema
+
+	db := s.db
+
+	subQuery := db.WithContext(ctx).Table("logs").
+		Select("DISTINCT ON (logs.file_id) logs.*").
+		Where("logs.user_id = ?", userID).Where("logs.action IN ?", file.SuggestedActions).
+		Order("logs.file_id, logs.created_at DESC")
+
+	if err := db.WithContext(ctx).Table("(?) AS logs", subQuery).
+		Preload("File").Preload("File.Owner").
+		Joins("JOIN files ON logs.file_id = files.id").
+		Where("files.is_dir = ?", isDir).Where("files.finished_at IS NOT NULL").
+		Order("logs.created_at DESC").
+		Limit(limit).
+		Find(&logSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	files := make([]file.File, len(logSchemas))
+	for i, logSchema := range logSchemas {
+		files[i] = *logSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
+func (s *FileStore) ListActivities(ctx context.Context, fileID uuid.UUID, cursor *pagination.Cursor) ([]file.Log, error) {
+	var logSchemas []LogSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[logCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Preload("User").Where("file_id = ?", fileID)
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Find(&logSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(logSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(logCursor{CreatedAt: &logSchemas[cursor.Limit].CreatedAt}))
+		logSchemas = logSchemas[:cursor.Limit]
+	}
+
+	logs := make([]file.Log, len(logSchemas))
+	for i, logSchema := range logSchemas {
+		logs[i] = *logSchema.ToDomainLog()
+	}
+
+	return logs, nil
+}
+
+func (s *FileStore) ListFiles(ctx context.Context, path string, cursor *pagination.Cursor, filter file.Filter, asc bool) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path)).Where("finished_at IS NOT NULL")
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if asc {
+		query = query.Order("size ASC")
+	} else {
+		query = query.Order("size DESC")
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
 }

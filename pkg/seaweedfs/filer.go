@@ -132,6 +132,29 @@ func (f *Filer) UploadFile(ctx context.Context, in *UploadFileRequest) (*UploadF
 	return &result, nil
 }
 
+func (f *Filer) AppendFile(ctx context.Context, in *AppendFileRequest) (*AppendFileResponse, error) {
+	var result AppendFileResponse
+
+	path, err := url.ParseRequestURI(in.FullFileName)
+	if err != nil {
+		return nil, fmt.Errorf("parse request uri: %w", err)
+	}
+
+	resp, err := f.client.R().SetContext(ctx).SetFileReader("file", in.FullFileName, in.Content).
+		SetQueryParam("op", "append").
+		SetResult(&result).
+		Post(path.String())
+	if err != nil {
+		return nil, fmt.Errorf("append file: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusCreated {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+	}
+
+	return &result, nil
+}
+
 func (f *Filer) CreateDirectory(ctx context.Context, in *CreateDirectoryRequest) error {
 	path, err := url.ParseRequestURI(in.DirPath)
 	if err != nil {

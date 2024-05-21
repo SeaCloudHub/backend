@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/SeaCloudHub/backend/domain/notification"
 
 	"github.com/SeaCloudHub/backend/pkg/app"
 	"github.com/SeaCloudHub/backend/pkg/apperror"
@@ -36,7 +39,7 @@ import (
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
 // @Param request path model.GetMetadataRequest true "Get metadata request"
-// @Success 200 {object} model.SuccessResponse{data=file.File}
+// @Success 200 {object} model.SuccessResponse{data=model.GetMetadataResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
@@ -116,7 +119,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 // @Description Download
 // @Tags file
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Param request path model.DownloadFileRequest true "Download file request"
+// @Param request path model.DownloadRequest true "Download file request"
 // @Success 200 {file} file
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
@@ -127,7 +130,7 @@ func (s *Server) GetMetadata(c echo.Context) error {
 func (s *Server) Download(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
-		req model.DownloadFileRequest
+		req model.DownloadRequest
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -150,7 +153,16 @@ func (s *Server) Download(c echo.Context) error {
 	}
 
 	if e.IsDir {
-		return s.error(c, apperror.ErrFileOnlyOperation())
+		canView, err := s.PermissionService.CanViewDirectory(ctx, id.ID, e.ID.String())
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		if !canView {
+			return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+		}
+
+		return s.downloadZip(c, e.Path, []string{e.ID.String()})
 	}
 
 	canView, err := s.PermissionService.CanViewFile(ctx, id.ID, e.ID.String())
@@ -172,7 +184,63 @@ func (s *Server) Download(c echo.Context) error {
 	}
 	defer f.Close()
 
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, uuid.MustParse(id.ID), file.LogActionOpen)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return c.Stream(http.StatusOK, mime, f)
+}
+
+// DownloadBatch godoc
+// @Summary DownloadBatch
+// @Description DownloadBatch
+// @Tags file
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request body model.DownloadBatchRequest true "Download batch request"
+// @Success 200 {file} file
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/download [post]
+func (s *Server) DownloadBatch(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.DownloadBatchRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	// check if user has view permission to the parent directory
+	parent, err := s.FileStore.GetByID(ctx, req.ParentID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canView, err := s.PermissionService.CanViewDirectory(ctx, user.ID.String(), parent.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+	}
+
+	return s.downloadZip(c, parent.FullPath(), req.IDs)
 }
 
 // UploadFiles godoc
@@ -254,7 +322,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 
 		wp.Submit(func() {
 			// save files
-			f, err := s.createFile(ctx, e, src, file.Filename, user.ID)
+			f, err := s.createFile(ctx, e, src, file.Filename, user.ID, false)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -290,7 +358,133 @@ func (s *Server) UploadFiles(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	logs := lo.Map(resp, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionCreate)
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, resp)
+}
+
+// UploadChunk godoc
+// @Summary UploadChunk
+// @Description UploadChunk
+// @Tags file
+// @Accept multipart/form-data
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request formData model.UploadChunkRequest true "Upload chunk request"
+// @Param file formData file true "File"
+// @Success 200 {object} model.SuccessResponse{data=file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/chunks [post]
+func (s *Server) UploadChunk(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.UploadChunkRequest
+		f   *file.File
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	e, err := s.FileStore.GetByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, file.ErrNotFound) {
+			return s.error(c, apperror.ErrEntityNotFound(err))
+		}
+
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// Check if user has permission to upload files
+	canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), e.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canEdit {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
+	}
+
+	mpFile, fileHeader, err := c.Request().FormFile("file")
+	if err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+	defer mpFile.Close()
+
+	// chec storage limit from file size
+	if uint64(fileHeader.Size)+e.Owner.StorageUsage > e.Owner.StorageCapacity {
+		return s.error(c, apperror.ErrStorageCapacityExceeded())
+	}
+
+	if req.FileID != "" {
+		// append chunk to file
+		f, err = s.FileStore.GetUnfinishedByID(ctx, req.FileID)
+		if err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		f, err = s.appendChunk(ctx, f.ID.String(), mpFile, req.Last)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		if req.Last {
+			payload := []map[string]string{
+				{"id": f.ID.String(), "mime": f.MimeType},
+			}
+
+			message, err := json.Marshal(payload)
+			if err != nil {
+				return s.error(c, apperror.ErrInternalServer(err))
+			}
+
+			if err := s.PubSubService.Publish(ctx, "thumbnails", string(message)); err != nil {
+				return s.error(c, apperror.ErrInternalServer(err))
+			}
+
+			// write log
+			if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(f.ID, user.ID, file.LogActionCreate)}); err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			}
+		}
+	} else {
+		// check storage limit from client input
+		if req.TotalSize+e.Owner.StorageUsage > e.Owner.StorageCapacity {
+			return s.error(c, apperror.ErrStorageCapacityExceeded())
+		}
+
+		// create file
+		f, err = s.createFile(ctx, e, mpFile, fileHeader.Filename, user.ID, true)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+	}
+
+	// update user storage usage
+	if err := s.UserStore.UpdateStorageUsage(ctx, e.OwnerID, e.Owner.StorageUsage+uint64(fileHeader.Size)); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, f.Response())
 }
 
 // ListEntries godoc
@@ -346,7 +540,9 @@ func (s *Server) ListEntries(c echo.Context) error {
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, e.FullPath(), cursor)
+	filter := file.NewFilter(req.Type, req.After)
+
+	files, err := s.FileStore.ListCursor(ctx, e.FullPath(), cursor, filter)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -357,6 +553,11 @@ func (s *Server) ListEntries(c echo.Context) error {
 
 	for i := range files {
 		files[i] = *files[i].Response()
+	}
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, uuid.MustParse(identity.ID), file.LogActionOpen)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
 
 	return s.success(c, model.ListEntriesResponse{
@@ -469,7 +670,7 @@ func (s *Server) ListTrash(c echo.Context) error {
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, trash.FullPath(), cursor)
+	files, err := s.FileStore.ListCursor(ctx, trash.FullPath(), cursor, file.Filter{})
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
@@ -549,6 +750,11 @@ func (s *Server) CreateDirectory(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(f.ID, user.ID, file.LogActionCreate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, f.Response())
 }
 
@@ -621,7 +827,37 @@ func (s *Server) Share(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	// TODO: notify users
+	token := *c.Get(ContextKeyIdentity).(*identity.Identity).Session.Token
+
+	go func() {
+		notifications := lo.Map(users, func(u identity.User, index int) notification.Notification {
+			content := map[string]interface{}{
+				"file":         e.Name,
+				"file_id":      e.ID.String(),
+				"is_dir":       e.IsDir,
+				"role":         req.Role,
+				"owner_avatar": user.AvatarURL,
+				"owner_name":   fmt.Sprint(user.FirstName, " ", user.LastName),
+			}
+
+			contentBytes, _ := json.Marshal(content)
+
+			return notification.Notification{
+				UserID:  u.ID.String(),
+				Content: string(contentBytes),
+			}
+		})
+
+		// Send all notifications in one batch
+		if err := s.NotificationService.SendNotification(context.Background(), notifications, user.ID.String(), token); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+		}
+	}()
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionShare)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 
 	return s.success(c, nil)
 }
@@ -775,6 +1011,11 @@ func (s *Server) UpdateGeneralAccess(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionUpdate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, nil)
 }
 
@@ -869,6 +1110,11 @@ func (s *Server) UpdateAccess(c echo.Context) error {
 	}
 
 	wp.StopWait()
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionUpdate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 
 	return s.success(c, nil)
 }
@@ -968,7 +1214,7 @@ func (s *Server) CopyFiles(c echo.Context) error {
 
 			newName := fmt.Sprintf("Copy of %s", e.Name)
 
-			f, err := s.createFile(ctx, dest, src, newName, user.ID)
+			f, err := s.createFile(ctx, dest, src, newName, user.ID, false)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -991,8 +1237,16 @@ func (s *Server) CopyFiles(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, resp)
+	// write log
+	logs := lo.Map(files, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionCreate)
+	})
 
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
+	return s.success(c, resp)
 }
 
 // Move godoc
@@ -1064,7 +1318,7 @@ func (s *Server) Move(c echo.Context) error {
 		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToEdit))
 	}
 
-	files, err := s.FileStore.ListSelectedChildren(ctx, src, req.SourceIDs)
+	files, err := s.FileStore.ListSelectedChildren(ctx, src.FullPath(), req.SourceIDs)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -1131,6 +1385,19 @@ func (s *Server) Move(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// write log
+	logs := lo.FilterMap(resp, func(f file.File, index int) (file.Log, bool) {
+		if f.Path != src.FullPath() {
+			return file.Log{}, false
+		}
+
+		return file.NewLog(f.ID, user.ID, file.LogActionMove), true
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, resp)
 }
 
@@ -1195,6 +1462,11 @@ func (s *Server) Rename(c echo.Context) error {
 	}
 
 	resp := *e.WithName(req.Name).WithPath(newPath).Response()
+
+	// write log
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionUpdate)}); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
 
 	return s.success(c, resp)
 }
@@ -1333,6 +1605,19 @@ func (s *Server) MoveToTrash(c echo.Context) error {
 
 	if err := s.UserStore.UpdateStorageUsage(ctx, src.OwnerID, src.Owner.StorageUsage-totalSize); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	// write log
+	logs := lo.FilterMap(resp, func(f file.File, index int) (file.Log, bool) {
+		if f.Path != src.FullPath() {
+			return file.Log{}, false
+		}
+
+		return file.NewLog(f.ID, user.ID, file.LogActionMove), true
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
 
 	return s.success(c, resp)
@@ -1484,6 +1769,15 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 
 	wp.StopWait()
 
+	// write log
+	logs := lo.Map(files, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionMove)
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, resp)
 }
 
@@ -1614,6 +1908,15 @@ func (s *Server) Delete(c echo.Context) error {
 
 	wp.StopWait()
 
+	// write log
+	logs := lo.Map(files, func(f file.File, index int) file.Log {
+		return file.NewLog(f.ID, user.ID, file.LogActionDelete)
+	})
+
+	if err := s.FileStore.WriteLogs(ctx, logs); err != nil {
+		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	}
+
 	return s.success(c, resp)
 }
 
@@ -1712,54 +2015,68 @@ func (s *Server) GetShared(c echo.Context) error {
 // @Tags file
 // @Accept json
 // @Produce json
-// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
-// @Param id path string true "File ID"
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.StarRequest true "Star request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
-// @Router /files/{id}/star [patch]
+// @Router /files/star [patch]
 func (s *Server) Star(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
-		id  = c.Param("id")
+		req model.StarRequest
 	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
 
 	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
-	e, err := s.FileStore.GetByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, file.ErrNotFound) {
-			return s.error(c, apperror.ErrEntityNotFound(err))
+	for _, id := range req.FileIDs {
+		e, err := s.FileStore.GetByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	canView, err := func() (bool, error) {
-		if e.IsDir {
-			return s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
-		}
-		return s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
-	}()
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
-
-	if !canView {
-		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
-	}
-
-	if err := s.FileStore.Star(ctx, e.ID, user.ID); err != nil {
-		if errors.Is(err, file.ErrNotFound) {
-			return s.error(c, apperror.ErrEntityNotFound(err))
+		canView, err := func() (bool, error) {
+			if e.IsDir {
+				return s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
+			}
+			return s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
+		}()
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
+		if !canView {
+			return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+		}
 
+		if err := s.FileStore.Star(ctx, e.ID, user.ID); err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		// write log
+		if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionStar)}); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+		}
+	}
 	return s.success(c, nil)
 }
 
@@ -1769,33 +2086,43 @@ func (s *Server) Star(c echo.Context) error {
 // @Tags file
 // @Accept json
 // @Produce json
-// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
-// @Param id path string true "File ID"
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.UnstarRequest true "Unstar request"
 // @Success 200 {object} model.SuccessResponse
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
-// @Router /files/{id}/unstar [patch]
+// @Router /files/unstar [patch]
 func (s *Server) Unstar(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
-		id  = c.Param("id")
+		req model.UnstarRequest
 	)
 
-	user, _ := c.Get(ContextKeyUser).(*identity.User)
-	fileId, err := uuid.Parse(id)
-	if err != nil {
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	if err := s.FileStore.Unstar(ctx, fileId, user.ID); err != nil {
-		if errors.Is(err, file.ErrNotFound) {
-			return s.error(c, apperror.ErrEntityNotFound(err))
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+	for _, id := range req.FileIDs {
+		fileId, err := uuid.Parse(id)
+		if err != nil {
+			return s.error(c, apperror.ErrInvalidParam(err))
 		}
 
-		return s.error(c, apperror.ErrInternalServer(err))
+		if err := s.FileStore.Unstar(ctx, fileId, user.ID); err != nil {
+			if errors.Is(err, file.ErrNotFound) {
+				return s.error(c, apperror.ErrEntityNotFound(err))
+			}
+
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
 	}
 
 	return s.success(c, nil)
@@ -1807,8 +2134,9 @@ func (s *Server) Unstar(c echo.Context) error {
 // @Tags file
 // @Accept json
 // @Produce json
-// @Param Authorization header string true " Bearer token" default(Bearer <session_token>)
-// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListStarredRequest true "List starred request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListStarredResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
@@ -1816,22 +2144,297 @@ func (s *Server) Unstar(c echo.Context) error {
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/starred [get]
 func (s *Server) ListStarred(c echo.Context) error {
-	var ctx = app.NewEchoContextAdapter(c)
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListStarredRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
 
 	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
-	files, err := s.FileStore.ListStarred(ctx, user.ID)
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After)
+
+	files, err := s.FileStore.ListStarred(ctx, user.ID, cursor, filter)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, files)
+	return s.success(c, model.ListStarredResponse{
+		Entries: files,
+		Cursor:  cursor.NextToken(),
+	})
+}
+
+// Search godoc
+// @Summary Search
+// @Description Search
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.SearchRequest true "Search request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/search [get]
+func (s *Server) Search(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.SearchRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	if req.ParentID == "" {
+		req.ParentID = user.RootID.String()
+	}
+
+	parent, err := s.FileStore.GetByID(ctx, req.ParentID)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	canView, err := s.PermissionService.CanViewDirectory(ctx, user.ID.String(), parent.ID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if !canView {
+		return s.error(c, apperror.ErrForbidden(permission.ErrNotPermittedToView))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After).WithPath(parent.FullPath())
+
+	files, err := s.FileStore.Search(ctx, req.Query, cursor, filter)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	fullPaths := lo.Map(files, func(file file.File, index int) string {
+		return file.Path
+	})
+
+	parents, err := s.FileStore.ListByFullPaths(ctx, fullPaths)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	entries := s.MapperService.FileWithParents(files, parents)
+
+	return s.success(c, model.SearchResponse{
+		Entries: entries,
+		Cursor:  cursor.NextToken(),
+	})
+}
+
+// ListTrash godoc
+// @Summary ListTrash
+// @Description ListTrash
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListSuggestedRequest true "List suggested request"
+// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/suggested [get]
+func (s *Server) ListSuggested(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListSuggestedRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	files, err := s.FileStore.ListSuggested(ctx, user.ID, req.Limit, req.Dir)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	fullPaths := lo.Map(files, func(file file.File, index int) string {
+		return file.Path
+	})
+
+	parents, err := s.FileStore.ListByFullPaths(ctx, fullPaths)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	entries := s.MapperService.FileWithParents(files, parents)
+
+	return s.success(c, entries)
+}
+
+// ListActivities godoc
+// @Summary ListActivities
+// @Description ListActivities
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param id path string true "File ID"
+// @Param request query model.ListActivitiesRequest true "List activities request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListActivitiesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/{id}/activities [get]
+func (s *Server) ListActivities(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListActivitiesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	activities, err := s.FileStore.ListActivities(ctx, uuid.MustParse(req.ID), cursor)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.ListActivitiesResponse{
+		Activities: activities,
+		Cursor:     cursor.NextToken(),
+	})
+}
+
+// GetStorage godoc
+// @Summary GetStorage
+// @Description GetStorage
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Success 200 {object} model.SuccessResponse{data=model.GetStorageResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/storage [get]
+func (s *Server) GetStorage(c echo.Context) error {
+	var ctx = app.NewEchoContextAdapter(c)
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	root, err := s.FileStore.GetByID(ctx, user.RootID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	files, err := s.FileStore.GetAllFiles(ctx, root.FullPath())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	storage := file.NewStorage(files)
+
+	return s.success(c, model.GetStorageResponse{
+		Storage:  storage,
+		Capacity: user.StorageCapacity,
+	})
+}
+
+// ListFileSizes godoc
+// @Summary ListFileSizes
+// @Description ListFileSizes
+// @Tags file
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param request query model.ListFileSizesRequest true "List file sizes request"
+// @Success 200 {object} model.SuccessResponse{data=model.ListFileSizesResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 404 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /files/sizes [get]
+func (s *Server) ListFileSizes(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.ListFileSizesRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
+
+	root, err := s.FileStore.GetByID(ctx, user.RootID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After)
+
+	sizes, err := s.FileStore.ListFiles(ctx, root.FullPath(), cursor, filter, req.Asc)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.ListFileSizesResponse{
+		Entries: sizes,
+		Cursor:  cursor.NextToken(),
+	})
 }
 
 func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.Use(s.passwordChangedAtMiddleware)
 	router.GET("/trash", s.ListTrash)
 	router.GET("/share", s.GetShared)
+	router.GET("/search", s.Search)
+	router.GET("/starred", s.ListStarred)
+	router.GET("/suggested", s.ListSuggested)
+	router.GET("/storage", s.GetStorage)
+	router.GET("/sizes", s.ListFileSizes)
+	router.POST("/download", s.DownloadBatch)
 	router.POST("/share", s.Share) // share file or directory with some users
 	router.POST("/directories", s.CreateDirectory)
 	router.POST("/copy", s.CopyFiles)
@@ -1841,6 +2444,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.POST("/restore", s.RestoreFromTrash)
 	router.POST("/delete", s.Delete)
 	router.POST("", s.UploadFiles)
+	router.POST("/chunks", s.UploadChunk)
 	router.PATCH("/general-access", s.UpdateGeneralAccess)
 	router.PATCH("/access", s.UpdateAccess)
 	router.GET("/:id", s.ListEntries)
@@ -1848,12 +2452,13 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.GET("/:id/metadata", s.GetMetadata)
 	router.GET("/:id/download", s.Download)
 	router.GET("/:id/access", s.Access) // get access to the shared file or directory
-	router.PATCH("/:id/star", s.Star)
-	router.PATCH("/:id/unstar", s.Unstar)
-	router.GET("/starred", s.ListStarred)
+	router.GET("/:id/activities", s.ListActivities)
+	router.PATCH("/star", s.Star)
+	router.PATCH("/unstar", s.Unstar)
+
 }
 
-func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID) (*file.File, error) {
+func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID, more bool) (*file.File, error) {
 	id := uuid.New()
 
 	contentType, src, err := app.DetectContentType(reader)
@@ -1871,7 +2476,7 @@ func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Re
 		return nil, fmt.Errorf("get metadata: %w", err)
 	}
 
-	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID)
+	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID).WithMore(more)
 	if err := s.FileStore.Create(ctx, f); err != nil {
 		return nil, fmt.Errorf("create file: %w", err)
 	}
@@ -1882,4 +2487,75 @@ func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Re
 	}
 
 	return f, nil
+}
+
+func (s *Server) appendChunk(ctx context.Context, fileID string, reader io.Reader, last bool) (*file.File, error) {
+	_, err := s.FileService.AppendFile(ctx, reader, fileID)
+	if err != nil {
+		return nil, fmt.Errorf("append file: %w", err)
+	}
+
+	entry, err := s.FileService.GetMetadata(ctx, fileID)
+	if err != nil {
+		return nil, fmt.Errorf("get metadata: %w", err)
+	}
+
+	f, err := s.FileStore.UpdateChunk(ctx, uuid.MustParse(fileID), entry.Size, last)
+	if err != nil {
+		return nil, fmt.Errorf("update chunk: %w", err)
+	}
+
+	return f, nil
+}
+
+func (s *Server) downloadZip(c echo.Context, path string, ids []string) error {
+	var ctx = app.NewEchoContextAdapter(c)
+
+	// list selected children
+	files, err := s.FileStore.ListSelectedChildren(ctx, path, ids)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	if len(files) == 0 {
+		return s.error(c, apperror.ErrNoFilesSelected(nil))
+	}
+
+	zw := zip.NewWriter(c.Response().Writer)
+	defer zw.Close()
+
+	for _, f := range files {
+		path := strings.TrimPrefix(f.FullPath(), path+"/")
+
+		if f.IsDir {
+			_, err := zw.Create(path + "/")
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			}
+
+			continue
+		}
+
+		r, _, err := s.FileService.DownloadFile(ctx, f.ID.String())
+		if err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			continue
+		}
+		defer r.Close()
+
+		w, err := zw.Create(path)
+		if err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			continue
+		}
+
+		if _, err := io.Copy(w, r); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+			continue
+		}
+	}
+
+	c.Response().Header().Set(echo.HeaderContentType, "application/zip")
+
+	return nil
 }
