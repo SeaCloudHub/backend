@@ -33,7 +33,6 @@ type ChangePasswordRequest struct {
 } // @name model.ChangePasswordRequest
 
 type UpdateProfileRequest struct {
-	Id        string `json:"id" validate:"required"`
 	AvatarUrl string `json:"avatar_url"`
 	FirstName string `json:"first_name" validate:"required,min=1"`
 	LastName  string `json:"last_name" validate:"required,min=1"`

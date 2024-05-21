@@ -206,7 +206,7 @@ func (s *Server) UpdateProfile(c echo.Context) error {
 	}
 
 	return s.success(c, model.UpdateProfileResponse{
-		Id: req.Id,
+		Id: id.ID,
 	})
 }
 

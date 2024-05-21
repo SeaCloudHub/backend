@@ -540,14 +540,11 @@ definitions:
       first_name:
         minLength: 1
         type: string
-      id:
-        type: string
       last_name:
         minLength: 1
         type: string
     required:
     - first_name
-    - id
     - last_name
     type: object
   model.UpdateProfileResponse:

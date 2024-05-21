@@ -4741,7 +4741,6 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "first_name",
-                "id",
                 "last_name"
             ],
             "properties": {
@@ -4751,9 +4750,6 @@ const docTemplate = `{
                 "first_name": {
                     "type": "string",
                     "minLength": 1
-                },
-                "id": {
-                    "type": "string"
                 },
                 "last_name": {
                     "type": "string",
