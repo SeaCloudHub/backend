@@ -48,6 +48,17 @@ func (s *UserStore) UpdatePasswordChangedAt(ctx context.Context, id uuid.UUID) e
 		Error
 }
 
+func (s *UserStore) UpdateNameAndAvatar(ctx context.Context, id uuid.UUID, avatar string, firstName string, lastName string) error {
+	return s.db.WithContext(ctx).Model(&UserSchema{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"avatar_url": avatar,
+			"first_name": firstName,
+			"last_name":  lastName,
+		}).
+		Error
+}
+
 func (s *UserStore) UpdateLastSignInAt(ctx context.Context, id uuid.UUID) error {
 	return s.db.WithContext(ctx).Model(&UserSchema{}).
 		Where("id = ?", id).
