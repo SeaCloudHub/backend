@@ -2297,9 +2297,9 @@ func (s *Server) ListSuggested(c echo.Context) error {
 	return s.success(c, entries)
 }
 
-// ListTrash godoc
-// @Summary ListTrash
-// @Description ListTrash
+// ListActivities godoc
+// @Summary ListActivities
+// @Description ListActivities
 // @Tags file
 // @Accept json
 // @Produce json
@@ -2312,7 +2312,7 @@ func (s *Server) ListSuggested(c echo.Context) error {
 // @Failure 403 {object} model.ErrorResponse
 // @Failure 404 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
-// @Router /files/{id}/activity [get]
+// @Router /files/{id}/activities [get]
 func (s *Server) ListActivities(c echo.Context) error {
 	var (
 		ctx = app.NewEchoContextAdapter(c)
