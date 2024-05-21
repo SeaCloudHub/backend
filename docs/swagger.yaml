@@ -1561,11 +1561,11 @@ paths:
       summary: Access
       tags:
       - file
-  /files/{id}/activity:
+  /files/{id}/activities:
     get:
       consumes:
       - application/json
-      description: ListTrash
+      description: ListActivities
       parameters:
       - default: Bearer <session_token>
         description: Bearer token
@@ -1618,7 +1618,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.ErrorResponse'
-      summary: ListTrash
+      summary: ListActivities
       tags:
       - file
   /files/{id}/download:

@@ -3198,9 +3198,9 @@
                 }
             }
         },
-        "/files/{id}/activity": {
+        "/files/{id}/activities": {
             "get": {
-                "description": "ListTrash",
+                "description": "ListActivities",
                 "consumes": [
                     "application/json"
                 ],
@@ -3210,7 +3210,7 @@
                 "tags": [
                     "file"
                 ],
-                "summary": "ListTrash",
+                "summary": "ListActivities",
                 "parameters": [
                     {
                         "type": "string",

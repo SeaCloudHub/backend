@@ -3201,9 +3201,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/files/{id}/activity": {
+        "/files/{id}/activities": {
             "get": {
-                "description": "ListTrash",
+                "description": "ListActivities",
                 "consumes": [
                     "application/json"
                 ],
@@ -3213,7 +3213,7 @@ const docTemplate = `{
                 "tags": [
                     "file"
                 ],
-                "summary": "ListTrash",
+                "summary": "ListActivities",
                 "parameters": [
                     {
                         "type": "string",
