@@ -171,6 +171,45 @@ func (s *Server) ChangePassword(c echo.Context) error {
 	return s.success(c, nil)
 }
 
+// UpdateProfile godoc
+// @Summary Update Profile
+// @Description Update Profile
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
+// @Param payload body model.UpdateProfileRequest true "Update profile request"
+// @Success 200 {object} model.SuccessResponse{data=model.UpdateProfileResponse}
+// @Failure 400 {object} model.ErrorResponse
+// @Failure 401 {object} model.ErrorResponse
+// @Failure 403 {object} model.ErrorResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /users/profile [patch]
+func (s *Server) UpdateProfile(c echo.Context) error {
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.UpdateProfileRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
+
+	id, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
+
+	if err := s.UserStore.UpdateNameAndAvatar(ctx, uuid.MustParse(id.ID), req.AvatarUrl, req.FirstName, req.LastName); err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	return s.success(c, model.UpdateProfileResponse{
+		Id: id.ID,
+	})
+}
+
 // GetByEmail godoc
 // @Summary Get user by email
 // @Description Get user by email
@@ -250,6 +289,7 @@ func (s *Server) RegisterUserRoutes(router *echo.Group) {
 	router.POST("/login", s.Login)
 	router.POST("/logout", s.Logout)
 	router.POST("/change-password", s.ChangePassword)
+	router.PATCH("/profile", s.UpdateProfile)
 	router.GET("/me", s.Me)
 	router.GET("/email", s.GetByEmail)
 	router.GET("/suggest", s.Suggest)

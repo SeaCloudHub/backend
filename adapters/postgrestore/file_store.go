@@ -911,7 +911,7 @@ func (s *FileStore) ListActivities(ctx context.Context, fileID uuid.UUID, cursor
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Preload("User").Where("file_id = ?", fileID).Where("finished_at IS NOT NULL")
+	query := s.db.WithContext(ctx).Preload("User").Where("file_id = ?", fileID)
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
