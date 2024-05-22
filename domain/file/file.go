@@ -75,9 +75,10 @@ type File struct {
 	CreatedAt     time.Time   `json:"created_at"`
 	UpdatedAt     time.Time   `json:"updated_at"`
 
-	Owner  *identity.User `json:"owner,omitempty"`
-	Parent *SimpleFile    `json:"parent,omitempty"`
-	Log    *Log           `json:"log,omitempty"`
+	Owner     *identity.User `json:"owner,omitempty"`
+	Parent    *SimpleFile    `json:"parent,omitempty"`
+	Log       *Log           `json:"log,omitempty"`
+	UserRoles []string       `json:"userRoles"`
 
 	more bool
 } // @name file.File
@@ -107,6 +108,12 @@ func (f *File) WithName(name string) *File {
 
 func (f *File) WithPath(path string) *File {
 	f.Path = filepath.Clean(path)
+
+	return f
+}
+
+func (f *File) WithUserRoles(roles []string) *File {
+	f.UserRoles = roles
 
 	return f
 }

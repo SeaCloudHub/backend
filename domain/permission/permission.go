@@ -29,6 +29,7 @@ type Service interface {
 	CreateAdminGroup(ctx context.Context, userID string) error
 	CreatePermission(ctx context.Context, in *CreatePermission) error
 	GetSharedPermissions(ctx context.Context, userID string, namespace string, relation string) ([]string, error)
+	GetFileUserRoles(ctx context.Context, userID string, fileID string, isDir bool) ([]string, error)
 
 	CreateDirectoryPermissions(ctx context.Context, userID string, fileID string, parentID string) error
 	CanEditDirectory(ctx context.Context, userID string, fileID string) (bool, error)
