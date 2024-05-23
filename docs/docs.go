@@ -2289,6 +2289,40 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "folder",
+                            "text",
+                            "document",
+                            "pdf",
+                            "json",
+                            "image",
+                            "video",
+                            "audio",
+                            "archive",
+                            "other"
+                        ],
+                        "type": "string",
+                        "name": "type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2303,10 +2337,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/file.File"
-                                            }
+                                            "$ref": "#/definitions/model.GetSharedResponse"
                                         }
                                     }
                                 }
@@ -2787,7 +2818,7 @@ const docTemplate = `{
         },
         "/files/suggested": {
             "get": {
-                "description": "ListTrash",
+                "description": "ListSuggested",
                 "consumes": [
                     "application/json"
                 ],
@@ -2797,7 +2828,7 @@ const docTemplate = `{
                 "tags": [
                     "file"
                 ],
-                "summary": "ListTrash",
+                "summary": "ListSuggested",
                 "parameters": [
                     {
                         "type": "string",
@@ -3993,6 +4024,12 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "userRoles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -4310,6 +4347,20 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/permission.FileUser"
+                    }
+                }
+            }
+        },
+        "model.GetSharedResponse": {
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "type": "string"
+                },
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/file.File"
                     }
                 }
             }

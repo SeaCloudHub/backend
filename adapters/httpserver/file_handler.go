@@ -20,6 +20,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
+	lop "github.com/samber/lo/parallel"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -107,8 +108,13 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	userRoles, err := s.PermissionService.GetFileUserRoles(ctx, id.ID, f.ID.String(), f.IsDir)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
 	return s.success(c, model.GetMetadataResponse{
-		File:    *f.Response(),
+		File:    *f.Response().WithUserRoles(userRoles),
 		Parents: parents,
 		Users:   users,
 	})
@@ -528,9 +534,9 @@ func (s *Server) ListEntries(c echo.Context) error {
 		return s.error(c, apperror.ErrDirectoryOnlyOperation())
 	}
 
-	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
-	canView, err := s.PermissionService.CanViewDirectory(ctx, identity.ID, e.ID.String())
+	canView, err := s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -556,9 +562,11 @@ func (s *Server) ListEntries(c echo.Context) error {
 	}
 
 	// write log
-	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, uuid.MustParse(identity.ID), file.LogActionOpen)}); err != nil {
+	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionOpen)}); err != nil {
 		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
+
+	files = s.mapUserRoles(ctx, user, files)
 
 	return s.success(c, model.ListEntriesResponse{
 		Entries: files,
@@ -594,7 +602,7 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 		return s.error(c, apperror.ErrInvalidParam(err))
 	}
 
-	identity, _ := c.Get(ContextKeyIdentity).(*identity.Identity)
+	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
 	e, err := s.FileStore.GetByID(ctx, req.ID)
 	if err != nil {
@@ -609,7 +617,7 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 		return s.error(c, apperror.ErrDirectoryOnlyOperation())
 	}
 
-	canView, err := s.PermissionService.CanViewDirectory(ctx, identity.ID, e.ID.String())
+	canView, err := s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -624,9 +632,7 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	for i := range files {
-		files[i] = *files[i].Response()
-	}
+	files = s.mapUserRoles(ctx, user, files)
 
 	return s.success(c, model.ListPageEntriesResponse{
 		Entries:    files,
@@ -1746,6 +1752,7 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 				}, totalSize)
 			}
 
+			resp = append(resp, *f.Response())
 			if dest.OwnerID == src.OwnerID {
 				return
 			}
@@ -1763,7 +1770,6 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 
 			m.Lock()
 			defer m.Unlock()
-			resp = append(resp, *f.Response())
 		})
 	}
 
@@ -1927,7 +1933,8 @@ func (s *Server) Delete(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Param request query model.GetSharedRequest true "Get shared request"
+// @Success 200 {object} model.SuccessResponse{data=model.GetSharedResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
@@ -1935,7 +1942,18 @@ func (s *Server) Delete(c echo.Context) error {
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/share [get]
 func (s *Server) GetShared(c echo.Context) error {
-	var ctx = app.NewEchoContextAdapter(c)
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.GetSharedRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
 
 	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
@@ -1944,6 +1962,8 @@ func (s *Server) GetShared(c echo.Context) error {
 		m       sync.Mutex
 		fileIDs []string
 	)
+
+	userRoleByFileID := make(map[string][]string)
 
 	g.Go(func() error {
 		ids, err := s.PermissionService.GetSharedPermissions(ctx, user.ID.String(), "Directory", "editors")
@@ -1954,6 +1974,9 @@ func (s *Server) GetShared(c echo.Context) error {
 		m.Lock()
 		defer m.Unlock()
 		fileIDs = append(fileIDs, ids...)
+		for _, id := range ids {
+			userRoleByFileID[id] = append(userRoleByFileID[id], "editor")
+		}
 
 		return nil
 	})
@@ -1967,6 +1990,9 @@ func (s *Server) GetShared(c echo.Context) error {
 		m.Lock()
 		defer m.Unlock()
 		fileIDs = append(fileIDs, ids...)
+		for _, id := range ids {
+			userRoleByFileID[id] = append(userRoleByFileID[id], "viewer")
+		}
 
 		return nil
 	})
@@ -1980,6 +2006,9 @@ func (s *Server) GetShared(c echo.Context) error {
 		m.Lock()
 		defer m.Unlock()
 		fileIDs = append(fileIDs, ids...)
+		for _, id := range ids {
+			userRoleByFileID[id] = append(userRoleByFileID[id], "editor")
+		}
 
 		return nil
 	})
@@ -1993,6 +2022,9 @@ func (s *Server) GetShared(c echo.Context) error {
 		m.Lock()
 		defer m.Unlock()
 		fileIDs = append(fileIDs, ids...)
+		for _, id := range ids {
+			userRoleByFileID[id] = append(userRoleByFileID[id], "viewer")
+		}
 
 		return nil
 	})
@@ -2001,12 +2033,22 @@ func (s *Server) GetShared(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	files, err := s.FileStore.ListByIDs(ctx, fileIDs)
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After)
+
+	files, err := s.FileStore.ListByIDsAndCursor(ctx, fileIDs, cursor, filter)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	return s.success(c, files)
+	for i, f := range files {
+		files[i].WithUserRoles(userRoleByFileID[f.ID.String()])
+	}
+
+	return s.success(c, model.GetSharedResponse{
+		Entries: files,
+		Cursor:  cursor.NextToken(),
+	})
 }
 
 // Star godoc
@@ -2167,6 +2209,8 @@ func (s *Server) ListStarred(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	files = s.mapUserRoles(ctx, user, files)
+
 	return s.success(c, model.ListStarredResponse{
 		Entries: files,
 		Cursor:  cursor.NextToken(),
@@ -2240,6 +2284,7 @@ func (s *Server) Search(c echo.Context) error {
 	}
 
 	entries := s.MapperService.FileWithParents(files, parents)
+	entries = s.mapUserRoles(ctx, user, entries)
 
 	return s.success(c, model.SearchResponse{
 		Entries: entries,
@@ -2247,9 +2292,9 @@ func (s *Server) Search(c echo.Context) error {
 	})
 }
 
-// ListTrash godoc
-// @Summary ListTrash
-// @Description ListTrash
+// ListSuggested godoc
+// @Summary ListSuggested
+// @Description ListSuggested
 // @Tags file
 // @Accept json
 // @Produce json
@@ -2293,6 +2338,8 @@ func (s *Server) ListSuggested(c echo.Context) error {
 	}
 
 	entries := s.MapperService.FileWithParents(files, parents)
+
+	entries = s.mapUserRoles(ctx, user, entries)
 
 	return s.success(c, entries)
 }
@@ -2456,6 +2503,16 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 	router.PATCH("/star", s.Star)
 	router.PATCH("/unstar", s.Unstar)
 
+}
+
+func (s *Server) mapUserRoles(ctx context.Context, user *identity.User, entries []file.File) []file.File {
+	return lop.Map(entries, func(e file.File, i int) file.File {
+		userRoles, err := s.PermissionService.GetFileUserRoles(ctx, user.ID.String(), e.ID.String(), e.IsDir)
+		if err != nil {
+			return e
+		}
+		return *e.WithUserRoles(userRoles)
+	})
 }
 
 func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID, more bool) (*file.File, error) {

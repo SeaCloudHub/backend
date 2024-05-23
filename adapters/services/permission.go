@@ -148,6 +148,36 @@ func (s *PermissionService) GetSharedPermissions(ctx context.Context, userID str
 	return sharedIDs, nil
 }
 
+func (s *PermissionService) GetFileUserRoles(ctx context.Context,
+	userID string, fileID string, isDir bool) ([]string, error) {
+	var (
+		permissions []string
+	)
+
+	namespace := "File"
+	if isDir {
+		namespace = "Directory"
+	}
+
+	result, _, err := s.readClient.RelationshipApi.GetRelationships(ctx).PageSize(100).
+		Namespace(namespace).Object(fileID).SubjectId(userID).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	for _, relationship := range result.RelationTuples {
+		if role, ok := permission.RelationshipRoleMap[relationship.Relation]; ok {
+			permissions = append(permissions, role)
+		}
+	}
+
+	return permissions, nil
+}
+
 func (s *PermissionService) CreateDirectoryPermissions(ctx context.Context, userID string, fileID string, parentID string) error {
 	relationshipPatch := []keto.RelationshipPatch{
 		{

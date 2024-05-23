@@ -276,6 +276,48 @@ func (s *FileStore) ListByIDs(ctx context.Context, ids []string) ([]file.File, e
 	return files, nil
 }
 
+func (s *FileStore) ListByIDsAndCursor(ctx context.Context, ids []string,
+	cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Where("id IN ?", ids).Where("finished_at IS NOT NULL")
+	if cursorObj.CreatedAt != nil {
+		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{CreatedAt: &fileSchemas[cursor.Limit].CreatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
+	}
+
+	files := make([]file.File, len(fileSchemas))
+
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
 func (s *FileStore) ListByFullPaths(ctx context.Context, fullPaths []string) ([]file.SimpleFile, error) {
 	var (
 		fileSchemas []FileSchema
