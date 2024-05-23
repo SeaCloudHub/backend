@@ -40,6 +40,10 @@ definitions:
         type: string
       updated_at:
         type: string
+      userRoles:
+        items:
+          type: string
+        type: array
     type: object
   file.Log:
     properties:
@@ -252,6 +256,15 @@ definitions:
       users:
         items:
           $ref: '#/definitions/permission.FileUser'
+        type: array
+    type: object
+  model.GetSharedResponse:
+    properties:
+      cursor:
+        type: string
+      entries:
+        items:
+          $ref: '#/definitions/file.File'
         type: array
     type: object
   model.GetStorageResponse:
@@ -2439,6 +2452,31 @@ paths:
         name: Authorization
         required: true
         type: string
+      - in: query
+        name: after
+        type: string
+      - in: query
+        name: cursor
+        type: string
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
       produces:
       - application/json
       responses:
@@ -2449,9 +2487,7 @@ paths:
             - $ref: '#/definitions/model.SuccessResponse'
             - properties:
                 data:
-                  items:
-                    $ref: '#/definitions/file.File'
-                  type: array
+                  $ref: '#/definitions/model.GetSharedResponse'
               type: object
         "400":
           description: Bad Request
@@ -2768,7 +2804,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: ListTrash
+      description: ListSuggested
       parameters:
       - default: Bearer <session_token>
         description: Bearer token
@@ -2818,7 +2854,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.ErrorResponse'
-      summary: ListTrash
+      summary: ListSuggested
       tags:
       - file
   /files/trash:

@@ -23,6 +23,7 @@ type Store interface {
 	GetRootDirectory(ctx context.Context) (*File, error)
 	GetTrashByUserID(ctx context.Context, userID uuid.UUID) (*File, error)
 	ListByIDs(ctx context.Context, ids []string) ([]File, error)
+	ListByIDsAndCursor(ctx context.Context, ids []string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	ListByFullPaths(ctx context.Context, fullPaths []string) ([]SimpleFile, error)
 	ListSelected(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedChildren(ctx context.Context, path string, ids []string) ([]File, error)

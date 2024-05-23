@@ -226,6 +226,26 @@ func (r *SearchRequest) Validate(ctx context.Context) error {
 	return validation.Validate().StructCtx(ctx, r)
 }
 
+type GetSharedRequest struct {
+	Cursor string     `query:"cursor" validate:"omitempty,base64url"`
+	Limit  int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Type   string     `query:"type" validate:"omitempty,oneof=folder text document pdf json image video audio archive other"`
+	After  *time.Time `query:"after" validate:"omitempty"`
+} // @name model.GetSharedRequest
+
+func (r *GetSharedRequest) Validate(ctx context.Context) error {
+	if r.Limit <= 0 {
+		r.Limit = 10
+	}
+
+	return validation.Validate().StructCtx(ctx, r)
+}
+
+type GetSharedResponse struct {
+	Entries []file.File `json:"entries"`
+	Cursor  string      `json:"cursor"`
+} // @name model.GetSharedResponse
+
 type SearchResponse struct {
 	Entries []file.File `json:"entries"`
 	Cursor  string      `json:"cursor"`

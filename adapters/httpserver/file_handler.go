@@ -1751,6 +1751,7 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 				}, totalSize)
 			}
 
+			resp = append(resp, *f.Response())
 			if dest.OwnerID == src.OwnerID {
 				return
 			}
@@ -1768,7 +1769,6 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 
 			m.Lock()
 			defer m.Unlock()
-			resp = append(resp, *f.Response())
 		})
 	}
 
@@ -1932,7 +1932,8 @@ func (s *Server) Delete(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer token" default(Bearer <session_token>)
-// @Success 200 {object} model.SuccessResponse{data=[]file.File}
+// @Param request query model.GetSharedRequest true "Get shared request"
+// @Success 200 {object} model.SuccessResponse{data=model.GetSharedResponse}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
 // @Failure 403 {object} model.ErrorResponse
@@ -1940,7 +1941,18 @@ func (s *Server) Delete(c echo.Context) error {
 // @Failure 500 {object} model.ErrorResponse
 // @Router /files/share [get]
 func (s *Server) GetShared(c echo.Context) error {
-	var ctx = app.NewEchoContextAdapter(c)
+	var (
+		ctx = app.NewEchoContextAdapter(c)
+		req model.GetSharedRequest
+	)
+
+	if err := c.Bind(&req); err != nil {
+		return s.error(c, apperror.ErrInvalidRequest(err))
+	}
+
+	if err := req.Validate(ctx); err != nil {
+		return s.error(c, apperror.ErrInvalidParam(err))
+	}
 
 	user, _ := c.Get(ContextKeyUser).(*identity.User)
 
@@ -2020,7 +2032,10 @@ func (s *Server) GetShared(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	files, err := s.FileStore.ListByIDs(ctx, fileIDs)
+	cursor := pagination.NewCursor(req.Cursor, req.Limit)
+	filter := file.NewFilter(req.Type, req.After)
+
+	files, err := s.FileStore.ListByIDsAndCursor(ctx, fileIDs, cursor, filter)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -2029,7 +2044,10 @@ func (s *Server) GetShared(c echo.Context) error {
 		files[i].WithUserRoles(userRoleByFileID[f.ID.String()])
 	}
 
-	return s.success(c, files)
+	return s.success(c, model.GetSharedResponse{
+		Entries: files,
+		Cursor:  cursor.NextToken(),
+	})
 }
 
 // Star godoc
