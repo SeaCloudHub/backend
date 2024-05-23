@@ -20,6 +20,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
+	lop "github.com/samber/lo/parallel"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -2505,7 +2506,7 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 }
 
 func (s *Server) mapUserRoles(ctx context.Context, user *identity.User, entries []file.File) []file.File {
-	return lo.Map(entries, func(e file.File, i int) file.File {
+	return lop.Map(entries, func(e file.File, i int) file.File {
 		userRoles, err := s.PermissionService.GetFileUserRoles(ctx, user.ID.String(), e.ID.String(), e.IsDir)
 		if err != nil {
 			return e
