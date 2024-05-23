@@ -152,8 +152,6 @@ func (s *PermissionService) GetFileUserRoles(ctx context.Context,
 	userID string, fileID string, isDir bool) ([]string, error) {
 	var (
 		permissions []string
-		first       = true
-		cursor      string
 	)
 
 	namespace := "File"
@@ -161,25 +159,20 @@ func (s *PermissionService) GetFileUserRoles(ctx context.Context,
 		namespace = "Directory"
 	}
 
-	for first || len(cursor) > 0 {
-		result, _, err := s.readClient.RelationshipApi.GetRelationships(ctx).PageSize(100).PageToken(cursor).
-			Namespace(namespace).Object(fileID).SubjectId(userID).Execute()
-		if err != nil {
-			if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
-				return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
-			}
-
-			return nil, fmt.Errorf("unexpected error: %w", err)
+	result, _, err := s.readClient.RelationshipApi.GetRelationships(ctx).PageSize(100).
+		Namespace(namespace).Object(fileID).SubjectId(userID).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return nil, fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
 		}
 
-		for _, relationship := range result.RelationTuples {
-			if role, ok := permission.RelationshipRoleMap[relationship.Relation]; ok {
-				permissions = append(permissions, role)
-			}
-		}
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
 
-		cursor = *result.NextPageToken
-		first = false
+	for _, relationship := range result.RelationTuples {
+		if role, ok := permission.RelationshipRoleMap[relationship.Relation]; ok {
+			permissions = append(permissions, role)
+		}
 	}
 
 	return permissions, nil

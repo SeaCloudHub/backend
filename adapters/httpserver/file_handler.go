@@ -565,10 +565,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
 
-	files, err = s.mapUserRoles(ctx, user, files)
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
+	files = s.mapUserRoles(ctx, user, files)
 
 	return s.success(c, model.ListEntriesResponse{
 		Entries: files,
@@ -634,10 +631,7 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	files, err = s.mapUserRoles(ctx, user, files)
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
+	files = s.mapUserRoles(ctx, user, files)
 
 	return s.success(c, model.ListPageEntriesResponse{
 		Entries:    files,
@@ -2196,10 +2190,7 @@ func (s *Server) ListStarred(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	files, err = s.mapUserRoles(ctx, user, files)
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
+	files = s.mapUserRoles(ctx, user, files)
 
 	return s.success(c, model.ListStarredResponse{
 		Entries: files,
@@ -2274,10 +2265,7 @@ func (s *Server) Search(c echo.Context) error {
 	}
 
 	entries := s.MapperService.FileWithParents(files, parents)
-	entries, err = s.mapUserRoles(ctx, user, entries)
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
+	entries = s.mapUserRoles(ctx, user, entries)
 
 	return s.success(c, model.SearchResponse{
 		Entries: entries,
@@ -2332,10 +2320,7 @@ func (s *Server) ListSuggested(c echo.Context) error {
 
 	entries := s.MapperService.FileWithParents(files, parents)
 
-	entries, err = s.mapUserRoles(ctx, user, entries)
-	if err != nil {
-		return s.error(c, apperror.ErrInternalServer(err))
-	}
+	entries = s.mapUserRoles(ctx, user, entries)
 
 	return s.success(c, entries)
 }
@@ -2501,19 +2486,14 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 
 }
 
-func (s *Server) mapUserRoles(ctx context.Context, user *identity.User, entries []file.File) ([]file.File, error) {
-	for i, e := range entries {
-		userRoles, err := s.PermissionService.GetFileUserRoles(ctx,
-			user.ID.String(), e.ID.String(), e.IsDir)
-
+func (s *Server) mapUserRoles(ctx context.Context, user *identity.User, entries []file.File) []file.File {
+	return lo.Map(entries, func(e file.File, i int) file.File {
+		userRoles, err := s.PermissionService.GetFileUserRoles(ctx, user.ID.String(), e.ID.String(), e.IsDir)
 		if err != nil {
-			return nil, err
+			return e
 		}
-
-		entries[i].WithUserRoles(userRoles)
-	}
-
-	return entries, nil
+		return *e.WithUserRoles(userRoles)
+	})
 }
 
 func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID, more bool) (*file.File, error) {
