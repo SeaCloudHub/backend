@@ -3980,6 +3980,9 @@ const docTemplate = `{
                 "is_dir": {
                     "type": "boolean"
                 },
+                "is_starred": {
+                    "type": "boolean"
+                },
                 "log": {
                     "$ref": "#/definitions/file.Log"
                 },
