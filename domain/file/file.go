@@ -44,6 +44,7 @@ type Store interface {
 	Star(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	Unstar(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) error
 	ListStarred(ctx context.Context, userID uuid.UUID, cursor *pagination.Cursor, filter Filter) ([]File, error)
+	IsStarred(ctx context.Context, fileID uuid.UUID, userID uuid.UUID) (bool, error)
 	GetAllFiles(ctx context.Context, path ...string) ([]File, error)
 	ListRootDirectory(ctx context.Context, pager *pagination.Pager) ([]File, error)
 	ListUserFiles(ctx context.Context, userID uuid.UUID) ([]*File, error)
@@ -80,6 +81,7 @@ type File struct {
 	Parent    *SimpleFile    `json:"parent,omitempty"`
 	Log       *Log           `json:"log,omitempty"`
 	UserRoles []string       `json:"userRoles"`
+	IsStarred bool           `json:"is_starred"`
 
 	more bool
 } // @name file.File
@@ -115,6 +117,12 @@ func (f *File) WithPath(path string) *File {
 
 func (f *File) WithUserRoles(roles []string) *File {
 	f.UserRoles = roles
+
+	return f
+}
+
+func (f *File) WithIsStarred(isStarred bool) *File {
+	f.IsStarred = isStarred
 
 	return f
 }

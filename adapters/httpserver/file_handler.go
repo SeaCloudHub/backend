@@ -566,7 +566,7 @@ func (s *Server) ListEntries(c echo.Context) error {
 		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 	}
 
-	files = s.mapUserRoles(ctx, user, files)
+	files = s.mapUserRolesAndStarred(ctx, user, files)
 
 	return s.success(c, model.ListEntriesResponse{
 		Entries: files,
@@ -632,7 +632,7 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	files = s.mapUserRoles(ctx, user, files)
+	files = s.mapUserRolesAndStarred(ctx, user, files)
 
 	return s.success(c, model.ListPageEntriesResponse{
 		Entries:    files,
@@ -2043,6 +2043,13 @@ func (s *Server) GetShared(c echo.Context) error {
 
 	for i, f := range files {
 		files[i].WithUserRoles(userRoleByFileID[f.ID.String()])
+
+		IsStarred, err := s.FileStore.IsStarred(ctx, f.ID, user.ID)
+		if err != nil {
+			return s.error(c, apperror.ErrInternalServer(err))
+		}
+
+		files[i].WithIsStarred(IsStarred)
 	}
 
 	return s.success(c, model.GetSharedResponse{
@@ -2209,7 +2216,7 @@ func (s *Server) ListStarred(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	files = s.mapUserRoles(ctx, user, files)
+	files = s.mapUserRolesAndStarred(ctx, user, files)
 
 	return s.success(c, model.ListStarredResponse{
 		Entries: files,
@@ -2284,7 +2291,7 @@ func (s *Server) Search(c echo.Context) error {
 	}
 
 	entries := s.MapperService.FileWithParents(files, parents)
-	entries = s.mapUserRoles(ctx, user, entries)
+	entries = s.mapUserRolesAndStarred(ctx, user, entries)
 
 	return s.success(c, model.SearchResponse{
 		Entries: entries,
@@ -2339,7 +2346,7 @@ func (s *Server) ListSuggested(c echo.Context) error {
 
 	entries := s.MapperService.FileWithParents(files, parents)
 
-	entries = s.mapUserRoles(ctx, user, entries)
+	entries = s.mapUserRolesAndStarred(ctx, user, entries)
 
 	return s.success(c, entries)
 }
@@ -2505,13 +2512,19 @@ func (s *Server) RegisterFileRoutes(router *echo.Group) {
 
 }
 
-func (s *Server) mapUserRoles(ctx context.Context, user *identity.User, entries []file.File) []file.File {
+func (s *Server) mapUserRolesAndStarred(ctx context.Context, user *identity.User, entries []file.File) []file.File {
 	return lop.Map(entries, func(e file.File, i int) file.File {
 		userRoles, err := s.PermissionService.GetFileUserRoles(ctx, user.ID.String(), e.ID.String(), e.IsDir)
 		if err != nil {
 			return e
 		}
-		return *e.WithUserRoles(userRoles)
+
+		isStarred, err := s.FileStore.IsStarred(ctx, e.ID, user.ID)
+		if err != nil {
+			return e
+		}
+
+		return *e.WithUserRoles(userRoles).WithIsStarred(isStarred)
 	})
 }
 

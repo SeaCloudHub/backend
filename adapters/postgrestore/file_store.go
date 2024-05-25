@@ -738,6 +738,22 @@ func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID, cursor *p
 
 }
 
+func (s *FileStore) IsStarred(ctx context.Context, fileID, userID uuid.UUID) (bool, error) {
+	var starSchema StarSchema
+
+	if err := s.db.WithContext(ctx).
+		Where("file_id = ? AND user_id = ?", fileID, userID).
+		First(&starSchema).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return true, nil
+}
+
 func (s *FileStore) GetAllFiles(ctx context.Context, path ...string) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
