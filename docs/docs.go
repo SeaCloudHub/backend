@@ -2927,6 +2927,11 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "name": "cursor",
                         "in": "query"
                     },
@@ -2935,6 +2940,23 @@ const docTemplate = `{
                         "minimum": 1,
                         "type": "integer",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "folder",
+                            "text",
+                            "document",
+                            "pdf",
+                            "json",
+                            "image",
+                            "video",
+                            "audio",
+                            "archive",
+                            "other"
+                        ],
+                        "type": "string",
+                        "name": "type",
                         "in": "query"
                     }
                 ],

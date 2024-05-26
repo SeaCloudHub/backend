@@ -128,6 +128,46 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 	return files, nil
 }
 
+func (s *FileStore) ListTrash(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
+	var fileSchemas []FileSchema
+
+	// parse cursor
+	cursorObj, err := pagination.DecodeToken[fsCursor](cursor.Token)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
+	}
+
+	query := s.db.WithContext(ctx).Where("path = ?", dirpath).Where("finished_at IS NOT NULL").Where("name != ?", ".trash")
+	if cursorObj.UpdatedAt != nil {
+		query = query.Where("updated_at <= ?", cursorObj.UpdatedAt)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if err := query.Limit(cursor.Limit + 1).Order("updated_at DESC").Order("id ASC").Preload("Owner").
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	if len(fileSchemas) > cursor.Limit {
+		cursor.SetNextToken(pagination.EncodeToken(fsCursor{UpdatedAt: &fileSchemas[cursor.Limit].UpdatedAt}))
+		fileSchemas = fileSchemas[:cursor.Limit]
+	}
+
+	files := make([]file.File, len(fileSchemas))
+	for i, fileSchema := range fileSchemas {
+		files[i] = *fileSchema.ToDomainFile()
+	}
+
+	return files, nil
+}
+
 func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cursor, filter file.Filter) ([]file.File, error) {
 	var fileSchemas []FileSchema
 
@@ -873,6 +913,7 @@ func (s *FileStore) DeleteStarByUserID(ctx context.Context, userID uuid.UUID) er
 
 type fsCursor struct {
 	CreatedAt *time.Time
+	UpdatedAt *time.Time
 }
 
 type logCursor struct {

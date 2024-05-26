@@ -62,8 +62,10 @@ type ListEntriesResponse struct {
 } // @name model.ListEntriesResponse
 
 type ListTrashRequest struct {
-	Limit  int    `query:"limit" validate:"omitempty,min=1,max=100"`
-	Cursor string `query:"cursor" validate:"omitempty,base64url"`
+	Limit  int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Cursor string     `query:"cursor" validate:"omitempty,base64url"`
+	Type   string     `query:"type" validate:"omitempty,oneof=folder text document pdf json image video audio archive other"`
+	After  *time.Time `query:"after" validate:"omitempty"`
 }
 
 func (r *ListTrashRequest) Validate(ctx context.Context) error {
