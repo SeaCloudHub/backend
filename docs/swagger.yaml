@@ -2870,6 +2870,9 @@ paths:
         required: true
         type: string
       - in: query
+        name: after
+        type: string
+      - in: query
         name: cursor
         type: string
       - in: query
@@ -2877,6 +2880,20 @@ paths:
         minimum: 1
         name: limit
         type: integer
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
       produces:
       - application/json
       responses:

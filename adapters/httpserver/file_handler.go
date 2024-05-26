@@ -676,7 +676,8 @@ func (s *Server) ListTrash(c echo.Context) error {
 	}
 
 	cursor := pagination.NewCursor(req.Cursor, req.Limit)
-	files, err := s.FileStore.ListCursor(ctx, trash.FullPath(), cursor, file.Filter{})
+	filter := file.NewFilter(req.Type, req.After)
+	files, err := s.FileStore.ListTrash(ctx, trash.FullPath(), cursor, filter)
 	if err != nil {
 		if errors.Is(err, file.ErrInvalidCursor) {
 			return s.error(c, apperror.ErrInvalidParam(err))
