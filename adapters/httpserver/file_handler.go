@@ -113,8 +113,10 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	isStarred, err := s.FileStore.IsStarred(ctx, f.ID, uuid.MustParse(id.ID))
+
 	return s.success(c, model.GetMetadataResponse{
-		File:    *f.Response().WithUserRoles(userRoles),
+		File:    *f.Response().WithUserRoles(userRoles).WithIsStarred(isStarred),
 		Parents: parents,
 		Users:   users,
 	})
@@ -690,6 +692,8 @@ func (s *Server) ListTrash(c echo.Context) error {
 		files[i] = *files[i].Response()
 	}
 
+	files = s.mapUserRolesAndStarred(ctx, user, files)
+
 	return s.success(c, model.ListTrashResponse{
 		Entries: files,
 		Cursor:  cursor.NextToken(),
@@ -1227,9 +1231,15 @@ func (s *Server) CopyFiles(c echo.Context) error {
 				return
 			}
 
+			userRoles, err := s.PermissionService.GetFileUserRoles(ctx, user.ID.String(), f.ID.String(), f.IsDir)
+			if err != nil {
+				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+				return
+			}
+
 			m.Lock()
 			defer m.Unlock()
-			resp = append(resp, *f.Response())
+			resp = append(resp, *f.Response().WithUserRoles(userRoles))
 		})
 	}
 
@@ -2473,6 +2483,8 @@ func (s *Server) ListFileSizes(c echo.Context) error {
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
+
+	sizes = s.mapUserRolesAndStarred(ctx, user, sizes)
 
 	return s.success(c, model.ListFileSizesResponse{
 		Entries: sizes,
