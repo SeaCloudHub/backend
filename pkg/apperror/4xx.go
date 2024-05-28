@@ -22,6 +22,7 @@ const (
 	RefreshTokenRequiredCode    = "403008"
 	EntityNotFoundCode          = "404006"
 	IdentityNotFoundCode        = "404007"
+	IdentityAlreadyExistsCode   = "409001"
 )
 
 // 400 Bad Request
@@ -94,4 +95,9 @@ func ErrEntityNotFound(err error) Error {
 
 func ErrIdentityNotFound(err error) Error {
 	return NewError(err, http.StatusNotFound, IdentityNotFoundCode, "Identity not found")
+}
+
+// 409 Conflict
+func ErrIdentityAlreadyExists(err error) Error {
+	return NewError(err, http.StatusConflict, IdentityAlreadyExistsCode, "Identity already exists")
 }

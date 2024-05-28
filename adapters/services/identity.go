@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/SeaCloudHub/backend/pkg/pagination"
 
@@ -219,6 +220,10 @@ func (s *IdentityService) CreateIdentity(ctx context.Context, in identity.Simple
 	).Execute()
 	if err != nil {
 		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			if genericErr.Error.GetCode() == http.StatusConflict {
+				return nil, identity.ErrIdentityAlreadyExists
+			}
+
 			return nil, fmt.Errorf("error creating identity: %s", genericErr.Error.GetReason())
 		}
 
@@ -254,6 +259,10 @@ func (s *IdentityService) CreateMultipleIdentities(ctx context.Context,
 			Identities: identitiesPatch}).Execute()
 	if err != nil {
 		if _, genericErr := assertKratosError[kratos.ErrorGeneric](err); genericErr != nil {
+			if genericErr.Error.GetCode() == http.StatusConflict {
+				return nil, identity.ErrIdentityAlreadyExists
+			}
+
 			return nil, fmt.Errorf("error creating identities: %s", genericErr.Error.Message)
 		}
 

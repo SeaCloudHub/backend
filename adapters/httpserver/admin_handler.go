@@ -102,6 +102,10 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 
 	id, err := s.IdentityService.CreateIdentity(ctx, s.MapperService.ToIdentity(req))
 	if err != nil {
+		if errors.Is(err, identity.ErrIdentityAlreadyExists) {
+			return s.error(c, apperror.ErrIdentityAlreadyExists(err))
+		}
+
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
@@ -158,6 +162,10 @@ func (s *Server) CreateMultipleIdentities(c echo.Context) error {
 
 	ids, err := s.IdentityService.CreateMultipleIdentities(ctx, simpleIdentities)
 	if err != nil {
+		if errors.Is(err, identity.ErrIdentityAlreadyExists) {
+			return s.error(c, apperror.ErrIdentityAlreadyExists(err))
+		}
+
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 

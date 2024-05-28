@@ -114,6 +114,9 @@ func (s *Server) GetMetadata(c echo.Context) error {
 	}
 
 	isStarred, err := s.FileStore.IsStarred(ctx, f.ID, uuid.MustParse(id.ID))
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
 
 	return s.success(c, model.GetMetadataResponse{
 		File:    *f.Response().WithUserRoles(userRoles).WithIsStarred(isStarred),
