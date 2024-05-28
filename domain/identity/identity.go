@@ -10,13 +10,14 @@ import (
 )
 
 var (
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrIncorrectPassword   = errors.New("incorrect password")
-	ErrInvalidPassword     = errors.New("invalid password")
-	ErrInvalidSession      = errors.New("invalid session")
-	ErrSessionTooOld       = errors.New("session too old")
-	ErrIdentityNotFound    = errors.New("identity not found")
-	ErrIdentityWasDisabled = errors.New("identity was disabled")
+	ErrInvalidCredentials    = errors.New("invalid credentials")
+	ErrIncorrectPassword     = errors.New("incorrect password")
+	ErrInvalidPassword       = errors.New("invalid password")
+	ErrInvalidSession        = errors.New("invalid session")
+	ErrSessionTooOld         = errors.New("session too old")
+	ErrIdentityNotFound      = errors.New("identity not found")
+	ErrIdentityWasDisabled   = errors.New("identity was disabled")
+	ErrIdentityAlreadyExists = errors.New("identity already exists")
 )
 
 type Service interface {
