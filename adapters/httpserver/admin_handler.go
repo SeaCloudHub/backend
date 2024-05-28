@@ -84,6 +84,7 @@ func (s *Server) ListIdentities(c echo.Context) error {
 // @Success 200 {object} model.SuccessResponse{data=identity.Identity}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 409 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /admin/identities [post]
 func (s *Server) CreateIdentity(c echo.Context) error {
@@ -137,6 +138,7 @@ func (s *Server) CreateIdentity(c echo.Context) error {
 // @Success 200 {object} model.SuccessResponse{data=[]identity.Identity}
 // @Failure 400 {object} model.ErrorResponse
 // @Failure 401 {object} model.ErrorResponse
+// @Failure 409 {object} model.ErrorResponse
 // @Failure 500 {object} model.ErrorResponse
 // @Router /admin/identities/bulk [post]
 func (s *Server) CreateMultipleIdentities(c echo.Context) error {

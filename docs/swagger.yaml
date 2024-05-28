@@ -797,6 +797,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/model.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1157,6 +1161,10 @@ paths:
             $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/model.ErrorResponse'
         "500":
