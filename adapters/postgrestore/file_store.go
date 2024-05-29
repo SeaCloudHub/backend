@@ -1041,7 +1041,9 @@ func (s *FileStore) ListFiles(ctx context.Context, path string, cursor *paginati
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path)).Where("finished_at IS NOT NULL")
+	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path)).
+		Where("finished_at IS NOT NULL").
+		Where("is_dir = ?", false)
 	if cursorObj.CreatedAt != nil {
 		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
 	}
