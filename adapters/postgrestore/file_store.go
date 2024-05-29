@@ -949,14 +949,14 @@ func (s *FileStore) ReadLogs(ctx context.Context, userID string, cursor *paginat
 
 	query := s.db.WithContext(ctx).Preload("User").Preload("File")
 	if cursorObj.CreatedAt != nil {
-		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+		query = query.Where("created_at <= ?", cursorObj.CreatedAt)
 	}
 
 	if userID != "" {
 		query = query.Where("user_id = ?", userID)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Find(&logSchemas).Error; err != nil {
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC, id DESC").Find(&logSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
