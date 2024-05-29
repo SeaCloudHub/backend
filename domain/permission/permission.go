@@ -78,6 +78,10 @@ func NewCreatePermission(userID string, fileID string, isDir bool, role string) 
 }
 
 type FileUser struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
+	UserID    string `json:"user_id"`
+	Role      string `json:"role"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	AvatarURL string `json:"avatar_url"`
 } // @name permission.FileUser

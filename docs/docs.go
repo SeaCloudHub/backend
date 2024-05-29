@@ -5024,6 +5024,18 @@ const docTemplate = `{
         "permission.FileUser": {
             "type": "object",
             "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
                 "role": {
                     "type": "string"
                 },
