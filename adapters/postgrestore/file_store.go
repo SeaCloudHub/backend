@@ -99,7 +99,7 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 
 	query := s.db.WithContext(ctx).Where("path = ?", dirpath).Where("finished_at IS NOT NULL").Where("name != ?", ".trash")
 	if cursorObj.CreatedAt != nil {
-		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+		query = query.Where("created_at <= ?", cursorObj.CreatedAt)
 	}
 
 	if filter.Type != "" {
@@ -110,7 +110,7 @@ func (s *FileStore) ListCursor(ctx context.Context, dirpath string, cursor *pagi
 		query = query.Where("updated_at > ?", filter.After)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Order("id DESC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -184,7 +184,7 @@ func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cur
 	}
 
 	if cursorObj.CreatedAt != nil {
-		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+		query = query.Where("created_at <= ?", cursorObj.CreatedAt)
 	}
 
 	if filter.Type != "" {
@@ -195,7 +195,7 @@ func (s *FileStore) Search(ctx context.Context, q string, cursor *pagination.Cur
 		query = query.Where("updated_at > ?", filter.After)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Order("id DESC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -328,7 +328,7 @@ func (s *FileStore) ListByIDsAndCursor(ctx context.Context, ids []string,
 
 	query := s.db.WithContext(ctx).Where("id IN ?", ids).Where("finished_at IS NOT NULL")
 	if cursorObj.CreatedAt != nil {
-		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+		query = query.Where("created_at <= ?", cursorObj.CreatedAt)
 	}
 
 	if filter.Type != "" {
@@ -339,7 +339,7 @@ func (s *FileStore) ListByIDsAndCursor(ctx context.Context, ids []string,
 		query = query.Where("updated_at > ?", filter.After)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("created_at ASC").Order("id ASC").Preload("Owner").
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Order("id DESC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -748,7 +748,7 @@ func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID, cursor *p
 		Where("stars.user_id = ?", userID)
 
 	if cursorObj.CreatedAt != nil {
-		query = query.Where("files.created_at >= ?", cursorObj.CreatedAt)
+		query = query.Where("files.created_at <= ?", cursorObj.CreatedAt)
 	}
 
 	if filter.Type != "" {
@@ -759,7 +759,7 @@ func (s *FileStore) ListStarred(ctx context.Context, userID uuid.UUID, cursor *p
 		query = query.Where("files.updated_at > ?", filter.After)
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Order("files.created_at ASC").Preload("Owner").
+	if err := query.Limit(cursor.Limit + 1).Order("files.created_at DESC").Preload("Owner").
 		Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
@@ -1012,7 +1012,7 @@ func (s *FileStore) ListActivities(ctx context.Context, fileID uuid.UUID, cursor
 
 	query := s.db.WithContext(ctx).Preload("User").Where("file_id = ?", fileID)
 	if cursorObj.CreatedAt != nil {
-		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+		query = query.Where("created_at <= ?", cursorObj.CreatedAt)
 	}
 
 	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Find(&logSchemas).Error; err != nil {
@@ -1041,9 +1041,11 @@ func (s *FileStore) ListFiles(ctx context.Context, path string, cursor *paginati
 		return nil, fmt.Errorf("%w: %w", file.ErrInvalidCursor, err)
 	}
 
-	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path)).Where("finished_at IS NOT NULL")
+	query := s.db.WithContext(ctx).Where("path ~ ?", fmt.Sprintf(`^(\%s(\/.*)?)?$`, path)).
+		Where("finished_at IS NOT NULL").
+		Where("is_dir = ?", false)
 	if cursorObj.CreatedAt != nil {
-		query = query.Where("created_at >= ?", cursorObj.CreatedAt)
+		query = query.Where("created_at <= ?", cursorObj.CreatedAt)
 	}
 
 	if filter.Type != "" {
@@ -1060,7 +1062,7 @@ func (s *FileStore) ListFiles(ctx context.Context, path string, cursor *paginati
 		query = query.Order("size DESC")
 	}
 
-	if err := query.Limit(cursor.Limit + 1).Find(&fileSchemas).Error; err != nil {
+	if err := query.Limit(cursor.Limit + 1).Order("created_at DESC").Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
