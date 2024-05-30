@@ -357,7 +357,7 @@ func (s *Server) UploadFiles(c echo.Context) error {
 
 		wp.Submit(func() {
 			// save files
-			f, err := s.createFile(ctx, e, src, file.Filename, user.ID, false)
+			f, err := s.createFile(ctx, e, src, file.Filename, user.ID, false, nil)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -508,7 +508,7 @@ func (s *Server) UploadChunk(c echo.Context) error {
 		}
 
 		// create file
-		f, err = s.createFile(ctx, e, mpFile, fileHeader.Filename, user.ID, true)
+		f, err = s.createFile(ctx, e, mpFile, fileHeader.Filename, user.ID, true, nil)
 		if err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}
@@ -1261,7 +1261,7 @@ func (s *Server) CopyFiles(c echo.Context) error {
 
 			newName := fmt.Sprintf("Copy of %s", e.Name)
 
-			f, err := s.createFile(ctx, dest, src, newName, user.ID, false)
+			f, err := s.createFile(ctx, dest, src, newName, user.ID, false, e.Thumbnail)
 			if err != nil {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
@@ -2579,7 +2579,7 @@ func (s *Server) mapUserRolesAndStarred(ctx context.Context, user *identity.User
 	})
 }
 
-func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID, more bool) (*file.File, error) {
+func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Reader, filename string, ownerID uuid.UUID, more bool, thumbnail *string) (*file.File, error) {
 	id := uuid.New()
 
 	contentType, src, err := app.DetectContentType(reader)
@@ -2597,7 +2597,7 @@ func (s *Server) createFile(ctx context.Context, parent *file.File, reader io.Re
 		return nil, fmt.Errorf("get metadata: %w", err)
 	}
 
-	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID).WithMore(more)
+	f := entry.ToFile(filename).WithID(id).WithPath(parent.FullPath()).WithOwnerID(ownerID).WithMore(more).WithThumbnail(thumbnail)
 	if err := s.FileStore.Create(ctx, f); err != nil {
 		return nil, fmt.Errorf("create file: %w", err)
 	}
