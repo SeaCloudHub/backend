@@ -173,6 +173,12 @@ func (f *File) WithMore(more bool) *File {
 	return f
 }
 
+func (f *File) WithThumbnail(thumbnail *string) *File {
+	f.Thumbnail = thumbnail
+
+	return f
+}
+
 func (f *File) IsRoot() bool {
 	return f.Path == "" || f.Path == "/"
 }

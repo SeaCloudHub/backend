@@ -38,6 +38,7 @@ func (s *FileStore) Create(ctx context.Context, f *file.File) error {
 		IsDir:         f.IsDir,
 		GeneralAccess: "restricted",
 		OwnerID:       f.OwnerID,
+		Thumbnail:     f.Thumbnail,
 	}
 
 	query := s.db.WithContext(ctx)
