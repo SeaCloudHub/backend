@@ -118,6 +118,30 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	userIDs := lo.Map(users, func(user permission.FileUser, _ int) string {
+		return user.UserID
+	})
+
+	userDetails, err := s.UserStore.ListByIDs(ctx, userIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	userDetalMap := lo.KeyBy(userDetails, func(userDetail identity.User) string {
+		return userDetail.ID.String()
+	})
+
+	users = lo.Map(users, func(user permission.FileUser, _ int) permission.FileUser {
+		u := userDetalMap[user.UserID]
+
+		user.Email = u.Email
+		user.FirstName = u.FirstName
+		user.LastName = u.LastName
+		user.AvatarURL = u.AvatarURL
+
+		return user
+	})
+
 	return s.success(c, model.GetMetadataResponse{
 		File:    *f.Response().WithUserRoles(userRoles).WithIsStarred(isStarred),
 		Parents: parents,
@@ -840,6 +864,12 @@ func (s *Server) Share(c echo.Context) error {
 		return u.ID
 	})
 
+	for _, userID := range userIDs {
+		if userID == user.ID {
+			return s.error(c, apperror.ErrInvalidRequest(errors.New("cannot share with yourself")))
+		}
+	}
+
 	if err := s.FileStore.UpsertShare(ctx, e.ID, userIDs, req.Role); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -1441,8 +1471,9 @@ func (s *Server) Move(c echo.Context) error {
 // @Router /files/rename [patch]
 func (s *Server) Rename(c echo.Context) error {
 	var (
-		ctx = app.NewEchoContextAdapter(c)
-		req model.RenameFileRequest
+		ctx     = app.NewEchoContextAdapter(c)
+		req     model.RenameFileRequest
+		canEdit bool
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -1464,12 +1495,12 @@ func (s *Server) Rename(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	canEdit, err := func() (bool, error) {
-		if e.IsDir {
-			return s.PermissionService.CanEditDirectory(ctx, user.ID.String(), e.ID.String())
-		}
-		return s.PermissionService.CanEditFile(ctx, user.ID.String(), e.ID.String())
-	}()
+	if e.IsDir {
+		canEdit, err = s.PermissionService.CanEditDirectory(ctx, user.ID.String(), e.ID.String())
+	} else {
+		canEdit, err = s.PermissionService.CanEditFile(ctx, user.ID.String(), e.ID.String())
+	}
+
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
@@ -2092,8 +2123,9 @@ func (s *Server) GetShared(c echo.Context) error {
 // @Router /files/star [patch]
 func (s *Server) Star(c echo.Context) error {
 	var (
-		ctx = app.NewEchoContextAdapter(c)
-		req model.StarRequest
+		ctx     = app.NewEchoContextAdapter(c)
+		req     model.StarRequest
+		canView bool
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -2116,12 +2148,12 @@ func (s *Server) Star(c echo.Context) error {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
-		canView, err := func() (bool, error) {
-			if e.IsDir {
-				return s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
-			}
-			return s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
-		}()
+		if e.IsDir {
+			canView, err = s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
+		} else {
+			canView, err = s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
+		}
+
 		if err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}

@@ -181,6 +181,20 @@ func (s *UserStore) ListByEmails(ctx context.Context, emails []string) ([]identi
 	return users, nil
 }
 
+func (s *UserStore) ListByIDs(ctx context.Context, ids []string) ([]identity.User, error) {
+	var userSchemas []UserSchema
+	if err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&userSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	users := make([]identity.User, 0, len(userSchemas))
+	for _, userSchema := range userSchemas {
+		users = append(users, *userSchema.ToDomainUser())
+	}
+
+	return users, nil
+}
+
 func (s *UserStore) FuzzySearch(ctx context.Context, query string) ([]identity.User, error) {
 	var userSchemas []UserSchema
 
