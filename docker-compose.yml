@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     expose:
-      - "8088"
+      - '8088'
     deploy:
       replicas: 3
     networks:
@@ -16,8 +16,8 @@ services:
     image: jwilder/nginx-proxy
     container_name: nginx-proxy
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     environment:
       - ENABLE_IPV6=true
     privileged: true
@@ -32,7 +32,7 @@ services:
     networks:
       - seacloudhub
     labels:
-      - "nginx_proxy=true"
+      - 'nginx_proxy=true'
 
   letsencrypt-nginx-proxy:
     image: jrcs/letsencrypt-nginx-proxy-companion
@@ -41,6 +41,9 @@ services:
       - vhostd:/etc/nginx/vhost.d
       - nginxcerts:/etc/nginx/certs:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - RENEW_PRIVATE_KEYS = false
+      - LETSENCRYPT_TEST = false
     privileged: true
     volumes_from:
       - nginx-proxy
