@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -1732,6 +1733,12 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
+	// if the previous path is not found, restore to the root directory
+	root, err := s.FileStore.GetByID(ctx, user.RootID.String())
+	if err != nil {
+		return s.error(c, apperror.ErrEntityNotFound(err))
+	}
+
 	var resp []file.File
 
 	wp := workerpool.New(10)
@@ -1744,29 +1751,29 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 
 		wp.Submit(func() {
 			dest, err := s.FileStore.GetByFullPath(ctx, *e.PreviousPath)
-			if err != nil {
+			if err != nil && !errors.Is(err, file.ErrNotFound) {
 				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 				return
 			}
 
-			// check if user has edit permission to the destination directory
-			canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), dest.ID.String())
-			if err != nil {
-				s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
-				return
-			}
-
-			if !canEdit {
-				// if user has no edit permission to the destination directory, restore to root directory
-				dest, err = s.FileStore.GetByID(ctx, e.Owner.RootID.String())
+			if errors.Is(err, file.ErrNotFound) {
+				dest = root
+			} else {
+				// check if user has edit permission to the destination directory
+				canEdit, err := s.PermissionService.CanEditDirectory(ctx, user.ID.String(), dest.ID.String())
 				if err != nil {
 					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+					return
+				}
+
+				if !canEdit {
+					s.Logger.Errorw(permission.ErrNotPermittedToEdit.Error(), zap.String("request_id", s.requestID(c)))
 					return
 				}
 			}
 
 			dstPath := strings.Replace(e.Path, src.FullPath(), dest.FullPath(), 1)
-			path := e.Path
+			path := e.FullPath()
 
 			// update parent relationship
 			if e.IsDir {
@@ -1789,7 +1796,7 @@ func (s *Server) RestoreFromTrash(c echo.Context) error {
 			totalSize := e.Size
 
 			if e.IsDir {
-				children, err := s.FileStore.RestoreChildrenFromTrash(ctx, path, dstPath)
+				children, err := s.FileStore.RestoreChildrenFromTrash(ctx, path, filepath.Join(dstPath, e.Name))
 				if err != nil {
 					s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
 					return
