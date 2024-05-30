@@ -567,8 +567,10 @@ func (s *Server) ListEntries(c echo.Context) error {
 	}
 
 	// write log
-	if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionOpen)}); err != nil {
-		s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+	if !e.IsRoot() {
+		if err := s.FileStore.WriteLogs(ctx, []file.Log{file.NewLog(e.ID, user.ID, file.LogActionOpen)}); err != nil {
+			s.Logger.Errorw(err.Error(), zap.String("request_id", s.requestID(c)))
+		}
 	}
 
 	files = s.mapUserRolesAndStarred(ctx, user, files)
@@ -632,7 +634,8 @@ func (s *Server) ListPageEntries(c echo.Context) error {
 	}
 
 	pager := pagination.NewPager(req.Page, req.Limit)
-	files, err := s.FileStore.ListPager(ctx, e.FullPath(), pager)
+	filter := file.NewFilter(req.Type, req.After)
+	files, err := s.FileStore.ListPager(ctx, e.FullPath(), pager, filter, req.Query)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}

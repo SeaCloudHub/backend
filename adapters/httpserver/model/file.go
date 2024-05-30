@@ -82,9 +82,12 @@ type ListTrashResponse struct {
 } // @name model.ListTrashResponse
 
 type ListPageEntriesRequest struct {
-	ID    string `param:"id" validate:"required,uuid" swaggerignore:"true"`
-	Page  int    `query:"page" validate:"required,min=1"`
-	Limit int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	ID    string     `param:"id" validate:"required,uuid" swaggerignore:"true"`
+	Page  int        `query:"page" validate:"required,min=1"`
+	Limit int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Query string     `query:"query" validate:"omitempty"`
+	Type  string     `query:"type" validate:"omitempty,oneof=folder text document pdf json image video audio archive other"`
+	After *time.Time `query:"after" validate:"omitempty"`
 } // @name model.ListPageEntriesRequest
 
 func (r *ListPageEntriesRequest) Validate(ctx context.Context) error {

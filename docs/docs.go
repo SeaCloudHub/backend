@@ -572,6 +572,11 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
                         "maximum": 100,
                         "minimum": 1,
                         "type": "integer",
@@ -584,6 +589,28 @@ const docTemplate = `{
                         "name": "page",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "name": "query",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "folder",
+                            "text",
+                            "document",
+                            "pdf",
+                            "json",
+                            "image",
+                            "video",
+                            "audio",
+                            "archive",
+                            "other"
+                        ],
+                        "type": "string",
+                        "name": "type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -3528,6 +3555,11 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
                         "maximum": 100,
                         "minimum": 1,
                         "type": "integer",
@@ -3540,6 +3572,28 @@ const docTemplate = `{
                         "name": "page",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "name": "query",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "folder",
+                            "text",
+                            "document",
+                            "pdf",
+                            "json",
+                            "image",
+                            "video",
+                            "audio",
+                            "archive",
+                            "other"
+                        ],
+                        "type": "string",
+                        "name": "type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
