@@ -58,24 +58,36 @@ func (s *FileStore) Create(ctx context.Context, f *file.File) error {
 	return nil
 }
 
-func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagination.Pager) ([]file.File, error) {
+func (s *FileStore) ListPager(ctx context.Context, dirpath string, pager *pagination.Pager, filter file.Filter, q string) ([]file.File, error) {
 	var (
 		fileSchemas []FileSchema
 		total       int64
 	)
 
-	if err := s.db.WithContext(ctx).Model(&fileSchemas).Where("finished_at IS NOT NULL").
-		Where("path = ?", dirpath).
-		Count(&total).Error; err != nil {
+	query := s.db.WithContext(ctx).Model(&fileSchemas).Where("finished_at IS NOT NULL").Where("path = ?", dirpath)
+	if q != "" {
+		query = query.Order(fmt.Sprintf("similarity(name, '%s') DESC", q))
+	}
+
+	query.Order("created_at DESC")
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	if filter.After != nil {
+		query = query.Where("updated_at > ?", filter.After)
+	}
+
+	if err := query.WithContext(ctx).Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}
 
 	pager.SetTotal(total)
 
 	offset, limit := pager.Do()
-	if err := s.db.WithContext(ctx).
+	if err := query.WithContext(ctx).
 		Preload("Owner").
-		Where("path = ?", dirpath).Where("finished_at IS NOT NULL").
 		Offset(offset).Limit(limit).Find(&fileSchemas).Error; err != nil {
 		return nil, fmt.Errorf("unexpected error: %w", err)
 	}

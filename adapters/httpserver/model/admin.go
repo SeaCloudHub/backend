@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"time"
 
 	"github.com/SeaCloudHub/backend/domain/file"
 	"github.com/SeaCloudHub/backend/domain/identity"
@@ -38,7 +39,7 @@ type CreateIdentityRequest struct {
 	Password  string `json:"password" validate:"required,min=8" csv:"password"`
 	FirstName string `json:"first_name" validate:"omitempty,max=50" csv:"first_name"`
 	LastName  string `json:"last_name" validate:"omitempty,max=50" csv:"last_name"`
-	AvatarURL string `json:"avatar_url" validate:"omitempty,url" csv:"avatar_url"`
+	AvatarURL string `json:"avatar_url" validate:"omitempty,url|filepath" csv:"avatar_url"`
 } // @name model.CreateIdentityRequest
 
 func (r *CreateIdentityRequest) Validate() error {
@@ -119,9 +120,12 @@ func (r *ChangeUserStorageCapacityRequest) Validate() error {
 }
 
 type GetUserFilesRequest struct {
-	IdentityId string `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
-	Page       int    `query:"page" validate:"required,min=1"`
-	Limit      int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	IdentityId string     `param:"identity_id" validate:"required,uuid" swaggerignore:"true"`
+	Page       int        `query:"page" validate:"required,min=1"`
+	Limit      int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Query      string     `query:"query" validate:"omitempty"`
+	Type       string     `query:"type" validate:"omitempty,oneof=folder text document pdf json image video audio archive other"`
+	After      *time.Time `query:"after" validate:"omitempty"`
 } // @name model.GetUserFilesRequest
 
 func (r *GetUserFilesRequest) Validate(ctx context.Context) error {

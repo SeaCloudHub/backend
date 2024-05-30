@@ -955,6 +955,9 @@ paths:
         required: true
         type: string
       - in: query
+        name: after
+        type: string
+      - in: query
         maximum: 100
         minimum: 1
         name: limit
@@ -964,6 +967,23 @@ paths:
         name: page
         required: true
         type: integer
+      - in: query
+        name: query
+        type: string
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
       produces:
       - application/json
       responses:
@@ -1751,6 +1771,9 @@ paths:
         required: true
         type: string
       - in: query
+        name: after
+        type: string
+      - in: query
         maximum: 100
         minimum: 1
         name: limit
@@ -1760,6 +1783,23 @@ paths:
         name: page
         required: true
         type: integer
+      - in: query
+        name: query
+        type: string
+      - enum:
+        - folder
+        - text
+        - document
+        - pdf
+        - json
+        - image
+        - video
+        - audio
+        - archive
+        - other
+        in: query
+        name: type
+        type: string
       produces:
       - application/json
       responses:

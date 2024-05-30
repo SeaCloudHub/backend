@@ -14,7 +14,7 @@ import (
 
 type Store interface {
 	Create(ctx context.Context, file *File) error
-	ListPager(ctx context.Context, dirpath string, pager *pagination.Pager) ([]File, error)
+	ListPager(ctx context.Context, dirpath string, pager *pagination.Pager, filter Filter, query string) ([]File, error)
 	ListCursor(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	ListTrash(ctx context.Context, dirpath string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	Search(ctx context.Context, query string, cursor *pagination.Cursor, filter Filter) ([]File, error)
@@ -171,6 +171,10 @@ func (f *File) WithMore(more bool) *File {
 	f.more = more
 
 	return f
+}
+
+func (f *File) IsRoot() bool {
+	return f.Path == "" || f.Path == "/"
 }
 
 type SimpleFile struct {

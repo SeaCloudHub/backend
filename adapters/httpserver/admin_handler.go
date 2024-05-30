@@ -496,7 +496,8 @@ func (s *Server) GetIdentityFiles(c echo.Context) error {
 	}
 
 	pager := pagination.NewPager(req.Page, req.Limit)
-	files, err := s.FileStore.ListPager(ctx, userDir.FullPath(), pager)
+	filter := file.NewFilter(req.Type, req.After)
+	files, err := s.FileStore.ListPager(ctx, userDir.FullPath(), pager, filter, req.Query)
 	if err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
