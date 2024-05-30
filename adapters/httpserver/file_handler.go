@@ -118,18 +118,28 @@ func (s *Server) GetMetadata(c echo.Context) error {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 
-	users = lop.Map(users, func(u permission.FileUser, _ int) permission.FileUser {
-		user, err := s.UserStore.GetByID(ctx, u.UserID)
-		if err != nil {
-			return u
-		}
+	userIDs := lo.Map(users, func(user permission.FileUser, _ int) string {
+		return user.UserID
+	})
 
-		u.Email = user.Email
-		u.FirstName = user.FirstName
-		u.LastName = user.LastName
-		u.AvatarURL = user.AvatarURL
+	userDetails, err := s.UserStore.ListByIDs(ctx, userIDs)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
 
-		return u
+	userDetalMap := lo.KeyBy(userDetails, func(userDetail identity.User) string {
+		return userDetail.ID.String()
+	})
+
+	users = lo.Map(users, func(user permission.FileUser, _ int) permission.FileUser {
+		u := userDetalMap[user.UserID]
+
+		user.Email = u.Email
+		user.FirstName = u.FirstName
+		user.LastName = u.LastName
+		user.AvatarURL = u.AvatarURL
+
+		return user
 	})
 
 	return s.success(c, model.GetMetadataResponse{
@@ -2113,8 +2123,9 @@ func (s *Server) GetShared(c echo.Context) error {
 // @Router /files/star [patch]
 func (s *Server) Star(c echo.Context) error {
 	var (
-		ctx = app.NewEchoContextAdapter(c)
-		req model.StarRequest
+		ctx     = app.NewEchoContextAdapter(c)
+		req     model.StarRequest
+		canView bool
 	)
 
 	if err := c.Bind(&req); err != nil {
@@ -2137,12 +2148,12 @@ func (s *Server) Star(c echo.Context) error {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}
 
-		canView, err := func() (bool, error) {
-			if e.IsDir {
-				return s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
-			}
-			return s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
-		}()
+		if e.IsDir {
+			canView, err = s.PermissionService.CanViewDirectory(ctx, user.ID.String(), e.ID.String())
+		} else {
+			canView, err = s.PermissionService.CanViewFile(ctx, user.ID.String(), e.ID.String())
+		}
+
 		if err != nil {
 			return s.error(c, apperror.ErrInternalServer(err))
 		}

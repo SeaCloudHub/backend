@@ -21,6 +21,7 @@ type Store interface {
 	GetAll(ctx context.Context) ([]User, error)
 	List(ctx context.Context, pagination *pagination.Pager, filter Filter) ([]User, error)
 	ListByEmails(ctx context.Context, emails []string) ([]User, error)
+	ListByIDs(ctx context.Context, userIDs []string) ([]User, error)
 	FuzzySearch(ctx context.Context, keyword string) ([]User, error)
 	UpdateStorageCapacity(ctx context.Context, userID uuid.UUID, storageCapacity uint64) error
 	ToggleActive(ctx context.Context, userID uuid.UUID) error
