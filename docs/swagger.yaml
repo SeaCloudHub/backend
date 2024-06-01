@@ -423,6 +423,15 @@ definitions:
     - id
     - source_ids
     type: object
+  model.OverviewUser:
+    properties:
+      active_users:
+        type: integer
+      blocked_users:
+        type: integer
+      total_users:
+        type: integer
+    type: object
   model.RenameFileRequest:
     properties:
       id:
@@ -494,6 +503,8 @@ definitions:
         additionalProperties:
           type: integer
         type: object
+      overview_user:
+        $ref: '#/definitions/model.OverviewUser'
       statistic_user:
         items:
           $ref: '#/definitions/model.StatisticUserComparison'

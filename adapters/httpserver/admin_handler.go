@@ -315,6 +315,7 @@ func (s *Server) Statistics(c echo.Context) error {
 	var totalStorageUsage uint64
 
 	statisticUserByMonthMap := make(map[string]model.StatisticUser)
+	overviewUser := model.OverviewUser{}
 	for _, user := range users {
 		month := ""
 		if user.IsActive {
@@ -328,10 +329,13 @@ func (s *Server) Statistics(c echo.Context) error {
 		// Update statistics based on user's status
 		if user.IsActive {
 			statisticUser.ActiveUsers++
+			overviewUser.ActiveUsers++
 		} else {
 			statisticUser.BlockedUsers++
+			overviewUser.BlockedUsers++
 		}
 		statisticUser.TotalUsers++
+		overviewUser.TotalUsers++
 		statisticUserByMonthMap[month] = statisticUser
 
 		// Update totalStorageUsage
@@ -363,6 +367,7 @@ func (s *Server) Statistics(c echo.Context) error {
 
 	resp := model.StatisticsResponse{
 		StatisticUser:        comparison,
+		OverviewUser:         overviewUser,
 		StatisticUserByMonth: statisticUserByMonthMap,
 		TotalStorageUsage:    totalStorageUsage,
 		TotalStorageCapacity: 30 << 30, // 30GB
