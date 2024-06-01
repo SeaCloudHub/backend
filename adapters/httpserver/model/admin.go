@@ -65,6 +65,12 @@ type StatisticUser struct {
 	BlockedUsers int `json:"blocked_users"`
 } // @name model.StatisticUser
 
+type OverviewUser struct {
+	TotalUsers   int `json:"total_users"`
+	ActiveUsers  int `json:"active_users"`
+	BlockedUsers int `json:"blocked_users"`
+} // @name model.OverviewUser
+
 type StatisticUserComparison struct {
 	Name       string  `json:"name"`
 	Value      int     `json:"value"`
@@ -105,6 +111,7 @@ func calculatePercentageChange(old, new int) float64 {
 
 type StatisticsResponse struct {
 	StatisticUser        []StatisticUserComparison `json:"statistic_user"`
+	OverviewUser         OverviewUser              `json:"overview_user"`
 	StatisticUserByMonth map[string]StatisticUser  `json:"statistic_user_by_month"`
 	TotalStorageUsage    uint64                    `json:"total_storage_usage"`
 	TotalStorageCapacity uint64                    `json:"total_storage_capacity"`

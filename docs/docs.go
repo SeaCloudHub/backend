@@ -4691,6 +4691,20 @@ const docTemplate = `{
                 }
             }
         },
+        "model.OverviewUser": {
+            "type": "object",
+            "properties": {
+                "active_users": {
+                    "type": "integer"
+                },
+                "blocked_users": {
+                    "type": "integer"
+                },
+                "total_users": {
+                    "type": "integer"
+                }
+            }
+        },
         "model.RenameFileRequest": {
             "type": "object",
             "required": [
@@ -4797,6 +4811,9 @@ const docTemplate = `{
                     "additionalProperties": {
                         "type": "integer"
                     }
+                },
+                "overview_user": {
+                    "$ref": "#/definitions/model.OverviewUser"
                 },
                 "statistic_user": {
                     "type": "array",
