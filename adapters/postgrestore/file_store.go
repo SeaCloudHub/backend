@@ -422,6 +422,25 @@ func (s *FileStore) ListSelected(ctx context.Context, parent *file.File, ids []s
 	return files, nil
 }
 
+func (s *FileStore) ListChildren(ctx context.Context, parent *file.File) ([]file.File, error) {
+	var (
+		fileSchemas []FileSchema
+		files       []file.File
+	)
+
+	if err := s.db.WithContext(ctx).Where("finished_at IS NOT NULL").
+		Where("path ~ ?", fmt.Sprintf(`^\%s(\/.*)?$`, parent.FullPath())).
+		Find(&fileSchemas).Error; err != nil {
+		return nil, fmt.Errorf("unexpected error: %w", err)
+	}
+
+	for _, fileSchema := range fileSchemas {
+		files = append(files, *fileSchema.ToDomainFile())
+	}
+
+	return files, nil
+}
+
 func (s *FileStore) ListSelectedChildren(ctx context.Context, path string, ids []string) ([]file.File, error) {
 	var (
 		fileSchemas []FileSchema

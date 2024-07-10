@@ -8,6 +8,7 @@ import (
 	"github.com/SeaCloudHub/backend/domain/permission"
 	"github.com/SeaCloudHub/backend/pkg/config"
 	keto "github.com/ory/keto-client-go"
+	"github.com/samber/lo"
 )
 
 type PermissionService struct {
@@ -74,6 +75,32 @@ func (s *PermissionService) CreatePermission(ctx context.Context, in *permission
 			Relation:  keto.PtrString(in.Relation),
 		},
 	).Execute()
+	if err != nil {
+		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
+			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())
+		}
+
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
+func (s *PermissionService) CreatePermissions(ctx context.Context, in []permission.CreatePermission) error {
+	relationshipPatch := lo.Map(in, func(p permission.CreatePermission, _ int) keto.RelationshipPatch {
+		return keto.RelationshipPatch{
+			Action: keto.PtrString("insert"),
+			RelationTuple: &keto.Relationship{
+				Namespace: p.Namespace,
+				Object:    p.FileID,
+				SubjectId: &p.UserID,
+				Relation:  p.Relation,
+			},
+		}
+
+	})
+
+	_, err := s.writeClient.RelationshipApi.PatchRelationships(ctx).RelationshipPatch(relationshipPatch).Execute()
 	if err != nil {
 		if _, genericErr := assertKetoError[keto.ErrorGeneric](err); genericErr != nil {
 			return fmt.Errorf("unexpected error: %s", genericErr.Error.GetReason())

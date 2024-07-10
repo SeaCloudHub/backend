@@ -985,9 +985,22 @@ func (s *Server) Access(c echo.Context) error {
 		}
 	}
 
+	// get all child files and directories
+	entries, err := s.FileStore.ListChildren(ctx, e)
+	if err != nil {
+		return s.error(c, apperror.ErrInternalServer(err))
+	}
+
+	params := lo.Map(entries, func(e file.File, _ int) permission.CreatePermission {
+		p := permission.NewCreatePermission(user.ID.String(), e.ID.String(), e.IsDir, role)
+		return *p
+	})
+
+	fp := permission.NewCreatePermission(user.ID.String(), e.ID.String(), e.IsDir, role)
+	params = append(params, *fp)
+
 	// add permissions
-	if err := s.PermissionService.CreatePermission(ctx, permission.NewCreatePermission(
-		user.ID.String(), e.ID.String(), e.IsDir, role)); err != nil {
+	if err := s.PermissionService.CreatePermissions(ctx, params); err != nil {
 		return s.error(c, apperror.ErrInternalServer(err))
 	}
 

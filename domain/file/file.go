@@ -26,6 +26,7 @@ type Store interface {
 	ListByIDs(ctx context.Context, ids []string) ([]File, error)
 	ListByIDsAndCursor(ctx context.Context, ids []string, cursor *pagination.Cursor, filter Filter) ([]File, error)
 	ListByFullPaths(ctx context.Context, fullPaths []string) ([]SimpleFile, error)
+	ListChildren(ctx context.Context, parent *File) ([]File, error)
 	ListSelected(ctx context.Context, parent *File, ids []string) ([]File, error)
 	ListSelectedChildren(ctx context.Context, path string, ids []string) ([]File, error)
 	ListSelectedOwnedChildren(ctx context.Context, userID uuid.UUID, parent *File, ids []string) ([]File, error)
